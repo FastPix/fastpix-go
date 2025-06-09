@@ -38,7 +38,7 @@
 {"Time":"2025-05-25T22:37:42.105979+05:30","Action":"pass","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestDirectUploadVideoMedia","Elapsed":0.38}
 {"Time":"2025-05-25T22:37:42.106018+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream"}
 {"Time":"2025-05-25T22:37:42.106035+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream","Output":"=== RUN   TestManageLivestream\n"}
-{"Time":"2025-05-25T22:37:42.106048+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream","Output":"    managelivestream_test.go:21: Using livestream server URL: https://v1.fastpix.io/live\n"}
+{"Time":"2025-05-25T22:37:42.106048+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream","Output":"    managelivestream_test.go:21: Using livestream server URL: https://api.fastpix.io/live\n"}
 {"Time":"2025-05-25T22:37:42.37131+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream","Output":"    managelivestream_test.go:66: Full Response Details:\n"}
 {"Time":"2025-05-25T22:37:42.371401+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream","Output":"    managelivestream_test.go:68: Success: true\n"}
 {"Time":"2025-05-25T22:37:42.371649+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestManageLivestream","Output":"    managelivestream_test.go:73: Raw resp.GetStreamsResponse.Data: [\n"}
@@ -277,7 +277,7 @@
 {"Time":"2025-05-25T22:37:46.745281+05:30","Action":"pass","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestComprehensiveMediaOperations","Elapsed":3.15}
 {"Time":"2025-05-25T22:37:46.745291+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback"}
 {"Time":"2025-05-25T22:37:46.745296+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback","Output":"=== RUN   TestPlayback\n"}
-{"Time":"2025-05-25T22:37:46.745315+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback","Output":"    playback_test.go:20: Using livestream server URL: https://v1.fastpix.io/live\n"}
+{"Time":"2025-05-25T22:37:46.745315+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback","Output":"    playback_test.go:20: Using livestream server URL: https://api.fastpix.io/live\n"}
 {"Time":"2025-05-25T22:37:47.043168+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback/LiveStreamPlayback"}
 {"Time":"2025-05-25T22:37:47.043238+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback/LiveStreamPlayback","Output":"=== RUN   TestPlayback/LiveStreamPlayback\n"}
 {"Time":"2025-05-25T22:37:47.043249+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback/LiveStreamPlayback/CreatePlaybackIDOfStream"}
@@ -317,7 +317,7 @@
 {"Time":"2025-05-25T22:37:48.196961+05:30","Action":"fail","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestPlayback","Elapsed":1.45}
 {"Time":"2025-05-25T22:37:48.196988+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream"}
 {"Time":"2025-05-25T22:37:48.197009+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream","Output":"=== RUN   TestSimulcastStream\n"}
-{"Time":"2025-05-25T22:37:48.19704+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream","Output":"    simulcaststream_test.go:20: Using livestream server URL: https://v1.fastpix.io/live\n"}
+{"Time":"2025-05-25T22:37:48.19704+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream","Output":"    simulcaststream_test.go:20: Using livestream server URL: https://api.fastpix.io/live\n"}
 {"Time":"2025-05-25T22:37:48.580792+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream/CreateSimulcastOfStream"}
 {"Time":"2025-05-25T22:37:48.580944+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream/CreateSimulcastOfStream","Output":"=== RUN   TestSimulcastStream/CreateSimulcastOfStream\n"}
 {"Time":"2025-05-25T22:37:49.728558+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream/CreateSimulcastOfStream","Output":"    simulcaststream_test.go:69: CreateSimulcastOfStream response: {\n"}
@@ -368,7 +368,7 @@
 {"Time":"2025-05-25T22:37:51.172257+05:30","Action":"pass","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestSimulcastStream","Elapsed":2.98}
 {"Time":"2025-05-25T22:37:51.172293+05:30","Action":"run","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream"}
 {"Time":"2025-05-25T22:37:51.172324+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream","Output":"=== RUN   TestCreateNewStream\n"}
-{"Time":"2025-05-25T22:37:51.172364+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream","Output":"    startlivestream_test.go:19: Using livestream server URL: https://v1.fastpix.io/live\n"}
+{"Time":"2025-05-25T22:37:51.172364+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream","Output":"    startlivestream_test.go:19: Using livestream server URL: https://api.fastpix.io/live\n"}
 {"Time":"2025-05-25T22:37:52.036318+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream","Output":"    startlivestream_test.go:59: Successfully created a new stream\n"}
 {"Time":"2025-05-25T22:37:52.03669+05:30","Action":"output","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream","Output":"--- PASS: TestCreateNewStream (0.86s)\n"}
 {"Time":"2025-05-25T22:37:52.036785+05:30","Action":"pass","Package":"github.com/FastPix/fastpix-go/tests","Test":"TestCreateNewStream","Elapsed":0.86}

@@ -32,7 +32,7 @@
     inputvideo_test.go:127: Successfully got upload URL: https://storage-iad01.fastpix.io/uploads/c7fb87b2-34c9-40b6-a313-e0f1392677dc/ba41b659-4462-4622-90a5-351687103589?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=on-demand-svc%2F20250525%2Fiad01%2Fs3%2Faws4_request&X-Amz-Date=20250525T180420Z&X-Amz-Expires=14400&X-Amz-SignedHeaders=host&X-Amz-Signature=41c3c6b3c9a7460fa4033a6e32c866cd4ff5be800c19ed0c13c4f88c5c721707
 --- PASS: TestDirectUploadVideoMedia (0.64s)
 === RUN   TestManageLivestream
-    managelivestream_test.go:21: Using livestream server URL: https://v1.fastpix.io/live
+    managelivestream_test.go:21: Using livestream server URL: https://api.fastpix.io/live
     managelivestream_test.go:66: Full Response Details:
     managelivestream_test.go:68: Success: true
     managelivestream_test.go:73: Raw resp.GetStreamsResponse.Data: [
@@ -261,8 +261,8 @@
 === RUN   TestComprehensiveMediaOperations
 --- PASS: TestComprehensiveMediaOperations (3.08s)
 === RUN   TestLiveStreamPlayback
-    playback_test.go:23: Using livestream server URL: https://v1.fastpix.io/live
-    playback_test.go:24: Using base server URL: https://v1.fastpix.io
+    playback_test.go:23: Using livestream server URL: https://api.fastpix.io/live
+    playback_test.go:24: Using base server URL: https://api.fastpix.io
     playback_test.go:59: Using stream ID: f26fbd6bf3b108dbadad0a1be8886805
 === RUN   TestLiveStreamPlayback/CreatePlaybackID
     playback_test.go:132: CreatePlaybackIDOfStream response: {
@@ -289,8 +289,8 @@
         --- PASS: TestLiveStreamPlayback/CreatePlaybackID/GetPlaybackID (0.94s)
         --- PASS: TestLiveStreamPlayback/CreatePlaybackID/DeletePlaybackID (0.65s)
 === RUN   TestMediaPlayback
-    playback_test.go:23: Using livestream server URL: https://v1.fastpix.io/live
-    playback_test.go:24: Using base server URL: https://v1.fastpix.io
+    playback_test.go:23: Using livestream server URL: https://api.fastpix.io/live
+    playback_test.go:24: Using base server URL: https://api.fastpix.io
     playback_test.go:89: Created media asset with ID: 3cdd30ad-0dff-42a4-8136-de5bd2e7999b
     playback_test.go:97: Media asset status: Processing
     playback_test.go:97: Media asset status: Processing
@@ -314,7 +314,7 @@
 --- PASS: TestMediaPlayback (61.85s)
     --- PASS: TestMediaPlayback/CreatePlaybackID (1.00s)
 === RUN   TestSimulcastStream
-    simulcaststream_test.go:20: Using livestream server URL: https://v1.fastpix.io/live
+    simulcaststream_test.go:20: Using livestream server URL: https://api.fastpix.io/live
 === RUN   TestSimulcastStream/CreateSimulcastOfStream
     simulcaststream_test.go:69: CreateSimulcastOfStream response: {
           "success": true,
@@ -355,7 +355,7 @@
         --- PASS: TestSimulcastStream/CreateSimulcastOfStream/UpdateSpecificSimulcastOfStream (1.07s)
         --- PASS: TestSimulcastStream/CreateSimulcastOfStream/DeleteSimulcastOfStream (0.43s)
 === RUN   TestCreateNewStream
-    startlivestream_test.go:19: Using livestream server URL: https://v1.fastpix.io/live
+    startlivestream_test.go:19: Using livestream server URL: https://api.fastpix.io/live
     startlivestream_test.go:59: Successfully created a new stream
 --- PASS: TestCreateNewStream (1.06s)
 PASS
