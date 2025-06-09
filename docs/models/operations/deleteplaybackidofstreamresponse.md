@@ -1,0 +1,9 @@
+# DeletePlaybackIDOfStreamResponse
+
+
+## Fields
+
+| Field                                                                                       | Type                                                                                        | Required                                                                                    | Description                                                                                 | Example                                                                                     |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `HTTPMeta`                                                                                  | [components.HTTPMetadata](../../models/components/httpmetadata.md)                          | :heavy_check_mark:                                                                          | N/A                                                                                         |                                                                                             |
+| `LiveStreamDeleteResponse`                                                                  | [*components.LiveStreamDeleteResponse](../../models/components/livestreamdeleteresponse.md) | :heavy_minus_sign:                                                                          | Stream's playbackId deleted successfully                                                    | {<br/>"success": true<br/>}                                                                 |

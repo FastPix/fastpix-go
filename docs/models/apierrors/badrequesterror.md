@@ -1,0 +1,10 @@
+# BadRequestError
+
+
+## Fields
+
+| Field                                                                     | Type                                                                      | Required                                                                  | Description                                                               | Example                                                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `Success`                                                                 | **bool*                                                                   | :heavy_minus_sign:                                                        | Demonstrates whether the request is successful or not.                    | false                                                                     |
+| `Error`                                                                   | [*components.BadRequestError](../../models/components/badrequesterror.md) | :heavy_minus_sign:                                                        | Displays details about the reasons behind the request's failure.          |                                                                           |
+| `HTTPMeta`                                                                | [components.HTTPMetadata](../../models/components/httpmetadata.md)        | :heavy_check_mark:                                                        | N/A                                                                       |                                                                           |

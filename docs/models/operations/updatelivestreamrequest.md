@@ -1,0 +1,9 @@
+# UpdateLiveStreamRequest
+
+
+## Fields
+
+| Field                                                                                   | Type                                                                                    | Required                                                                                | Description                                                                             | Example                                                                                 |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `StreamID`                                                                              | *string*                                                                                | :heavy_check_mark:                                                                      | Upon creating a new live stream, FastPix assigns a unique identifier to the stream.     | 91a264dcc447b63da6fb79ef925cd76d                                                        |
+| `PatchLiveStreamRequest`                                                                | [*components.PatchLiveStreamRequest](../../models/components/patchlivestreamrequest.md) | :heavy_minus_sign:                                                                      | N/A                                                                                     | {<br/>"metadata": {<br/>"livestream_name": "Gaming_stream"<br/>},<br/>"reconnectWindow": 100<br/>} |

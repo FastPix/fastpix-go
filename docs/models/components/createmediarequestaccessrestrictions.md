@@ -1,0 +1,9 @@
+# CreateMediaRequestAccessRestrictions
+
+
+## Fields
+
+| Field                                                                                               | Type                                                                                                | Required                                                                                            | Description                                                                                         |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `Domains`                                                                                           | [*components.CreateMediaRequestDomains](../../models/components/createmediarequestdomains.md)       | :heavy_minus_sign:                                                                                  | N/A                                                                                                 |
+| `UserAgents`                                                                                        | [*components.CreateMediaRequestUserAgents](../../models/components/createmediarequestuseragents.md) | :heavy_minus_sign:                                                                                  | N/A                                                                                                 |

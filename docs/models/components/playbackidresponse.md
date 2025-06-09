@@ -1,0 +1,11 @@
+# PlaybackIDResponse
+
+Displays the result of the request.
+
+
+## Fields
+
+| Field                                                                                                   | Type                                                                                                    | Required                                                                                                | Description                                                                                             | Example                                                                                                 |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `Success`                                                                                               | **bool*                                                                                                 | :heavy_minus_sign:                                                                                      | It demonstrates whether the request is successful or not.                                               | true                                                                                                    |
+| `Data`                                                                                                  | [*components.PlaybackIDResponseData](../../models/components/playbackidresponsedata.md)                 | :heavy_minus_sign:                                                                                      | N/A                                                                                                     | {<br/>"success": true,<br/>"data": {<br/>"id": "88b7ac0f-2504-4dd5-b7b4-d84ab4fee1bd",<br/>"accessPolicy": "public"<br/>}<br/>} |
