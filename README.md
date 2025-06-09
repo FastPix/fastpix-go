@@ -173,7 +173,7 @@ The default server can be overridden globally using the `WithServerURL(serverURL
 
 ```go
 sdk := fastpixgo.New(
-	fastpixgo.WithServerURL("https://api.fastpix.io/live"),
+	fastpixgo.WithServerURL("https://api.fastpix.io/v1/live"),
 	fastpixgo.WithSecurity(components.Security{
 		Username: fastpixgo.String("your-username"),
 		Password: fastpixgo.String("your-password"),
