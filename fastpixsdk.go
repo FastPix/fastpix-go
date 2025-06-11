@@ -13,8 +13,8 @@ import (
 
 // ServerList contains the list of servers available to the SDK
 var ServerList = []string{
-	// LIVE STREAM
-	"https://api.fastpix.io/v1/live",
+	//On demand streaming
+	"https://api.fastpix.io/v1/on-demand",
 }
 
 // HTTPClient provides an interface for suplying the SDK with a custom HTTP client
