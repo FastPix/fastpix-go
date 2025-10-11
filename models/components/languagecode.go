@@ -1,0 +1,212 @@
+
+
+package components
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// LanguageCode - Language code for content localization
+type LanguageCode string
+
+const (
+	LanguageCodeArSa LanguageCode = "ar-SA"
+	LanguageCodeBnBd LanguageCode = "bn-BD"
+	LanguageCodeBnIn LanguageCode = "bn-IN"
+	LanguageCodeCaEs LanguageCode = "ca-ES"
+	LanguageCodeCsCz LanguageCode = "cs-CZ"
+	LanguageCodeDaDk LanguageCode = "da-DK"
+	LanguageCodeDeAt LanguageCode = "de-AT"
+	LanguageCodeDeCh LanguageCode = "de-CH"
+	LanguageCodeDeDe LanguageCode = "de-DE"
+	LanguageCodeElGr LanguageCode = "el-GR"
+	LanguageCodeEnAu LanguageCode = "en-AU"
+	LanguageCodeEnCa LanguageCode = "en-CA"
+	LanguageCodeEnGb LanguageCode = "en-GB"
+	LanguageCodeEnIe LanguageCode = "en-IE"
+	LanguageCodeEnIn LanguageCode = "en-IN"
+	LanguageCodeEnNz LanguageCode = "en-NZ"
+	LanguageCodeEnUs LanguageCode = "en-US"
+	LanguageCodeEnZa LanguageCode = "en-ZA"
+	LanguageCodeEsAr LanguageCode = "es-AR"
+	LanguageCodeEsCl LanguageCode = "es-CL"
+	LanguageCodeEsCo LanguageCode = "es-CO"
+	LanguageCodeEsEs LanguageCode = "es-ES"
+	LanguageCodeEsMx LanguageCode = "es-MX"
+	LanguageCodeEsUs LanguageCode = "es-US"
+	LanguageCodeFiFi LanguageCode = "fi-FI"
+	LanguageCodeFrBe LanguageCode = "fr-BE"
+	LanguageCodeFrCa LanguageCode = "fr-CA"
+	LanguageCodeFrCh LanguageCode = "fr-CH"
+	LanguageCodeFrFr LanguageCode = "fr-FR"
+	LanguageCodeHeIl LanguageCode = "he-IL"
+	LanguageCodeHiIn LanguageCode = "hi-IN"
+	LanguageCodeHrHr LanguageCode = "hr-HR"
+	LanguageCodeHuHu LanguageCode = "hu-HU"
+	LanguageCodeIDID LanguageCode = "id-ID"
+	LanguageCodeItCh LanguageCode = "it-CH"
+	LanguageCodeItIt LanguageCode = "it-IT"
+	LanguageCodeJaJp LanguageCode = "ja-JP"
+	LanguageCodeKoKr LanguageCode = "ko-KR"
+	LanguageCodeMsMy LanguageCode = "ms-MY"
+	LanguageCodeNbNo LanguageCode = "nb-NO"
+	LanguageCodeNlBe LanguageCode = "nl-BE"
+	LanguageCodeNlNl LanguageCode = "nl-NL"
+	LanguageCodeNoNo LanguageCode = "no-NO"
+	LanguageCodePlPl LanguageCode = "pl-PL"
+	LanguageCodePtBr LanguageCode = "pt-BR"
+	LanguageCodePtPt LanguageCode = "pt-PT"
+	LanguageCodeRoRo LanguageCode = "ro-RO"
+	LanguageCodeRuRu LanguageCode = "ru-RU"
+	LanguageCodeSkSk LanguageCode = "sk-SK"
+	LanguageCodeSvSe LanguageCode = "sv-SE"
+	LanguageCodeTaIn LanguageCode = "ta-IN"
+	LanguageCodeTaLk LanguageCode = "ta-LK"
+	LanguageCodeTeIn LanguageCode = "te-IN"
+	LanguageCodeThTh LanguageCode = "th-TH"
+	LanguageCodeTrTr LanguageCode = "tr-TR"
+	LanguageCodeUkUa LanguageCode = "uk-UA"
+	LanguageCodeViVn LanguageCode = "vi-VN"
+	LanguageCodeBgBg LanguageCode = "bg-BG"
+	LanguageCodeZhCn LanguageCode = "zh-CN"
+	LanguageCodeZhHk LanguageCode = "zh-HK"
+	LanguageCodeZhTw LanguageCode = "zh-TW"
+)
+
+func (e LanguageCode) ToPointer() *LanguageCode {
+	return &e
+}
+func (e *LanguageCode) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch v {
+	case "ar-SA":
+		fallthrough
+	case "bn-BD":
+		fallthrough
+	case "bn-IN":
+		fallthrough
+	case "ca-ES":
+		fallthrough
+	case "cs-CZ":
+		fallthrough
+	case "da-DK":
+		fallthrough
+	case "de-AT":
+		fallthrough
+	case "de-CH":
+		fallthrough
+	case "de-DE":
+		fallthrough
+	case "el-GR":
+		fallthrough
+	case "en-AU":
+		fallthrough
+	case "en-CA":
+		fallthrough
+	case "en-GB":
+		fallthrough
+	case "en-IE":
+		fallthrough
+	case "en-IN":
+		fallthrough
+	case "en-NZ":
+		fallthrough
+	case "en-US":
+		fallthrough
+	case "en-ZA":
+		fallthrough
+	case "es-AR":
+		fallthrough
+	case "es-CL":
+		fallthrough
+	case "es-CO":
+		fallthrough
+	case "es-ES":
+		fallthrough
+	case "es-MX":
+		fallthrough
+	case "es-US":
+		fallthrough
+	case "fi-FI":
+		fallthrough
+	case "fr-BE":
+		fallthrough
+	case "fr-CA":
+		fallthrough
+	case "fr-CH":
+		fallthrough
+	case "fr-FR":
+		fallthrough
+	case "he-IL":
+		fallthrough
+	case "hi-IN":
+		fallthrough
+	case "hr-HR":
+		fallthrough
+	case "hu-HU":
+		fallthrough
+	case "id-ID":
+		fallthrough
+	case "it-CH":
+		fallthrough
+	case "it-IT":
+		fallthrough
+	case "ja-JP":
+		fallthrough
+	case "ko-KR":
+		fallthrough
+	case "ms-MY":
+		fallthrough
+	case "nb-NO":
+		fallthrough
+	case "nl-BE":
+		fallthrough
+	case "nl-NL":
+		fallthrough
+	case "no-NO":
+		fallthrough
+	case "pl-PL":
+		fallthrough
+	case "pt-BR":
+		fallthrough
+	case "pt-PT":
+		fallthrough
+	case "ro-RO":
+		fallthrough
+	case "ru-RU":
+		fallthrough
+	case "sk-SK":
+		fallthrough
+	case "sv-SE":
+		fallthrough
+	case "ta-IN":
+		fallthrough
+	case "ta-LK":
+		fallthrough
+	case "te-IN":
+		fallthrough
+	case "th-TH":
+		fallthrough
+	case "tr-TR":
+		fallthrough
+	case "uk-UA":
+		fallthrough
+	case "vi-VN":
+		fallthrough
+	case "bg-BG":
+		fallthrough
+	case "zh-CN":
+		fallthrough
+	case "zh-HK":
+		fallthrough
+	case "zh-TW":
+		*e = LanguageCode(v)
+		return nil
+	default:
+		return fmt.Errorf("invalid value for LanguageCode: %v", v)
+	}
+}

@@ -1,0 +1,105 @@
+
+
+package operations
+
+import (
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/models/components"
+)
+
+type UpdateMediaSummaryRequestBody struct {
+	// Enable or disable the summary feature for the media. Set to true to enable summary or false to disable.
+	//
+	Generate bool `json:"generate"`
+	// Specifies the desired word count for the generated summary.
+	// - The value must be between **30** and **250** words.
+	//
+	SummaryLength *int64 `default:"100" json:"summaryLength"`
+}
+
+func (u UpdateMediaSummaryRequestBody) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(u, "", false)
+}
+
+func (u *UpdateMediaSummaryRequestBody) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &u, "", false, []string{"generate"}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *UpdateMediaSummaryRequestBody) GetGenerate() bool {
+	if u == nil {
+		return false
+	}
+	return u.Generate
+}
+
+func (u *UpdateMediaSummaryRequestBody) GetSummaryLength() *int64 {
+	if u == nil {
+		return nil
+	}
+	return u.SummaryLength
+}
+
+type UpdateMediaSummaryRequest struct {
+	// The unique identifier assigned to the media when created. The value should be a valid UUID.
+	//
+	MediaID     string                        `pathParam:"style=simple,explode=false,name=mediaId"`
+	RequestBody UpdateMediaSummaryRequestBody `request:"mediaType=application/json"`
+}
+
+func (u *UpdateMediaSummaryRequest) GetMediaID() string {
+	if u == nil {
+		return ""
+	}
+	return u.MediaID
+}
+
+func (u *UpdateMediaSummaryRequest) GetRequestBody() UpdateMediaSummaryRequestBody {
+	if u == nil {
+		return UpdateMediaSummaryRequestBody{}
+	}
+	return u.RequestBody
+}
+
+// UpdateMediaSummaryResponseBody - Media details updated successfully with the generated summary
+type UpdateMediaSummaryResponseBody struct {
+	// Indicates if the request was successful or not.
+	Success *bool                       `json:"success,omitempty"`
+	Data    *components.SummaryResponse `json:"data,omitempty"`
+}
+
+func (u *UpdateMediaSummaryResponseBody) GetSuccess() *bool {
+	if u == nil {
+		return nil
+	}
+	return u.Success
+}
+
+func (u *UpdateMediaSummaryResponseBody) GetData() *components.SummaryResponse {
+	if u == nil {
+		return nil
+	}
+	return u.Data
+}
+
+type UpdateMediaSummaryResponse struct {
+	HTTPMeta components.HTTPMetadata `json:"-"`
+	// Media details updated successfully with the generated summary
+	Object *UpdateMediaSummaryResponseBody
+}
+
+func (u *UpdateMediaSummaryResponse) GetHTTPMeta() components.HTTPMetadata {
+	if u == nil {
+		return components.HTTPMetadata{}
+	}
+	return u.HTTPMeta
+}
+
+func (u *UpdateMediaSummaryResponse) GetObject() *UpdateMediaSummaryResponseBody {
+	if u == nil {
+		return nil
+	}
+	return u.Object
+}

@@ -1,0 +1,9 @@
+# GetDrmConfigurationByIDResponse
+
+
+## Fields
+
+| Field                                                                                                             | Type                                                                                                              | Required                                                                                                          | Description                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `HTTPMeta`                                                                                                        | [components.HTTPMetadata](../../models/components/httpmetadata.md)                                                | :heavy_check_mark:                                                                                                | N/A                                                                                                               |
+| `Object`                                                                                                          | [*operations.GetDrmConfigurationByIDResponseBody](../../models/operations/getdrmconfigurationbyidresponsebody.md) | :heavy_minus_sign:                                                                                                | DRM configuration retrieved successfully                                                                          |

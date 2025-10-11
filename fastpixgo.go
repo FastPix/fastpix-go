@@ -1,0 +1,222 @@
+
+
+package fastpixgo
+
+// Generated from OpenAPI doc version 1.0.0 and generator version 2.723.8
+
+import (
+	"context"
+	"fmt"
+	"github.com/FastPix/fastpix-go/internal/config"
+	"github.com/FastPix/fastpix-go/internal/hooks"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/retry"
+	"net/http"
+	"time"
+)
+
+// ServerList contains the list of servers available to the SDK
+var ServerList = []string{
+	// FastPix Video APIs
+	"https://api.fastpix.io/v1/",
+}
+
+// HTTPClient provides an interface for supplying the SDK with a custom HTTP client
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// String provides a helper function to return a pointer to a string
+func String(s string) *string { return &s }
+
+// Bool provides a helper function to return a pointer to a bool
+func Bool(b bool) *bool { return &b }
+
+// Int provides a helper function to return a pointer to an int
+func Int(i int) *int { return &i }
+
+// Int64 provides a helper function to return a pointer to an int64
+func Int64(i int64) *int64 { return &i }
+
+// Float32 provides a helper function to return a pointer to a float32
+func Float32(f float32) *float32 { return &f }
+
+// Float64 provides a helper function to return a pointer to a float64
+func Float64(f float64) *float64 { return &f }
+
+// Pointer provides a helper function to return a pointer to a type
+func Pointer[T any](v T) *T { return &v }
+
+// Fastpixgo - FASTPIX API'S: FastPix provides a comprehensive set of APIs that enable developers to manage both **on-demand media (video/audio)** and **live streaming experiences**, with built-in security features through **cryptographic signing keys**. These APIs cover the full lifecycle of content creation, management, distribution, playback, and secure access, making them ideal for building scalable video-first applications.
+// ### Media APIs (Video & Audio on Demand)
+// The **Media APIs** allow developers to create, retrieve, update, and delete media files, as well as manage metadata, playback settings, and additional tracks such as audio or subtitles. With these endpoints, developers can:
+// - Upload videos directly or create media from URLs.   - Manage playback permissions and configure playback IDs.   - Add multilingual audio or subtitle tracks for global audiences.   - Build robust video-on-demand (VOD) and audio-on-demand (AOD) libraries.
+// **Use case scenarios**   - **Video-on-Demand Platforms:** Manage large content libraries for streaming services.   - **E-Learning Solutions:** Upload and organize lecture videos, metadata, and playback settings.   - **Multilingual Content Delivery:** Add multiple language tracks or subtitles to serve global users.
+// ### Live Stream APIs
+// The **Live Stream APIs** simplify the process of creating, managing, and distributing live content. Developers can initiate broadcasts, configure stream settings, and extend streams to external platforms through simulcasting. These endpoints also support real-time interaction and customization of live events.
+// - Start and manage live broadcasts programmatically.   - Control stream metadata, privacy, and playback options.   - Simulcast to platforms like YouTube, Facebook, or Twitch.   - Update stream details and manage live playback IDs in real time.
+// **Use case scenarios**   - **Event Broadcasting:** Enable organizers to set up live streams for conferences, concerts, or webinars.   - **Creator Platforms:** Provide streamers with tools for broadcasting gameplay, tutorials, or vlogs with simulcasting support.   - **Corporate Streaming:** Deliver secure internal town halls or meetings with privacy and playback controls.
+// ### Video Data APIs
+// The **Video Data APIs** Provide insights into viewer interactions, performance metrics, and playback errors to optimize content delivery and user experience.
+//
+//   - Track video views, unique viewers, and engagement metrics
+//
+//   - Identify top-performing content and usage patterns
+//
+//   - Break down data by browser, device, or geography
+//
+//   - Detect playback errors and performance issues
+//
+//   - Enable data-driven content strategy decisions
+//
+//     **Use case scenarios**
+//
+//   - Analytics Dashboards: Monitor performance across content libraries
+//
+//   - Quality Monitoring: Diagnose and resolve playback issues
+//
+//   - Content Strategy Optimization: Identify high-value content
+//
+//   - User Behavior Insights: Understand audience interactions
+//
+// ### Signing Keys
+// FastPix also provides endpoints for managing **cryptographic signing keys**, which are essential for securely signing and verifying tokens, such as JSON Web Tokens (JWTs). These keys are critical for authenticating and authorizing API requests, as well as for protecting access to media assets.
+// - **Private key:** Used to create digital signatures (kept secret).   - **Public key:** Used to verify digital signatures (shared for verification).
+// By rotating and managing signing keys regularly, developers can maintain strong security practices and prevent unauthorized access.
+// **Use case scenarios**   - **Token-based authentication:** Validate user access to premium or subscription-based content.   - **Key rotation:** Regularly rotate keys to reduce risk of compromise.   - **Protect intellectual property:** Prevent unauthorized distribution of valuable media assets.   - **Control usage:** Restrict access to specific users, groups, or contexts.   - **Prevent tampering:** Ensure requested assets have not been modified.   - **Time-bound access:** Enable signed URLs with expiration for controlled viewing windows.
+type Fastpixgo struct {
+	SDKVersion        string
+	InputVideo        *InputVideo
+	ManageVideos      *ManageVideos
+	InVideoAIFeatures *InVideoAIFeatures
+	Playback          *Playback
+	Playlist          *Playlist
+	DRMConfigurations *DRMConfigurations
+	StartLiveStream   *StartLiveStream
+	ManageLiveStream  *ManageLiveStream
+	LivePlayback      *LivePlayback
+	SimulcastStream   *SimulcastStream
+	SigningKeys       *SigningKeys
+	Views             *Views
+	Dimensions        *Dimensions
+	Metrics           *Metrics
+	Errors            *Errors
+
+	sdkConfiguration config.SDKConfiguration
+	hooks            *hooks.Hooks
+}
+
+type SDKOption func(*Fastpixgo)
+
+// WithServerURL allows the overriding of the default server URL
+func WithServerURL(serverURL string) SDKOption {
+	return func(sdk *Fastpixgo) {
+		sdk.sdkConfiguration.ServerURL = serverURL
+	}
+}
+
+// WithTemplatedServerURL allows the overriding of the default server URL with a templated URL populated with the provided parameters
+func WithTemplatedServerURL(serverURL string, params map[string]string) SDKOption {
+	return func(sdk *Fastpixgo) {
+		if params != nil {
+			serverURL = utils.ReplaceParameters(serverURL, params)
+		}
+
+		sdk.sdkConfiguration.ServerURL = serverURL
+	}
+}
+
+// WithServerIndex allows the overriding of the default server by index
+func WithServerIndex(serverIndex int) SDKOption {
+	return func(sdk *Fastpixgo) {
+		if serverIndex < 0 || serverIndex >= len(ServerList) {
+			panic(fmt.Errorf("server index %d out of range", serverIndex))
+		}
+
+		sdk.sdkConfiguration.ServerIndex = serverIndex
+	}
+}
+
+// WithClient allows the overriding of the default HTTP client used by the SDK
+func WithClient(client HTTPClient) SDKOption {
+	return func(sdk *Fastpixgo) {
+		sdk.sdkConfiguration.Client = client
+	}
+}
+
+// WithSecurity configures the SDK to use the provided security details
+func WithSecurity(security components.Security) SDKOption {
+	return func(sdk *Fastpixgo) {
+		sdk.sdkConfiguration.Security = utils.AsSecuritySource(security)
+	}
+}
+
+// WithSecuritySource configures the SDK to invoke the Security Source function on each method call to determine authentication
+func WithSecuritySource(security func(context.Context) (components.Security, error)) SDKOption {
+	return func(sdk *Fastpixgo) {
+		sdk.sdkConfiguration.Security = func(ctx context.Context) (interface{}, error) {
+			return security(ctx)
+		}
+	}
+}
+
+func WithRetryConfig(retryConfig retry.Config) SDKOption {
+	return func(sdk *Fastpixgo) {
+		sdk.sdkConfiguration.RetryConfig = &retryConfig
+	}
+}
+
+// WithTimeout Optional request timeout applied to each operation
+func WithTimeout(timeout time.Duration) SDKOption {
+	return func(sdk *Fastpixgo) {
+		sdk.sdkConfiguration.Timeout = &timeout
+	}
+}
+
+// New creates a new instance of the SDK with the provided options
+func New(opts ...SDKOption) *Fastpixgo {
+	sdk := &Fastpixgo{
+		SDKVersion: "1.0.0",
+		sdkConfiguration: config.SDKConfiguration{
+			UserAgent:  "fastpix-sdk/go 1.0.0 2.723.8 1.0.0 github.com/FastPix/fastpix-go",
+			ServerList: ServerList,
+		},
+		hooks: hooks.New(),
+	}
+	for _, opt := range opts {
+		opt(sdk)
+	}
+
+	if sdk.sdkConfiguration.Security == nil {
+		var envVarSecurity components.Security
+		if utils.PopulateSecurityFromEnv(&envVarSecurity) {
+			sdk.sdkConfiguration.Security = utils.AsSecuritySource(envVarSecurity)
+		}
+	}
+
+	// Use WithClient to override the default client if you would like to customize the timeout
+	if sdk.sdkConfiguration.Client == nil {
+		sdk.sdkConfiguration.Client = &http.Client{Timeout: 60 * time.Second}
+	}
+
+	sdk.sdkConfiguration = sdk.hooks.SDKInit(sdk.sdkConfiguration)
+
+	sdk.InputVideo = newInputVideo(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.ManageVideos = newManageVideos(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.InVideoAIFeatures = newInVideoAIFeatures(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.Playback = newPlayback(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.Playlist = newPlaylist(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.DRMConfigurations = newDRMConfigurations(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.StartLiveStream = newStartLiveStream(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.ManageLiveStream = newManageLiveStream(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.LivePlayback = newLivePlayback(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.SimulcastStream = newSimulcastStream(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.SigningKeys = newSigningKeys(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.Views = newViews(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.Dimensions = newDimensions(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.Metrics = newMetrics(sdk, sdk.sdkConfiguration, sdk.hooks)
+	sdk.Errors = newErrors(sdk, sdk.sdkConfiguration, sdk.hooks)
+
+	return sdk
+}

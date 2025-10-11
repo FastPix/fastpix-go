@@ -1,0 +1,345 @@
+
+
+package operations
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/models/components"
+)
+
+// GetTimeseriesDataMetricID - Pass metric Id
+type GetTimeseriesDataMetricID string
+
+const (
+	GetTimeseriesDataMetricIDViews                         GetTimeseriesDataMetricID = "views"
+	GetTimeseriesDataMetricIDUniqueViewers                 GetTimeseriesDataMetricID = "unique_viewers"
+	GetTimeseriesDataMetricIDPlayingTime                   GetTimeseriesDataMetricID = "playing_time"
+	GetTimeseriesDataMetricIDQualityOfExperienceScore      GetTimeseriesDataMetricID = "quality_of_experience_score"
+	GetTimeseriesDataMetricIDPlaybackScore                 GetTimeseriesDataMetricID = "playback_score"
+	GetTimeseriesDataMetricIDPlaybackFailurePercentage     GetTimeseriesDataMetricID = "playback_failure_percentage"
+	GetTimeseriesDataMetricIDExitBeforeVideoStart          GetTimeseriesDataMetricID = "exit_before_video_start"
+	GetTimeseriesDataMetricIDVideoStartupFailurePercentage GetTimeseriesDataMetricID = "video_startup_failure_percentage"
+	GetTimeseriesDataMetricIDStartupScore                  GetTimeseriesDataMetricID = "startup_score"
+	GetTimeseriesDataMetricIDVideoStartupTime              GetTimeseriesDataMetricID = "video_startup_time"
+	GetTimeseriesDataMetricIDPlayerStartupTime             GetTimeseriesDataMetricID = "player_startup_time"
+	GetTimeseriesDataMetricIDPageLoadTime                  GetTimeseriesDataMetricID = "page_load_time"
+	GetTimeseriesDataMetricIDTotalStartupTime              GetTimeseriesDataMetricID = "total_startup_time"
+	GetTimeseriesDataMetricIDLiveStreamLatency             GetTimeseriesDataMetricID = "live_stream_latency"
+	GetTimeseriesDataMetricIDAverageBitrate                GetTimeseriesDataMetricID = "average_bitrate"
+	GetTimeseriesDataMetricIDBufferCount                   GetTimeseriesDataMetricID = "buffer_count"
+	GetTimeseriesDataMetricIDRenderQualityScore            GetTimeseriesDataMetricID = "render_quality_score"
+	GetTimeseriesDataMetricIDAvgUpscaling                  GetTimeseriesDataMetricID = "avg_upscaling"
+	GetTimeseriesDataMetricIDAvgDownscaling                GetTimeseriesDataMetricID = "avg_downscaling"
+	GetTimeseriesDataMetricIDMaxUpscaling                  GetTimeseriesDataMetricID = "max_upscaling"
+	GetTimeseriesDataMetricIDMaxDownscaling                GetTimeseriesDataMetricID = "max_downscaling"
+	GetTimeseriesDataMetricIDJumpLatency                   GetTimeseriesDataMetricID = "jump_latency"
+	GetTimeseriesDataMetricIDStabilityScore                GetTimeseriesDataMetricID = "stability_score"
+	GetTimeseriesDataMetricIDBufferRatio                   GetTimeseriesDataMetricID = "buffer_ratio"
+	GetTimeseriesDataMetricIDBufferFrequency               GetTimeseriesDataMetricID = "buffer_frequency"
+	GetTimeseriesDataMetricIDBufferFill                    GetTimeseriesDataMetricID = "buffer_fill"
+)
+
+func (e GetTimeseriesDataMetricID) ToPointer() *GetTimeseriesDataMetricID {
+	return &e
+}
+func (e *GetTimeseriesDataMetricID) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch v {
+	case "views":
+		fallthrough
+	case "unique_viewers":
+		fallthrough
+	case "playing_time":
+		fallthrough
+	case "quality_of_experience_score":
+		fallthrough
+	case "playback_score":
+		fallthrough
+	case "playback_failure_percentage":
+		fallthrough
+	case "exit_before_video_start":
+		fallthrough
+	case "video_startup_failure_percentage":
+		fallthrough
+	case "startup_score":
+		fallthrough
+	case "video_startup_time":
+		fallthrough
+	case "player_startup_time":
+		fallthrough
+	case "page_load_time":
+		fallthrough
+	case "total_startup_time":
+		fallthrough
+	case "live_stream_latency":
+		fallthrough
+	case "average_bitrate":
+		fallthrough
+	case "buffer_count":
+		fallthrough
+	case "render_quality_score":
+		fallthrough
+	case "avg_upscaling":
+		fallthrough
+	case "avg_downscaling":
+		fallthrough
+	case "max_upscaling":
+		fallthrough
+	case "max_downscaling":
+		fallthrough
+	case "jump_latency":
+		fallthrough
+	case "stability_score":
+		fallthrough
+	case "buffer_ratio":
+		fallthrough
+	case "buffer_frequency":
+		fallthrough
+	case "buffer_fill":
+		*e = GetTimeseriesDataMetricID(v)
+		return nil
+	default:
+		return fmt.Errorf("invalid value for GetTimeseriesDataMetricID: %v", v)
+	}
+}
+
+// GroupBy - Pass this value to group the metrics list by.
+type GroupBy string
+
+const (
+	GroupByMinute     GroupBy = "minute"
+	GroupByTenMinutes GroupBy = "ten_minutes"
+	GroupByHour       GroupBy = "hour"
+	GroupByDay        GroupBy = "day"
+)
+
+func (e GroupBy) ToPointer() *GroupBy {
+	return &e
+}
+func (e *GroupBy) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch v {
+	case "minute":
+		fallthrough
+	case "ten_minutes":
+		fallthrough
+	case "hour":
+		fallthrough
+	case "day":
+		*e = GroupBy(v)
+		return nil
+	default:
+		return fmt.Errorf("invalid value for GroupBy: %v", v)
+	}
+}
+
+// GetTimeseriesDataSortOrder - The order direction to sort the metrics list by.
+type GetTimeseriesDataSortOrder string
+
+const (
+	GetTimeseriesDataSortOrderAsc  GetTimeseriesDataSortOrder = "asc"
+	GetTimeseriesDataSortOrderDesc GetTimeseriesDataSortOrder = "desc"
+)
+
+func (e GetTimeseriesDataSortOrder) ToPointer() *GetTimeseriesDataSortOrder {
+	return &e
+}
+func (e *GetTimeseriesDataSortOrder) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch v {
+	case "asc":
+		fallthrough
+	case "desc":
+		*e = GetTimeseriesDataSortOrder(v)
+		return nil
+	default:
+		return fmt.Errorf("invalid value for GetTimeseriesDataSortOrder: %v", v)
+	}
+}
+
+// GetTimeseriesDataTimespan - This parameter specifies the time span between which the video views list should be retrieved by. You can provide either from and to unix epoch timestamps or time duration. The scope of duration is between 60 minutes to 30 days.
+type GetTimeseriesDataTimespan string
+
+const (
+	GetTimeseriesDataTimespanSixtyminutes    GetTimeseriesDataTimespan = "60:minutes"
+	GetTimeseriesDataTimespanSixhours        GetTimeseriesDataTimespan = "6:hours"
+	GetTimeseriesDataTimespanTwentyFourhours GetTimeseriesDataTimespan = "24:hours"
+	GetTimeseriesDataTimespanThreedays       GetTimeseriesDataTimespan = "3:days"
+	GetTimeseriesDataTimespanSevendays       GetTimeseriesDataTimespan = "7:days"
+	GetTimeseriesDataTimespanThirtydays      GetTimeseriesDataTimespan = "30:days"
+)
+
+func (e GetTimeseriesDataTimespan) ToPointer() *GetTimeseriesDataTimespan {
+	return &e
+}
+func (e *GetTimeseriesDataTimespan) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch v {
+	case "60:minutes":
+		fallthrough
+	case "6:hours":
+		fallthrough
+	case "24:hours":
+		fallthrough
+	case "3:days":
+		fallthrough
+	case "7:days":
+		fallthrough
+	case "30:days":
+		*e = GetTimeseriesDataTimespan(v)
+		return nil
+	default:
+		return fmt.Errorf("invalid value for GetTimeseriesDataTimespan: %v", v)
+	}
+}
+
+type GetTimeseriesDataRequest struct {
+	// Pass metric Id
+	//
+	MetricID GetTimeseriesDataMetricID `pathParam:"style=simple,explode=false,name=metricId"`
+	// Pass this value to group the metrics list by.
+	//
+	GroupBy *GroupBy `default:"minute" queryParam:"style=form,explode=true,name=groupBy"`
+	// The order direction to sort the metrics list by.
+	//
+	SortOrder *GetTimeseriesDataSortOrder `default:"asc" queryParam:"style=form,explode=true,name=sortOrder"`
+	// The measurement for the given metrics.
+	// Possible Values : [95th, median, avg, count or sum]
+	//
+	Measurement *string `default:"avg" queryParam:"style=form,explode=true,name=measurement"`
+	// This parameter specifies the time span between which the video views list should be retrieved by. You can provide either from and to unix epoch timestamps or time duration. The scope of duration is between 60 minutes to 30 days.
+	//
+	Timespan GetTimeseriesDataTimespan `queryParam:"style=form,explode=true,name=timespan[]"`
+	// Pass the dimensions and their corresponding values you want to filter the views by. For excluding the values in the filter we can pass '!' before the filter value. The list of filters can be obtained from list of dimensions endpoint.
+	// Example Values : [ browser_name:Chrome , os_name:macOS , device_name:Galaxy ]
+	//
+	Filterby *string `queryParam:"style=form,explode=true,name=filterby[]"`
+}
+
+func (g GetTimeseriesDataRequest) MarshalJSON() ([]byte, error) {
+	return utils.MarshalJSON(g, "", false)
+}
+
+func (g *GetTimeseriesDataRequest) UnmarshalJSON(data []byte) error {
+	if err := utils.UnmarshalJSON(data, &g, "", false, []string{"metricId", "timespan[]"}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *GetTimeseriesDataRequest) GetMetricID() GetTimeseriesDataMetricID {
+	if g == nil {
+		return GetTimeseriesDataMetricID("")
+	}
+	return g.MetricID
+}
+
+func (g *GetTimeseriesDataRequest) GetGroupBy() *GroupBy {
+	if g == nil {
+		return nil
+	}
+	return g.GroupBy
+}
+
+func (g *GetTimeseriesDataRequest) GetSortOrder() *GetTimeseriesDataSortOrder {
+	if g == nil {
+		return nil
+	}
+	return g.SortOrder
+}
+
+func (g *GetTimeseriesDataRequest) GetMeasurement() *string {
+	if g == nil {
+		return nil
+	}
+	return g.Measurement
+}
+
+func (g *GetTimeseriesDataRequest) GetTimespan() GetTimeseriesDataTimespan {
+	if g == nil {
+		return GetTimeseriesDataTimespan("")
+	}
+	return g.Timespan
+}
+
+func (g *GetTimeseriesDataRequest) GetFilterby() *string {
+	if g == nil {
+		return nil
+	}
+	return g.Filterby
+}
+
+// GetTimeseriesDataResponseBody - Get filter/ dimension value details by dimension name.
+type GetTimeseriesDataResponseBody struct {
+	// It demonstrates whether the request is successful or not.
+	Success *bool `json:"success,omitempty"`
+	// Retrieves breakdown values for a specified metric and timespan
+	MetaData *components.MetricsTimeseriesMetaDataDetails `json:"metaData,omitempty"`
+	// Displays the result of the request.
+	Data []components.MetricsTimeseriesDataDetails `json:"data,omitempty"`
+	// The timeframe from and to details displayed in the form of unix epoch timestamps.
+	//
+	Timespan []int64 `json:"timespan,omitempty"`
+}
+
+func (g *GetTimeseriesDataResponseBody) GetSuccess() *bool {
+	if g == nil {
+		return nil
+	}
+	return g.Success
+}
+
+func (g *GetTimeseriesDataResponseBody) GetMetaData() *components.MetricsTimeseriesMetaDataDetails {
+	if g == nil {
+		return nil
+	}
+	return g.MetaData
+}
+
+func (g *GetTimeseriesDataResponseBody) GetData() []components.MetricsTimeseriesDataDetails {
+	if g == nil {
+		return nil
+	}
+	return g.Data
+}
+
+func (g *GetTimeseriesDataResponseBody) GetTimespan() []int64 {
+	if g == nil {
+		return nil
+	}
+	return g.Timespan
+}
+
+type GetTimeseriesDataResponse struct {
+	HTTPMeta components.HTTPMetadata `json:"-"`
+	// Get filter/ dimension value details by dimension name.
+	Object *GetTimeseriesDataResponseBody
+}
+
+func (g *GetTimeseriesDataResponse) GetHTTPMeta() components.HTTPMetadata {
+	if g == nil {
+		return components.HTTPMetadata{}
+	}
+	return g.HTTPMeta
+}
+
+func (g *GetTimeseriesDataResponse) GetObject() *GetTimeseriesDataResponseBody {
+	if g == nil {
+		return nil
+	}
+	return g.Object
+}

@@ -1,0 +1,10 @@
+# ViewNotFoundError
+
+
+## Fields
+
+| Field                                                                         | Type                                                                          | Required                                                                      | Description                                                                   | Example                                                                       |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `Success`                                                                     | **bool*                                                                       | :heavy_minus_sign:                                                            | It demonstrates whether the request is successful or not.                     | false                                                                         |
+| `Error`                                                                       | [*components.ViewNotFoundError](../../models/components/viewnotfounderror.md) | :heavy_minus_sign:                                                            | Returns the problem that has occured                                          |                                                                               |
+| `HTTPMeta`                                                                    | [components.HTTPMetadata](../../models/components/httpmetadata.md)            | :heavy_check_mark:                                                            | N/A                                                                           |                                                                               |

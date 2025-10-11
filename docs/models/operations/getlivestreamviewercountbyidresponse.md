@@ -1,0 +1,9 @@
+# GetLiveStreamViewerCountByIDResponse
+
+
+## Fields
+
+| Field                                                                           | Type                                                                            | Required                                                                        | Description                                                                     | Example                                                                         |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `HTTPMeta`                                                                      | [components.HTTPMetadata](../../models/components/httpmetadata.md)              | :heavy_check_mark:                                                              | N/A                                                                             |                                                                                 |
+| `ViewsCountResponse`                                                            | [*components.ViewsCountResponse](../../models/components/viewscountresponse.md) | :heavy_minus_sign:                                                              | Stream viewer count retrieved successfully                                      | {<br/>"success": true,<br/>"data": {<br/>"views": 20<br/>}<br/>}                |

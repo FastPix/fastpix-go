@@ -1,0 +1,9 @@
+# DeleteSigningKeyResponse
+
+
+## Fields
+
+| Field                                                                                       | Type                                                                                        | Required                                                                                    | Description                                                                                 | Example                                                                                     |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `HTTPMeta`                                                                                  | [components.HTTPMetadata](../../models/components/httpmetadata.md)                          | :heavy_check_mark:                                                                          | N/A                                                                                         |                                                                                             |
+| `DeleteSigningKeyResponse`                                                                  | [*components.DeleteSigningKeyResponse](../../models/components/deletesigningkeyresponse.md) | :heavy_minus_sign:                                                                          | successfully fetched all signing keys                                                       | {<br/>"success": true<br/>}                                                                 |

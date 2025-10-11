@@ -1,0 +1,9 @@
+# MediaClipResponseAccessRestrictions
+
+
+## Fields
+
+| Field                                                                                             | Type                                                                                              | Required                                                                                          | Description                                                                                       |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `Domains`                                                                                         | [*components.MediaClipResponseDomains](../../models/components/mediaclipresponsedomains.md)       | :heavy_minus_sign:                                                                                | N/A                                                                                               |
+| `UserAgents`                                                                                      | [*components.MediaClipResponseUserAgents](../../models/components/mediaclipresponseuseragents.md) | :heavy_minus_sign:                                                                                | N/A                                                                                               |

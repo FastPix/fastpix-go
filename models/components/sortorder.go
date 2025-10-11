@@ -1,0 +1,35 @@
+
+
+package components
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// SortOrder - The values in the list can be arranged in two ways: DESC (Descending) or ASC (Ascending).
+type SortOrder string
+
+const (
+	SortOrderAsc  SortOrder = "asc"
+	SortOrderDesc SortOrder = "desc"
+)
+
+func (e SortOrder) ToPointer() *SortOrder {
+	return &e
+}
+func (e *SortOrder) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	switch v {
+	case "asc":
+		fallthrough
+	case "desc":
+		*e = SortOrder(v)
+		return nil
+	default:
+		return fmt.Errorf("invalid value for SortOrder: %v", v)
+	}
+}

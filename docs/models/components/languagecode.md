@@ -1,0 +1,70 @@
+# LanguageCode
+
+Language code for content localization
+
+
+## Values
+
+| Name               | Value              |
+| ------------------ | ------------------ |
+| `LanguageCodeArSa` | ar-SA              |
+| `LanguageCodeBnBd` | bn-BD              |
+| `LanguageCodeBnIn` | bn-IN              |
+| `LanguageCodeCaEs` | ca-ES              |
+| `LanguageCodeCsCz` | cs-CZ              |
+| `LanguageCodeDaDk` | da-DK              |
+| `LanguageCodeDeAt` | de-AT              |
+| `LanguageCodeDeCh` | de-CH              |
+| `LanguageCodeDeDe` | de-DE              |
+| `LanguageCodeElGr` | el-GR              |
+| `LanguageCodeEnAu` | en-AU              |
+| `LanguageCodeEnCa` | en-CA              |
+| `LanguageCodeEnGb` | en-GB              |
+| `LanguageCodeEnIe` | en-IE              |
+| `LanguageCodeEnIn` | en-IN              |
+| `LanguageCodeEnNz` | en-NZ              |
+| `LanguageCodeEnUs` | en-US              |
+| `LanguageCodeEnZa` | en-ZA              |
+| `LanguageCodeEsAr` | es-AR              |
+| `LanguageCodeEsCl` | es-CL              |
+| `LanguageCodeEsCo` | es-CO              |
+| `LanguageCodeEsEs` | es-ES              |
+| `LanguageCodeEsMx` | es-MX              |
+| `LanguageCodeEsUs` | es-US              |
+| `LanguageCodeFiFi` | fi-FI              |
+| `LanguageCodeFrBe` | fr-BE              |
+| `LanguageCodeFrCa` | fr-CA              |
+| `LanguageCodeFrCh` | fr-CH              |
+| `LanguageCodeFrFr` | fr-FR              |
+| `LanguageCodeHeIl` | he-IL              |
+| `LanguageCodeHiIn` | hi-IN              |
+| `LanguageCodeHrHr` | hr-HR              |
+| `LanguageCodeHuHu` | hu-HU              |
+| `LanguageCodeIDID` | id-ID              |
+| `LanguageCodeItCh` | it-CH              |
+| `LanguageCodeItIt` | it-IT              |
+| `LanguageCodeJaJp` | ja-JP              |
+| `LanguageCodeKoKr` | ko-KR              |
+| `LanguageCodeMsMy` | ms-MY              |
+| `LanguageCodeNbNo` | nb-NO              |
+| `LanguageCodeNlBe` | nl-BE              |
+| `LanguageCodeNlNl` | nl-NL              |
+| `LanguageCodeNoNo` | no-NO              |
+| `LanguageCodePlPl` | pl-PL              |
+| `LanguageCodePtBr` | pt-BR              |
+| `LanguageCodePtPt` | pt-PT              |
+| `LanguageCodeRoRo` | ro-RO              |
+| `LanguageCodeRuRu` | ru-RU              |
+| `LanguageCodeSkSk` | sk-SK              |
+| `LanguageCodeSvSe` | sv-SE              |
+| `LanguageCodeTaIn` | ta-IN              |
+| `LanguageCodeTaLk` | ta-LK              |
+| `LanguageCodeTeIn` | te-IN              |
+| `LanguageCodeThTh` | th-TH              |
+| `LanguageCodeTrTr` | tr-TR              |
+| `LanguageCodeUkUa` | uk-UA              |
+| `LanguageCodeViVn` | vi-VN              |
+| `LanguageCodeBgBg` | bg-BG              |
+| `LanguageCodeZhCn` | zh-CN              |
+| `LanguageCodeZhHk` | zh-HK              |
+| `LanguageCodeZhTw` | zh-TW              |
