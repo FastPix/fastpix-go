@@ -22,3 +22,47 @@ jobs:
 
       - name: Test
         run: go test $(go list ./... | grep -v /samples)
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## FastPix Go SDK ${{ github.ref_name }}
+            
+            ### What's New
+            - Complete API coverage for Media, Live Streaming, Video Data, and Signing Keys
+            - Add comprehensive AI features, DRM configurations, playlists, and analytics
+            - Implement robust error handling with specific error types
+            - Add extensive test suite with 14 test files covering all modules
+            - Update to Go 1.22+ with enhanced type safety and performance
+            - Reorganize package structure for better maintainability
+            - Add comprehensive documentation and usage examples
+            - Implement built-in retry mechanisms and timeout handling
+            
+            ### Installation
+            ```bash
+            go get github.com/FastPix/fastpix-go@${{ github.ref_name }}
+            ```
+            
+            ### Breaking Changes
+            - Minimum Go version requirement updated to 1.22+
+            
+            ### Documentation
+            - [Go Package](https://pkg.go.dev/github.com/FastPix/fastpix-go)
+            - [GitHub Repository](https://github.com/FastPix/fastpix-go)
+          draft: false
+          prerelease: false
