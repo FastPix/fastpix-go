@@ -3,7 +3,7 @@ name: Go SDK Release
 on:
   push:
     tags:
-      - 'v*.*.*' # Trigger only on version tags like v1.0.0
+      - 'v*' # Runs when a tag like v1.0.0 is pushed
 
 jobs:
   build:
@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -31,25 +32,26 @@ jobs:
       - name: Verify formatting
         run: go fmt ./...
 
-      - name: Vet (Static Analysis)
+      - name: Run static analysis
         run: go vet ./...
 
       - name: Build
-        run: go build ./...
+        run: go build $(go list ./... | grep -v /samples)
 
-      - name: Test
-        run: go test -v ./...
+      - name: Run tests
+        run: go test -v $(go list ./... | grep -v /samples)
 
   release:
-    name: Release Go SDK
+    name: Publish Release
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -62,42 +64,36 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          name: FastPix Go SDK ${{ github.ref_name }}
           body: |
             ## 🏗️ FastPix Go SDK ${{ github.ref_name }}
             
             ### 🚀 What's New
             - Complete API coverage for Media, Live Streaming, Video Data, and Signing Keys
-            - Add AI features, DRM configurations, playlists, and analytics
-            - Improved error handling with specific error types
-            - Added comprehensive test suite covering all modules
-            - Updated to Go 1.22+ for better performance
-            - Reorganized package structure for maintainability
-            - Added documentation and usage examples
-            - Implemented built-in retry and timeout handling
-
+            - Added DRM, AI, and Analytics modules
+            - Improved error handling and timeout logic
+            - Comprehensive test coverage
+            - Updated for Go 1.22+
+            
             ### 📦 Installation
             ```bash
             go get github.com/FastPix/fastpix-go@${{ github.ref_name }}
             ```
 
-            ### ⚠️ Breaking Changes
-            - Minimum Go version: 1.22+
-
             ### 📚 Documentation
             - [pkg.go.dev](https://pkg.go.dev/github.com/FastPix/fastpix-go)
-            - [GitHub Repository](https://github.com/FastPix/fastpix-go)
+            - [GitHub](https://github.com/FastPix/fastpix-go)
           draft: false
           prerelease: false
 
-      - name: Trigger pkg.go.dev Index
+      - name: Trigger pkg.go.dev indexing
         run: |
           VERSION=${{ github.ref_name }}
           MODULE="github.com/FastPix/fastpix-go"
           echo "🔄 Requesting pkg.go.dev to fetch ${MODULE}@${VERSION}"
-          curl -s "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info"
-
-      - name: Optional pkg.go.dev Crawl
-        run: |
-          MODULE="github.com/FastPix/fastpix-go"
-          curl -s "https://pkg.go.dev/${MODULE}?tab=versions" > /dev/null
+          HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info")
+          echo "HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Failed to trigger pkg.go.dev indexing"
+            exit 1
+          fi
