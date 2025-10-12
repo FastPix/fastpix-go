@@ -33,7 +33,7 @@ jobs:
         run: go fmt ./...
 
       - name: Run static analysis
-        run: go vet ./...
+        run: go vet $(go list ./... | grep -v /samples)
 
       - name: Build
         run: go build $(go list ./... | grep -v /samples)
