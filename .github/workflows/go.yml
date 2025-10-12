@@ -91,9 +91,24 @@ jobs:
           VERSION=${{ github.ref_name }}
           MODULE="github.com/FastPix/fastpix-go"
           echo "🔄 Requesting pkg.go.dev to fetch ${MODULE}@${VERSION}"
-          HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info")
-          echo "HTTP Status: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "Failed to trigger pkg.go.dev indexing"
-            exit 1
-          fi
+          
+          # Try multiple times with delays
+          for i in {1..3}; do
+            echo "Attempt $i/3..."
+            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info")
+            echo "HTTP Status: $HTTP_STATUS"
+            
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "✅ Successfully triggered pkg.go.dev indexing"
+              exit 0
+            fi
+            
+            if [ $i -lt 3 ]; then
+              echo "⏳ Waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+          
+          echo "⚠️ pkg.go.dev indexing may take time to propagate"
+          echo "The release was created successfully, but indexing might be delayed"
+          echo "Check https://pkg.go.dev/${MODULE} in a few minutes"
