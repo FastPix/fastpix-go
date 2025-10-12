@@ -5,7 +5,7 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/fastpix/fastpix-go/models/components"
 )
 
 type CreateMediaPlaybackIDAccessRestrictions struct {

@@ -3,7 +3,7 @@
 package operations
 
 import (
-	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/fastpix/fastpix-go/models/components"
 )
 
 type AddMediaTrackRequestBody struct {

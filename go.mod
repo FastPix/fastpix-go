@@ -1,4 +1,4 @@
-module github.com/FastPix/fastpix-go
+module github.com/fastpix/fastpix-go
 
 go 1.20
 

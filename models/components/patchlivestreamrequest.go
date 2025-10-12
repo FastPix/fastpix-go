@@ -3,7 +3,7 @@
 package components
 
 import (
-	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/fastpix/fastpix-go/internal/utils"
 )
 
 type PatchLiveStreamRequest struct {

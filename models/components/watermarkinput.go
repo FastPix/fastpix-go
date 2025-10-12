@@ -5,7 +5,7 @@ package components
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/fastpix/fastpix-go/internal/utils"
 )
 
 // WatermarkInputType - Type of overlay (currently only supports 'watermark').

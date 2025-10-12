@@ -5,7 +5,7 @@ package components
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/fastpix/fastpix-go/internal/utils"
 )
 
 // CreateLiveStreamRequestMaxResolution - Max resolution can be used to control the maximum resolution your media is encoded, stored, and streamed at.

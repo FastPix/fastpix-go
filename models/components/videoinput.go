@@ -5,7 +5,7 @@ package components
 import (
 	"errors"
 	"fmt"
-	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/fastpix/fastpix-go/internal/utils"
 )
 
 type Segment2 struct {

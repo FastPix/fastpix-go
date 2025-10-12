@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FastPix/fastpix-go/optionalnullable"
-	"github.com/FastPix/fastpix-go/types"
+	"github.com/fastpix/fastpix-go/optionalnullable"
+	"github.com/fastpix/fastpix-go/types"
 )
 
 func GenerateURL(_ context.Context, serverURL, path string, pathParams interface{}, globals interface{}) (string, error) {

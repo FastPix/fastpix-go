@@ -5,7 +5,7 @@ package hooks
 import (
 	"context"
 	"errors"
-	"github.com/FastPix/fastpix-go/internal/config"
+	"github.com/fastpix/fastpix-go/internal/config"
 	"net/http"
 )
 
