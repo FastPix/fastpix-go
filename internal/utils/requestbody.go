@@ -15,7 +15,7 @@ import (
 	"reflect"
 	"regexp"
 
-	"github.com/FastPix/fastpix-go/optionalnullable"
+	"github.com/fastpix/fastpix-go/optionalnullable"
 )
 
 const (

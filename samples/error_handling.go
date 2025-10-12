@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	fastpixgo "github.com/FastPix/fastpix-go"
-	"github.com/FastPix/fastpix-go/models/apierrors"
-	"github.com/FastPix/fastpix-go/models/components"
-	"github.com/FastPix/fastpix-go/models/operations"
+	fastpixgo "github.com/fastpix/fastpix-go"
+	"github.com/fastpix/fastpix-go/models/apierrors"
+	"github.com/fastpix/fastpix-go/models/components"
+	"github.com/fastpix/fastpix-go/models/operations"
 )
 
 func main() {

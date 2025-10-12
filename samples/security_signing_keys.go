@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	fastpixgo "github.com/FastPix/fastpix-go"
-	"github.com/FastPix/fastpix-go/models/components"
+	fastpixgo "github.com/fastpix/fastpix-go"
+	"github.com/fastpix/fastpix-go/models/components"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FastPix/fastpix-go/models/operations"
+	"github.com/fastpix/fastpix-go/models/operations"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

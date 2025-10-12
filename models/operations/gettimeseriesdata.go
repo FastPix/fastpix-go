@@ -5,8 +5,8 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/FastPix/fastpix-go/internal/utils"
-	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/fastpix/fastpix-go/internal/utils"
+	"github.com/fastpix/fastpix-go/models/components"
 )
 
 // GetTimeseriesDataMetricID - Pass metric Id

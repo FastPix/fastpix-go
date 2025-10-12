@@ -1,9 +1,9 @@
-module github.com/FastPix/fastpix-go/tests
+module github.com/fastpix/fastpix-go/tests
 
 go 1.22
 
 require (
-	github.com/FastPix/fastpix-go v0.0.0
+	github.com/fastpix/fastpix-go v0.0.0
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -13,4 +13,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/FastPix/fastpix-go => ../
+replace github.com/fastpix/fastpix-go => ../

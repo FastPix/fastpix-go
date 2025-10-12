@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	fastpix "github.com/FastPix/fastpix-go"
-	"github.com/FastPix/fastpix-go/models/components"
+	fastpix "github.com/fastpix/fastpix-go"
+	"github.com/fastpix/fastpix-go/models/components"
 	"github.com/stretchr/testify/assert"
 )
 

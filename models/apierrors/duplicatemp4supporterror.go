@@ -4,7 +4,7 @@ package apierrors
 
 import (
 	"encoding/json"
-	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/fastpix/fastpix-go/models/components"
 )
 
 type DuplicateMp4SupportError struct {
