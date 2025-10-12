@@ -1,29 +1,47 @@
-name: Go
+name: Go SDK Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*' # Trigger only on version tags like v1.0.0
 
 jobs:
   build:
+    name: Build and Test
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.22'
 
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Verify formatting
+        run: go fmt ./...
+
+      - name: Vet (Static Analysis)
+        run: go vet ./...
+
       - name: Build
-        run: go build $(go list ./... | grep -v /samples)
+        run: go build ./...
 
       - name: Test
-        run: go test $(go list ./... | grep -v /samples)
+        run: go test -v ./...
 
   release:
+    name: Release Go SDK
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
@@ -35,34 +53,51 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create Release
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            ## FastPix Go SDK ${{ github.ref_name }}
+            ## 🏗️ FastPix Go SDK ${{ github.ref_name }}
             
-            ### What's New
+            ### 🚀 What's New
             - Complete API coverage for Media, Live Streaming, Video Data, and Signing Keys
-            - Add comprehensive AI features, DRM configurations, playlists, and analytics
-            - Implement robust error handling with specific error types
-            - Add extensive test suite with 14 test files covering all modules
-            - Update to Go 1.22+ with enhanced type safety and performance
-            - Reorganize package structure for better maintainability
-            - Add comprehensive documentation and usage examples
-            - Implement built-in retry mechanisms and timeout handling
-            
-            ### Installation
+            - Add AI features, DRM configurations, playlists, and analytics
+            - Improved error handling with specific error types
+            - Added comprehensive test suite covering all modules
+            - Updated to Go 1.22+ for better performance
+            - Reorganized package structure for maintainability
+            - Added documentation and usage examples
+            - Implemented built-in retry and timeout handling
+
+            ### 📦 Installation
             ```bash
             go get github.com/FastPix/fastpix-go@${{ github.ref_name }}
             ```
-            
-            ### Breaking Changes
-            - Minimum Go version requirement updated to 1.22+
-            
-            ### Documentation
-            - [Go Package](https://pkg.go.dev/github.com/FastPix/fastpix-go)
+
+            ### ⚠️ Breaking Changes
+            - Minimum Go version: 1.22+
+
+            ### 📚 Documentation
+            - [pkg.go.dev](https://pkg.go.dev/github.com/FastPix/fastpix-go)
             - [GitHub Repository](https://github.com/FastPix/fastpix-go)
           draft: false
           prerelease: false
+
+      - name: Trigger pkg.go.dev Index
+        run: |
+          VERSION=${{ github.ref_name }}
+          MODULE="github.com/FastPix/fastpix-go"
+          echo "🔄 Requesting pkg.go.dev to fetch ${MODULE}@${VERSION}"
+          curl -s "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info"
+
+      - name: Optional pkg.go.dev Crawl
+        run: |
+          MODULE="github.com/FastPix/fastpix-go"
+          curl -s "https://pkg.go.dev/${MODULE}?tab=versions" > /dev/null

@@ -12,8 +12,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/fastpix/fastpix-go/optionalnullable"
-	"github.com/fastpix/fastpix-go/types"
+	"github.com/FastPix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/types"
 )
 
 func PopulateQueryParams(_ context.Context, req *http.Request, queryParams interface{}, globals interface{}) error {

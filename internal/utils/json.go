@@ -14,7 +14,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/fastpix/fastpix-go/types"
+	"github.com/FastPix/fastpix-go/types"
 )
 
 func MarshalJSON(v interface{}, tag reflect.StructTag, topLevel bool) ([]byte, error) {

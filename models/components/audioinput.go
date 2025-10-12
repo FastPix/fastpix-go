@@ -5,7 +5,7 @@ package components
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fastpix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/internal/utils"
 )
 
 // AudioInputType - Type of overlay (currently only supports 'audio').

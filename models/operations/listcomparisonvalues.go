@@ -5,7 +5,7 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fastpix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/models/components"
 )
 
 // ListComparisonValuesTimespan - This parameter specifies the time span between which the video views list should be retrieved by. You can provide either from and to unix epoch timestamps or time duration. The scope of duration is between 60 minutes to 30 days.

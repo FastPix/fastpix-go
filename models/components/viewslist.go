@@ -3,7 +3,7 @@
 package components
 
 import (
-	"github.com/fastpix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/optionalnullable"
 )
 
 type ViewsList struct {

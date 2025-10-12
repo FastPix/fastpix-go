@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/fastpix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/optionalnullable"
 )
 
 func PopulateHeaders(_ context.Context, req *http.Request, headers interface{}, globals interface{}) {

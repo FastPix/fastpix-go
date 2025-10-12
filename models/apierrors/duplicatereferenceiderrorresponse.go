@@ -4,7 +4,7 @@ package apierrors
 
 import (
 	"encoding/json"
-	"github.com/fastpix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/models/components"
 )
 
 // DuplicateReferenceIDErrorResponse - Displays the result of the request.

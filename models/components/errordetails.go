@@ -5,8 +5,8 @@ package components
 import (
 	"errors"
 	"fmt"
-	"github.com/fastpix/fastpix-go/internal/utils"
-	"github.com/fastpix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/optionalnullable"
 )
 
 type ErrorDetailsPercentageType string

@@ -4,7 +4,7 @@ package config
 
 import (
 	"context"
-	"github.com/fastpix/fastpix-go/retry"
+	"github.com/FastPix/fastpix-go/retry"
 	"net/http"
 	"time"
 )

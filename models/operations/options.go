@@ -4,8 +4,8 @@ package operations
 
 import (
 	"errors"
-	"github.com/fastpix/fastpix-go/internal/utils"
-	"github.com/fastpix/fastpix-go/retry"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/retry"
 	"time"
 )
 
