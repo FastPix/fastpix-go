@@ -1,5 +1,3 @@
-
-
 package fastpixgo
 
 // Generated from OpenAPI doc version 1.0.0 and generator version 2.723.8

@@ -1,5 +1,3 @@
-
-
 package components
 
 // PlaybackSettings - Displays the result of the playback settings.

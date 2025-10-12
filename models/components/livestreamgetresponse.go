@@ -1,5 +1,3 @@
-
-
 package components
 
 // LivestreamgetResponse - Displays the result of the request.

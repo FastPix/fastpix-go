@@ -1,5 +1,3 @@
-
-
 package components
 
 // LiveStreamResponseDTO - Displays the result of the request.

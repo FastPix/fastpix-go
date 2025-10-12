@@ -52,7 +52,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d signing keys:\n", len(keysResponse.GetAllSigningKeyResponse.Data))
 		for i, key := range keysResponse.GetAllSigningKeyResponse.Data {
-			fmt.Printf("  %d. ID: %s, Created: %s\n", 
+			fmt.Printf("  %d. ID: %s, Created: %s\n",
 				i+1, *key.ID, getStringValue(key.CreatedAt))
 		}
 	}
@@ -96,7 +96,7 @@ func main() {
 			log.Printf("Error creating signing key %d: %v", i+1, err)
 			continue
 		}
-		
+
 		if createResponse.CreateResponse != nil && createResponse.CreateResponse.Data != nil && createResponse.CreateResponse.Data.ID != nil {
 			keyID := createResponse.CreateResponse.Data.ID
 			createdKeys = append(createdKeys, *keyID)
@@ -117,11 +117,11 @@ func main() {
 
 	// 6. Key Rotation Example
 	fmt.Println("\n=== Key Rotation Example ===")
-	
+
 	if len(createdKeys) > 0 {
 		// Simulate key rotation by deleting old keys
 		fmt.Println("Performing key rotation...")
-		
+
 		// Keep the newest key, delete others
 		for i, keyID := range createdKeys[:len(createdKeys)-1] {
 			fmt.Printf("Deleting old key %d: %s\n", i+1, keyID)
@@ -132,24 +132,24 @@ func main() {
 				fmt.Printf("Successfully deleted key %s\n", keyID)
 			}
 		}
-		
+
 		// Keep the last key as active
 		activeKeyID := createdKeys[len(createdKeys)-1]
 		fmt.Printf("Active key: %s\n", activeKeyID)
-		
+
 		// Get details of active key
 		activeKeyResponse, err := client.SigningKeys.GetSigningKeyByID(ctx, activeKeyID)
 		if err != nil {
 			log.Printf("Error getting active key details: %v", err)
 		} else {
-			fmt.Printf("Active key public key: %s\n", 
+			fmt.Printf("Active key public key: %s\n",
 				getStringValue(activeKeyResponse.GetPublicPemUsingSigningKeyIDResponseDTO.Data.PublicKey))
 		}
 	}
 
 	// 7. Security Best Practices
 	fmt.Println("\n=== Security Best Practices ===")
-	
+
 	// Create a new key for demonstration
 	fmt.Println("Creating a new signing key for security demonstration...")
 	newKeyResponse, err := client.SigningKeys.CreateSigningKey(ctx)
@@ -162,7 +162,7 @@ func main() {
 		} else {
 			fmt.Println("New signing key created but no ID returned")
 		}
-		
+
 		// Demonstrate secure key handling
 		fmt.Println("\nSecurity recommendations:")
 		fmt.Println("1. Store private keys securely (not in code)")
@@ -170,7 +170,7 @@ func main() {
 		fmt.Println("3. Use environment variables for sensitive data")
 		fmt.Println("4. Implement proper access controls")
 		fmt.Println("5. Monitor key usage and access")
-		
+
 		// Clean up the demonstration key
 		fmt.Printf("\nCleaning up demonstration key: %s\n", *newKeyID)
 		_, err = client.SigningKeys.DeleteSigningKey(ctx, *newKeyID)
@@ -183,7 +183,7 @@ func main() {
 
 	// 8. Error Handling for Security Operations
 	fmt.Println("\n=== Security Error Handling ===")
-	
+
 	// Try to get a non-existent key
 	fakeKeyID := "non-existent-key-id"
 	_, err = client.SigningKeys.GetSigningKeyByID(ctx, fakeKeyID)
@@ -192,7 +192,7 @@ func main() {
 	} else {
 		fmt.Println("Unexpected success for non-existent key")
 	}
-	
+
 	// Try to delete a non-existent key
 	_, err = client.SigningKeys.DeleteSigningKey(ctx, fakeKeyID)
 	if err != nil {
@@ -203,18 +203,18 @@ func main() {
 
 	// 9. Pagination Example
 	fmt.Println("\n=== Pagination Example ===")
-	
+
 	// Demonstrate pagination for signing keys
 	pageSize := 5.0
 	pageOffset := 0.0
-	
+
 	fmt.Printf("Fetching signing keys with pagination (limit: %.0f, offset: %.0f)\n", pageSize, pageOffset)
 	paginatedResponse, err := client.SigningKeys.ListSigningKeys(ctx, &pageSize, &pageOffset)
 	if err != nil {
 		log.Printf("Error with paginated request: %v", err)
 	} else {
 		fmt.Printf("Page 1: Found %d keys\n", len(paginatedResponse.GetAllSigningKeyResponse.Data))
-		
+
 		// Get next page
 		pageOffset = 5.0
 		fmt.Printf("Fetching next page (limit: %.0f, offset: %.0f)\n", pageSize, pageOffset)

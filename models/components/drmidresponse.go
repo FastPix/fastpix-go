@@ -1,5 +1,3 @@
-
-
 package components
 
 type DrmIDResponse struct {

@@ -1,5 +1,3 @@
-
-
 package components
 
 // UserAgentRestrictions - Restrictions based on the user agent

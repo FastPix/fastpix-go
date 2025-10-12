@@ -1,5 +1,3 @@
-
-
 package components
 
 // PatchResponseDTO - Displays the result of the request.

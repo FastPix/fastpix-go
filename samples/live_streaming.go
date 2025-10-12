@@ -68,7 +68,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d live streams:\n", len(streamsResponse.GetStreamsResponse.Data))
 		for i, stream := range streamsResponse.GetStreamsResponse.Data {
-			fmt.Printf("  %d. ID: %s, Name: %s, Status: %s\n", 
+			fmt.Printf("  %d. ID: %s, Name: %s, Status: %s\n",
 				i+1, *stream.StreamID, getStringValue(stream.Name), getStringValue(stream.Status))
 		}
 	}

@@ -1,5 +1,3 @@
-
-
 package components
 
 // SimulcastUnavailableError - Returns the problem that has occured.

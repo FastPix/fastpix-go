@@ -1,5 +1,3 @@
-
-
 package operations
 
 import (

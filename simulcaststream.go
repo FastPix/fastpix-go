@@ -1,5 +1,3 @@
-
-
 package fastpixgo
 
 import (

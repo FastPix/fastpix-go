@@ -41,7 +41,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d video views in the last 24 hours:\n", len(viewsResponse.Object.Data))
 		for i, view := range viewsResponse.Object.Data {
-			fmt.Printf("  %d. View ID: %s, Media ID: %s, Duration: %d seconds\n", 
+			fmt.Printf("  %d. View ID: %s, Media ID: %s, Duration: %d seconds\n",
 				i+1, view.ViewID, getStringValue(view.MediaID), getInt64Value(view.Duration))
 		}
 	}
@@ -69,7 +69,7 @@ func main() {
 	topContentResponse, err := client.Views.ListByTopContent(
 		ctx,
 		operations.ListByTopContentTimespanTwentyFourhours,
-		nil, // filterby
+		nil,                 // filterby
 		fastpixgo.Int64(10), // limit
 	)
 	if err != nil {
@@ -77,7 +77,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d top content items:\n", len(topContentResponse.Object.Data))
 		for i, content := range topContentResponse.Object.Data {
-			fmt.Printf("  %d. Media ID: %s, Views: %d\n", 
+			fmt.Printf("  %d. Media ID: %s, Views: %d\n",
 				i+1, getStringValue(content.MediaID), getInt64Value(content.Views))
 		}
 	}
@@ -126,7 +126,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d breakdown values:\n", len(breakdownResponse.Object.Data))
 		for i, value := range breakdownResponse.Object.Data {
-			fmt.Printf("  %d. Dimension: %s, Value: %s, Count: %d\n", 
+			fmt.Printf("  %d. Dimension: %s, Value: %s, Count: %d\n",
 				i+1, getStringValue(value.Dimension), getStringValue(value.Value), getInt64Value(value.Count))
 		}
 	}
@@ -138,7 +138,7 @@ func main() {
 		operations.ListOverallValuesMetricIDViews,
 		operations.ListOverallValuesTimespanTwentyFourhours,
 		fastpixgo.Pointer("count"), // measurement
-		nil, // filterby
+		nil,                        // filterby
 	)
 	if err != nil {
 		log.Printf("Error listing overall values: %v", err)
@@ -172,9 +172,9 @@ func main() {
 	comparisonResponse, err := client.Metrics.ListComparisonValues(
 		ctx,
 		operations.ListComparisonValuesTimespanTwentyFourhours,
-		nil, // filterby
+		nil,            // filterby
 		&dimensionComp, // dimension
-		&value, // value
+		&value,         // value
 	)
 	if err != nil {
 		log.Printf("Error listing comparison values: %v", err)
@@ -194,7 +194,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d dimensions:\n", len(dimensionsResponse.Object.Data))
 		for i, dimension := range dimensionsResponse.Object.Data {
-			fmt.Printf("  %d. ID: %s, Name: %s\n", 
+			fmt.Printf("  %d. ID: %s, Name: %s\n",
 				i+1, getStringValue(dimension.ID), getStringValue(dimension.Name))
 		}
 	}
@@ -212,7 +212,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d filter values for browser name:\n", len(filterValuesResponse.Object.Data))
 		for i, value := range filterValuesResponse.Object.Data {
-			fmt.Printf("  %d. Value: %s, Count: %d\n", 
+			fmt.Printf("  %d. Value: %s, Count: %d\n",
 				i+1, getStringValue(value.Value), getInt64Value(value.Count))
 		}
 	}
@@ -225,7 +225,7 @@ func main() {
 	errorsResponse, err := client.Errors.ListErrors(
 		ctx,
 		operations.ListErrorsTimespanTwentyFourhours,
-		nil, // filterby
+		nil,                 // filterby
 		fastpixgo.Int64(10), // limit
 	)
 	if err != nil {
@@ -233,7 +233,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d errors in the last 24 hours:\n", len(errorsResponse.Object.Data))
 		for i, error := range errorsResponse.Object.Data {
-			fmt.Printf("  %d. Error ID: %s, Type: %s, Message: %s\n", 
+			fmt.Printf("  %d. Error ID: %s, Type: %s, Message: %s\n",
 				i+1, error.ErrorID, getStringValue(error.Type), getStringValue(error.Message))
 		}
 	}
@@ -266,10 +266,10 @@ func main() {
 
 	// 6. Analytics Dashboard Summary
 	fmt.Println("\n=== Analytics Dashboard Summary ===")
-	
+
 	// Get comprehensive analytics summary
 	fmt.Println("Generating analytics summary...")
-	
+
 	// Get overall metrics
 	overall, err := client.Metrics.ListOverallValues(
 		ctx,

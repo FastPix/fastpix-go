@@ -60,7 +60,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d playlists:\n", len(playlistsResponse.GetAllPlaylistsResponse.Data))
 		for i, playlist := range playlistsResponse.GetAllPlaylistsResponse.Data {
-			fmt.Printf("  %d. ID: %s, Name: %s, Type: %s\n", 
+			fmt.Printf("  %d. ID: %s, Name: %s, Type: %s\n",
 				i+1, *playlist.ID, getStringValue(playlist.Name), getStringValue(playlist.Type))
 		}
 	}
@@ -102,7 +102,7 @@ func main() {
 
 		// 5. Add Media to Playlist
 		fmt.Printf("\n=== Adding Media to Playlist: %s ===\n", *playlistID)
-		
+
 		// First, get some media to add to the playlist
 		mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
 		if err != nil {
@@ -164,7 +164,7 @@ func main() {
 
 	// 9. Media Playback Management
 	fmt.Println("\n=== Media Playback Management ===")
-	
+
 	// Get media for playback operations
 	mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	if err != nil {
@@ -212,7 +212,7 @@ func main() {
 
 	// 10. DRM Configuration
 	fmt.Println("\n=== DRM Configuration ===")
-	
+
 	// List DRM Configurations
 	fmt.Println("Listing DRM Configurations...")
 	drmResponse, err := client.DRMConfigurations.GetDrmConfiguration(ctx)

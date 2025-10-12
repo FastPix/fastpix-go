@@ -1,5 +1,3 @@
-
-
 package components
 
 // UpdateTrackRequest - Contains details about the track being added to the media file.

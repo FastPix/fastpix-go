@@ -1,5 +1,3 @@
-
-
 package components
 
 // MediaClipNotFoundError - Displays details about the reasons behind the request's failure.

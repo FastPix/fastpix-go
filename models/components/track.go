@@ -1,5 +1,3 @@
-
-
 package components
 
 // Track - A media consists of different media tracks, like video, audio, and subtitle, all combined.

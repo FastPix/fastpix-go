@@ -1,5 +1,3 @@
-
-
 package components
 
 // SrtPlaybackResponse - This object contains the livestream playback response details for SRT Protocol

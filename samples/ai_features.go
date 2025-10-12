@@ -128,12 +128,12 @@ func main() {
 
 	// 6. Batch AI Processing
 	fmt.Println("\n=== Batch AI Processing ===")
-	
+
 	// Process multiple media items with AI features
 	if len(mediaResponse.Object.Data) > 1 {
 		for i, media := range mediaResponse.Object.Data[1:3] { // Process up to 2 more media items
 			fmt.Printf("\nProcessing media %d: %s\n", i+2, *media.ID)
-			
+
 			// Generate summary for each media
 			batchSummaryRequest := operations.UpdateMediaSummaryRequestBody{
 				Generate:      true,
@@ -163,7 +163,7 @@ func main() {
 
 	// 7. AI Features Status Check
 	fmt.Println("\n=== Checking AI Features Status ===")
-	
+
 	// Get media details to check AI features status
 	mediaDetailsResponse, err := client.ManageVideos.GetMedia(ctx, *mediaID)
 	if err != nil {
@@ -173,7 +173,7 @@ func main() {
 		fmt.Printf("Media Title: %s\n", getStringValue(media.Title))
 		fmt.Printf("Media Duration: %d seconds\n", getInt64Value(media.Duration))
 		fmt.Printf("Media Status: %s\n", getStringValue(media.Status))
-		
+
 		// Check if AI features are available in metadata
 		if media.Metadata != nil {
 			fmt.Println("Media Metadata:")
@@ -185,10 +185,10 @@ func main() {
 
 	// 8. Error Handling for AI Features
 	fmt.Println("\n=== AI Features Error Handling ===")
-	
+
 	// Try to process a non-existent media ID to demonstrate error handling
 	fakeMediaID := "non-existent-media-id"
-	
+
 	fakeSummaryRequest := operations.UpdateMediaSummaryRequestBody{
 		Generate:      true,
 		SummaryLength: fastpixgo.Int64(100),

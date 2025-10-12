@@ -1,5 +1,3 @@
-
-
 package components
 
 // DomainRestrictions - Restrictions based on the originating domain of a request

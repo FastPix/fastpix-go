@@ -1,5 +1,3 @@
-
-
 package components
 
 // TrackSubtitlesGenerateRequest - Contains details for generating subtitle tracks for a media file.

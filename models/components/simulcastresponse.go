@@ -1,5 +1,3 @@
-
-
 package components
 
 // SimulcastResponseData - Displays the result of the request.

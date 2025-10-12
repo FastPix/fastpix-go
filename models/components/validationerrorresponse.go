@@ -1,5 +1,3 @@
-
-
 package components
 
 // ValidationErrorResponseError - Displays details about the reasons behind the request's failure.

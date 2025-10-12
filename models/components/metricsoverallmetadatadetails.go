@@ -1,5 +1,3 @@
-
-
 package components
 
 // MetricsOverallMetaDataDetails - Metadata that has to be paased for metric calculations.

@@ -1,5 +1,3 @@
-
-
 package components
 
 // PlaylistCreatedResponse - Displays the result of the request.

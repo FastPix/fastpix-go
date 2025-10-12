@@ -1,5 +1,3 @@
-
-
 package components
 
 // ViewNotFoundError - Returns the problem that has occured

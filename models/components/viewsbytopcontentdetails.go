@@ -1,5 +1,3 @@
-
-
 package components
 
 // ViewsByTopContentDetails - Retrieves a list of the top video views

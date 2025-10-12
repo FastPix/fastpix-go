@@ -1,5 +1,3 @@
-
-
 package components
 
 type CreateResponse struct {

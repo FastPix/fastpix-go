@@ -1,5 +1,3 @@
-
-
 package components
 
 // DateRange - Date range with start and end dates.

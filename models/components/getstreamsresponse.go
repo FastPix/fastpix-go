@@ -1,5 +1,3 @@
-
-
 package components
 
 // GetStreamsResponse - Displays the result of the request.

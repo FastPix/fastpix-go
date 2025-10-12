@@ -1,5 +1,3 @@
-
-
 package components
 
 // DataPagination - Pagination organizes content into pages for better readability and navigation.

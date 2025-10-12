@@ -1,5 +1,3 @@
-
-
 package components
 
 // PlaybackIDDomains - Restrictions based on the originating domain of a request (e.g., whether requests from certain websites should be allowed or blocked).

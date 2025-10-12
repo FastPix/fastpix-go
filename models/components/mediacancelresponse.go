@@ -1,5 +1,3 @@
-
-
 package components
 
 // MediaCancelResponse - Response returned when an upload is cancelled.
