@@ -3,7 +3,7 @@
 package components
 
 import (
-	"github.com/fastpix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/internal/utils"
 )
 
 // StreamAlreadyEnabledErrorError - Contains details explaining why the request failed.

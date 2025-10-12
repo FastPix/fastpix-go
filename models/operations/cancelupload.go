@@ -3,7 +3,7 @@
 package operations
 
 import (
-	"github.com/fastpix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/models/components"
 )
 
 type CancelUploadRequest struct {

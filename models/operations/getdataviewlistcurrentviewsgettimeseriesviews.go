@@ -3,9 +3,9 @@
 package operations
 
 import (
-	"github.com/fastpix/fastpix-go/internal/utils"
-	"github.com/fastpix/fastpix-go/models/components"
-	"github.com/fastpix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/optionalnullable"
 	"time"
 )
 

@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/fastpix/fastpix-go/retry"
+	"github.com/FastPix/fastpix-go/retry"
 	"io"
 	"math"
 	"math/rand"

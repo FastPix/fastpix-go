@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/fastpix/fastpix-go/internal/utils"
-	"github.com/fastpix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/models/components"
 )
 
 type InputType string

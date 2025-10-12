@@ -7,11 +7,11 @@ package fastpixgo
 import (
 	"context"
 	"fmt"
-	"github.com/fastpix/fastpix-go/internal/config"
-	"github.com/fastpix/fastpix-go/internal/hooks"
-	"github.com/fastpix/fastpix-go/internal/utils"
-	"github.com/fastpix/fastpix-go/models/components"
-	"github.com/fastpix/fastpix-go/retry"
+	"github.com/FastPix/fastpix-go/internal/config"
+	"github.com/FastPix/fastpix-go/internal/hooks"
+	"github.com/FastPix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/retry"
 	"net/http"
 	"time"
 )
@@ -179,7 +179,7 @@ func New(opts ...SDKOption) *Fastpixgo {
 	sdk := &Fastpixgo{
 		SDKVersion: "1.0.0",
 		sdkConfiguration: config.SDKConfiguration{
-			UserAgent:  "fastpix-sdk/go 1.0.0 2.723.8 1.0.0 github.com/fastpix/fastpix-go",
+			UserAgent:  "fastpix-sdk/go 1.0.0 2.723.8 1.0.0 github.com/FastPix/fastpix-go",
 			ServerList: ServerList,
 		},
 		hooks: hooks.New(),

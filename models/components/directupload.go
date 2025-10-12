@@ -3,7 +3,7 @@
 package components
 
 import (
-	"github.com/fastpix/fastpix-go/internal/utils"
+	"github.com/FastPix/fastpix-go/internal/utils"
 )
 
 // DirectUpload - Displays the result of the request.

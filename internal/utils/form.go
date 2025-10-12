@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fastpix/fastpix-go/optionalnullable"
-	"github.com/fastpix/fastpix-go/types"
+	"github.com/FastPix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/types"
 )
 
 func populateForm(paramName string, explode bool, objType reflect.Type, objValue reflect.Value, delimiter string, defaultValue *string, getFieldName func(reflect.StructField) string) url.Values {
