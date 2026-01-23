@@ -3,10 +3,10 @@
 
 ## Supported Types
 
-### VideoInput
+### PullVideoInput
 
 ```go
-input := components.CreateInputVideoInput(components.VideoInput{/* values here */})
+input := components.CreateInputPullVideoInput(components.PullVideoInput{/* values here */})
 ```
 
 ### WatermarkInput

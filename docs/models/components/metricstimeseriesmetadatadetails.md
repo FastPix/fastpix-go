@@ -1,4 +1,4 @@
-# MetricsTimeseriesMetaDataDetails
+# MetricsTimeseriesmetadataDetails
 
 Retrieves breakdown values for a specified metric and timespan
 

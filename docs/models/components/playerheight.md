@@ -15,6 +15,6 @@ playerHeight := components.CreatePlayerHeightStr(string{/* values here */})
 ### 
 
 ```go
-playerHeight := components.CreatePlayerHeightNumber(float64{/* values here */})
+playerHeight := components.CreatePlayerHeightInteger(int64{/* values here */})
 ```
 

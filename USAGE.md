@@ -14,24 +14,20 @@ func main() {
 
 	s := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
-			Username: fastpixgo.Pointer("your-access-token"),
+			Username: fastpixgo.Pointer("your access-token"),
 			Password: fastpixgo.Pointer("your-secret-key"),
 		}),
 	)
 
-	res, err := s.InputVideo.CreateMedia(ctx, components.CreateMediaRequest{
+	res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
 		Inputs: []components.Input{
-			components.CreateInputVideoInput(
-				components.VideoInput{
-					Type: "video",
-					URL:  "https://static.fastpix.io/sample.mp4",
-				},
+			components.CreateInputPullVideoInput(
+				components.PullVideoInput{},
 			),
 		},
 		Metadata: map[string]string{
-			"key1": "value1",
+			"your-metadata-key": "your-metadata-value",
 		},
-		AccessPolicy: components.CreateMediaRequestAccessPolicyPublic,
 	})
 	if err != nil {
 		log.Fatal(err)

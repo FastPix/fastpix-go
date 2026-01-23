@@ -1,6 +1,6 @@
 # PlaybackIDDomains
 
-Restrictions based on the originating domain of a request (e.g., whether requests from certain websites should be allowed or blocked).
+Restrictions based on the originating domain of a request (for example, whether requests from certain websites must be allowed or blocked).
 
 
 ## Fields
