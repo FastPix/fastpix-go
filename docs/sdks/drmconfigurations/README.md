@@ -1,14 +1,13 @@
-# DRMConfigurations
-(*DRMConfigurations*)
+# DrmConfigurations
 
 ## Overview
 
 ### Available Operations
 
-* [GetDrmConfiguration](#getdrmconfiguration) - Get list of DRM configuration IDs
-* [GetDrmConfigurationByID](#getdrmconfigurationbyid) - Get DRM configuration by ID
+* [List](#list) - Get list of DRM configuration IDs
+* [GetByID](#getbyid) - Get DRM configuration by ID
 
-## GetDrmConfiguration
+## List
 
 
 This endpoint retrieves the DRM configuration (DRM ID) associated with a workspace. It returns a list of DRM configurations, identified by a unique DRM ID, which is used for creating DRM encrypted asset.
@@ -31,10 +30,15 @@ Related guide: <a href="https://docs.fastpix.io/docs/secure-playback-with-drm">M
 package main
 
 import(
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+
 	"github.com/FastPix/fastpix-go/models/components"
 	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
 )
 
 func main() {
@@ -42,17 +46,46 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.DRMConfigurations.GetDrmConfiguration(ctx, fastpixgo.Pointer[int64](1), fastpixgo.Pointer[int64](10))
+    res, err := s.DrmConfigurations.List(ctx, fastpixgo.Pointer[int64](1), fastpixgo.Pointer[int64](10))
     if err != nil {
         log.Fatal(err)
     }
     if res.Object != nil {
-        // handle response
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.Object)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.Object)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
@@ -72,22 +105,18 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.BadRequestError         | 400                               | application/json                  |
-| apierrors.InvalidPermissionError  | 401                               | application/json                  |
-| apierrors.ForbiddenError          | 403                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |
 
-## GetDrmConfigurationByID
+## GetByID
 
 
 This endpoint retrieves a DRM configuration ID. It is used to fetch the DRM-related ID for a workspace, typically required when validating or applying DRM policies to video assets.
 
 **How it works:**
 1. Make a GET request to this endpoint, replacing `{drmConfigurationId}` with the UUID of the DRM configuration.  
-2. The response will contain the associated DRM configuration ID.
+2. The response contains the associated DRM configuration ID.
 
 Related guide: <a href="https://docs.fastpix.io/docs/secure-playback-with-drm">Manage DRM configuration</a>
 
@@ -99,10 +128,15 @@ Related guide: <a href="https://docs.fastpix.io/docs/secure-playback-with-drm">M
 package main
 
 import(
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+
 	"github.com/FastPix/fastpix-go/models/components"
 	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
 )
 
 func main() {
@@ -110,17 +144,47 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.DRMConfigurations.GetDrmConfigurationByID(ctx, "4fa85f64-5717-4562-b3fc-2c963f66afa6")
+    // your-drm-configuration-id: DRM configuration ID returned from create DRM configuration API
+    res, err := s.DrmConfigurations.GetByID(ctx, "your-drm-configuration-id")
     if err != nil {
         log.Fatal(err)
     }
     if res.Object != nil {
-        // handle response
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.Object)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.Object)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
@@ -130,7 +194,7 @@ func main() {
 | Parameter                                                | Type                                                     | Required                                                 | Description                                              | Example                                                  |
 | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
 | `ctx`                                                    | [context.Context](https://pkg.go.dev/context#Context)    | :heavy_check_mark:                                       | The context to use for the request.                      |                                                          |
-| `drmConfigurationID`                                     | *string*                                                 | :heavy_check_mark:                                       | The unique identifier of the DRM configuration.          | 4fa85f64-5717-4562-b3fc-2c963f66afa6                     |
+| `drmConfigurationID`                                     | *string*                                                 | :heavy_check_mark:                                       | The unique identifier of the DRM configuration.          | your-drm-configuration-id                     |
 | `opts`                                                   | [][operations.Option](../../models/operations/option.md) | :heavy_minus_sign:                                       | The options for this request.                            |                                                          |
 
 ### Response
@@ -139,11 +203,6 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.BadRequestError         | 400                               | application/json                  |
-| apierrors.InvalidPermissionError  | 401                               | application/json                  |
-| apierrors.ForbiddenError          | 403                               | application/json                  |
-| apierrors.MediaNotFoundError      | 404                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |

@@ -1,31 +1,70 @@
-# Built things
-_Debug/
-Compiled/
-
-# AudioCache can be rebuilt from sources
-AudioCache/
-
-# Lockfile
-_OpenInEditor.lock
-
-# User settings
-Game.agf.user
-*.crm.user
-
-# Backups
-Game.agf.bak
-backup_acsprset.spr
-
-# Memory dumps
-*.dmp
-
-# Temporary files
-# temporarily created during sprite or room background compression
-~aclzw.tmp
-# temporary, main game data, before getting packed into exe
-game28.dta
-# temporary build of the game before being moved to Compiled/ folder
+# Binaries for programs and plugins
 *.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.xml
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+build/
+bin/
+*.a
 
 # Log files
+*.log
 warnings.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+~aclzw.tmp
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Lock files (if using alternative package managers)
+Gopkg.lock
+glide.lock

@@ -1,6 +1,6 @@
 # DimensionsID
 
-Pass Dimensions id
+Pass Dimensions Id
 
 
 
@@ -51,6 +51,7 @@ Pass Dimensions id
 | `DimensionsIDExitBeforeVideoStart`  | exit_before_video_start             |
 | `DimensionsIDViewHasAd`             | view_has_ad                         |
 | `DimensionsIDVideoStartupFailed`    | video_startup_failed                |
+| `DimensionsIDVideoContentType`      | video_content_type                  |
 | `DimensionsIDPageContext`           | page_context                        |
 | `DimensionsIDPlaybackFailed`        | playback_failed                     |
 | `DimensionsIDCustom1`               | custom_1                            |

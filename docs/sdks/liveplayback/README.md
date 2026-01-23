@@ -1,15 +1,14 @@
 # LivePlayback
-(*LivePlayback*)
 
 ## Overview
 
 ### Available Operations
 
-* [CreatePlaybackIDOfStream](#createplaybackidofstream) - Create a playbackId
-* [DeletePlaybackIDOfStream](#deleteplaybackidofstream) - Delete a playbackId
-* [GetLiveStreamPlaybackID](#getlivestreamplaybackid) - Get playbackId details
+* [Create](#create) - Create a playbackId
+* [GetPlaybackIDDetails](#getplaybackiddetails) - Get playbackId details
+* [DeletePlaybackID](#deleteplaybackid) - Delete a playbackId
 
-## CreatePlaybackIDOfStream
+## Create
 
 Generates a new playback ID for the live stream, allowing viewers to access the stream through this ID. The playback ID can be shared with viewers for direct access to the live broadcast. 
 
@@ -26,10 +25,15 @@ Generates a new playback ID for the live stream, allowing viewers to access the 
 package main
 
 import(
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+
 	"github.com/FastPix/fastpix-go/models/components"
 	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
 )
 
 func main() {
@@ -37,31 +41,59 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.LivePlayback.CreatePlaybackIDOfStream(ctx, "8717422d89288ad5958d4a86e9afe2a2", components.PlaybackIDRequest{
-        AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
-    })
+    // your-stream-id: Live stream ID returned from create stream API
+    res, err := s.LivePlayback.Create(ctx, "your-stream-id", components.PlaybackIDRequest{})
     if err != nil {
         log.Fatal(err)
     }
     if res.PlaybackIDSuccessResponse != nil {
-        // handle response
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.PlaybackIDSuccessResponse, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.PlaybackIDSuccessResponse)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.PlaybackIDSuccessResponse, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.PlaybackIDSuccessResponse)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
 
 ### Parameters
 
-| Parameter                                                                           | Type                                                                                | Required                                                                            | Description                                                                         | Example                                                                             |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `ctx`                                                                               | [context.Context](https://pkg.go.dev/context#Context)                               | :heavy_check_mark:                                                                  | The context to use for the request.                                                 |                                                                                     |
-| `streamID`                                                                          | *string*                                                                            | :heavy_check_mark:                                                                  | Upon creating a new live stream, FastPix assigns a unique identifier to the stream. | 8717422d89288ad5958d4a86e9afe2a2                                                    |
-| `playbackIDRequest`                                                                 | [components.PlaybackIDRequest](../../models/components/playbackidrequest.md)        | :heavy_check_mark:                                                                  | N/A                                                                                 | {<br/>"accessPolicy": "public"<br/>}                                                |
-| `opts`                                                                              | [][operations.Option](../../models/operations/option.md)                            | :heavy_minus_sign:                                                                  | The options for this request.                                                       |                                                                                     |
+| Parameter                                                                            | Type                                                                                 | Required                                                                             | Description                                                                          | Example                                                                              |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `ctx`                                                                                | [context.Context](https://pkg.go.dev/context#Context)                                | :heavy_check_mark:                                                                   | The context to use for the request.                                                  |                                                                                      |
+| `streamID`                                                                           | *string*                                                                             | :heavy_check_mark:                                                                   | After creating a new live stream, FastPix assigns a unique identifier to the stream. | your-stream-id                                                     |
+| `body`                                                                               | [components.PlaybackIDRequest](../../models/components/playbackidrequest.md)         | :heavy_check_mark:                                                                   | N/A                                                                                  | {<br/>"accessPolicy": "public"<br/>}                                                 |
+| `opts`                                                                               | [][operations.Option](../../models/operations/option.md)                             | :heavy_minus_sign:                                                                   | The options for this request.                                                        |                                                                                      |
 
 ### Response
 
@@ -69,17 +101,108 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.UnauthorizedError       | 401                               | application/json                  |
-| apierrors.InvalidPermissionError  | 403                               | application/json                  |
-| apierrors.LiveNotFoundError       | 404                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |
 
-## DeletePlaybackIDOfStream
+## GetPlaybackIDDetails
 
-Deletes a previously created playback ID for a live stream. This will prevent any new viewers from accessing the stream through the playback ID, though current viewers will be able to continue watching for a limited time before being disconnected. By providing the `playbackId`, FastPix deletes the ID and ensures new playback requests will fail. 
+Retrieves details for an existing playback ID. When you provide the playbackId returned from a previous stream or playback creation request, FastPix returns the associated playback information, including the access policy.
+
+#### Example
+A developer needs to confirm the access policy of the playback ID to ensure whether the stream is public or private for viewers.
+
+### Example Usage
+
+<!-- UsageSnippet language="go" operationID="get-live-stream-playback-id" method="get" path="/live/streams/{streamId}/playback-ids/{playbackId}" -->
+```go
+package main
+
+import(
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+
+	"github.com/FastPix/fastpix-go/models/components"
+	fastpixgo "github.com/FastPix/fastpix-go"
+)
+
+func main() {
+    ctx := context.Background()
+
+    s := fastpixgo.New(
+        fastpixgo.WithSecurity(components.Security{
+            Username: fastpixgo.Pointer("your access-token"),
+            Password: fastpixgo.Pointer("your-secret-key"),
+        }),
+    )
+
+    // your-stream-id: Live stream ID returned from create stream API
+    // your-playback-id: Playback ID returned from create playback ID API
+    res, err := s.LivePlayback.GetPlaybackIDDetails(ctx, "your-stream-id", "your-playback-id")
+    if err != nil {
+        log.Fatal(err)
+    }
+    if res.PlaybackIDSuccessResponse != nil {
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.PlaybackIDSuccessResponse, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.PlaybackIDSuccessResponse)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.PlaybackIDSuccessResponse, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.PlaybackIDSuccessResponse)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
+    }
+}
+```
+
+### Parameters
+
+| Parameter                                                                             | Type                                                                                  | Required                                                                              | Description                                                                           | Example                                                                               |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `ctx`                                                                                 | [context.Context](https://pkg.go.dev/context#Context)                                 | :heavy_check_mark:                                                                    | The context to use for the request.                                                   |                                                                                       |
+| `streamID`                                                                            | *string*                                                                              | :heavy_check_mark:                                                                    | After creating a new live stream, FastPix assigns a unique identifier to the stream.  | your-stream-id                                                      |
+| `playbackID`                                                                          | *string*                                                                              | :heavy_check_mark:                                                                    | After creating a new playbackId, FastPix assigns a unique identifier to the playback. | your-playback-id                                                      |
+| `opts`                                                                                | [][operations.Option](../../models/operations/option.md)                              | :heavy_minus_sign:                                                                    | The options for this request.                                                         |                                                                                       |
+
+### Response
+
+**[*operations.GetLiveStreamPlaybackIDResponse](../../models/operations/getlivestreamplaybackidresponse.md), error**
+
+### Errors
+
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |
+
+## DeletePlaybackID
+
+Deletes a previously created playback ID for a live stream.This prevents new viewers from accessing the stream using the playback ID, while current viewers can continue watching for a short period before the connection ends. FastPix deletes the ID and ensures the new playback request fails.
 
 #### Example
 A streaming service wants to prevent new users from joining a live stream that is nearing its end. The host can delete the playback ID to ensure no one can join the stream or replay it once it ends.
@@ -92,9 +215,12 @@ package main
 
 import(
 	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+
 	"github.com/FastPix/fastpix-go/models/components"
 	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
 )
 
 func main() {
@@ -102,17 +228,28 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.LivePlayback.DeletePlaybackIDOfStream(ctx, "8717422d89288ad5958d4a86e9afe2a2", "88b7ac0f-2504-4dd5-b7b4-d84ab4fee1bd")
+    // your-stream-id: Live stream ID returned from create stream API
+    // your-playback-id: Playback ID returned from create playback ID API
+    res, err := s.LivePlayback.DeletePlaybackID(ctx, "your-stream-id", "your-playback-id")
     if err != nil {
         log.Fatal(err)
     }
     if res.LiveStreamDeleteResponse != nil {
-        // handle response
+        // Print response in JSON format for better readability
+        responseJSON, err := json.MarshalIndent(res.LiveStreamDeleteResponse, "", "  ")
+        if err != nil {
+            log.Printf("Error marshaling response: %v", err)
+            fmt.Printf("Response: %+v\n", res.LiveStreamDeleteResponse)
+        } else {
+            fmt.Println(string(responseJSON))
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
@@ -122,8 +259,8 @@ func main() {
 | Parameter                                                                           | Type                                                                                | Required                                                                            | Description                                                                         | Example                                                                             |
 | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `ctx`                                                                               | [context.Context](https://pkg.go.dev/context#Context)                               | :heavy_check_mark:                                                                  | The context to use for the request.                                                 |                                                                                     |
-| `streamID`                                                                          | *string*                                                                            | :heavy_check_mark:                                                                  | Upon creating a new live stream, FastPix assigns a unique identifier to the stream. | 8717422d89288ad5958d4a86e9afe2a2                                                    |
-| `playbackID`                                                                        | *string*                                                                            | :heavy_check_mark:                                                                  | Unique identifier for the playbackId                                                | 88b7ac0f-2504-4dd5-b7b4-d84ab4fee1bd                                                |
+| `streamID`                                                                          | *string*                                                                            | :heavy_check_mark:                                                                  | Upon creating a new live stream, FastPix assigns a unique identifier to the stream. | your-stream-id                                                    |
+| `playbackID`                                                                        | *string*                                                                            | :heavy_check_mark:                                                                  | Unique identifier for the playbackId                                                | your-playback-id                                                |
 | `opts`                                                                              | [][operations.Option](../../models/operations/option.md)                            | :heavy_minus_sign:                                                                  | The options for this request.                                                       |                                                                                     |
 
 ### Response
@@ -132,73 +269,6 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.UnauthorizedError       | 401                               | application/json                  |
-| apierrors.InvalidPermissionError  | 403                               | application/json                  |
-| apierrors.NotFoundErrorPlaybackID | 404                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
-
-## GetLiveStreamPlaybackID
-
-Retrieves details about a previously created playback ID. If you provide the distinct `playbackId` that was given back to you in the previous stream or <a href="https://docs.fastpix.io/reference/create-playbackid-of-stream">create playbackId</a> request, FastPix will provide the relevant playback details such as the access policy. 
-
-#### Example
-A developer needs to confirm the access policy of the playback ID to ensure whether the stream is public or private for viewers.
-
-### Example Usage
-
-<!-- UsageSnippet language="go" operationID="get-live-stream-playback-id" method="get" path="/live/streams/{streamId}/playback-ids/{playbackId}" -->
-```go
-package main
-
-import(
-	"context"
-	"github.com/FastPix/fastpix-go/models/components"
-	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
-)
-
-func main() {
-    ctx := context.Background()
-
-    s := fastpixgo.New(
-        fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
-            Password: fastpixgo.Pointer("your-secret-key"),
-        }),
-    )
-
-    res, err := s.LivePlayback.GetLiveStreamPlaybackID(ctx, "61a264dcc447b63da6fb79ef925cd76d", "61a264dcc447b63da6fb79ef925cd76d")
-    if err != nil {
-        log.Fatal(err)
-    }
-    if res.PlaybackIDSuccessResponse != nil {
-        // handle response
-    }
-}
-```
-
-### Parameters
-
-| Parameter                                                                            | Type                                                                                 | Required                                                                             | Description                                                                          | Example                                                                              |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `ctx`                                                                                | [context.Context](https://pkg.go.dev/context#Context)                                | :heavy_check_mark:                                                                   | The context to use for the request.                                                  |                                                                                      |
-| `streamID`                                                                           | *string*                                                                             | :heavy_check_mark:                                                                   | Upon creating a new live stream, FastPix assigns a unique identifier to the stream.  | 61a264dcc447b63da6fb79ef925cd76d                                                     |
-| `playbackID`                                                                         | *string*                                                                             | :heavy_check_mark:                                                                   | Upon creating a new playbackId, FastPix assigns a unique identifier to the playback. | 61a264dcc447b63da6fb79ef925cd76d                                                     |
-| `opts`                                                                               | [][operations.Option](../../models/operations/option.md)                             | :heavy_minus_sign:                                                                   | The options for this request.                                                        |                                                                                      |
-
-### Response
-
-**[*operations.GetLiveStreamPlaybackIDResponse](../../models/operations/getlivestreamplaybackidresponse.md), error**
-
-### Errors
-
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.UnauthorizedError       | 401                               | application/json                  |
-| apierrors.InvalidPermissionError  | 403                               | application/json                  |
-| apierrors.NotFoundErrorPlaybackID | 404                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |

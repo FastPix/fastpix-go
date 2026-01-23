@@ -1,6 +1,6 @@
 # AudioInputType
 
-Type of overlay (currently only supports 'audio').
+Type of overlay (currently only supports "audio").
 
 
 ## Values

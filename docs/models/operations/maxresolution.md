@@ -13,4 +13,3 @@ Determines the highest quality resolution available.
 | `MaxResolutionOneThousandAndEightyp`           | 1080p                                          |
 | `MaxResolutionSevenHundredAndTwentyp`          | 720p                                           |
 | `MaxResolutionFourHundredAndEightyp`           | 480p                                           |
-| `MaxResolutionThreeHundredAndSixtyp`           | 360p                                           |

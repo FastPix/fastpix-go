@@ -1,24 +1,24 @@
 # StartLiveStream
-(*StartLiveStream*)
 
 ## Overview
 
 ### Available Operations
 
-* [CreateNewStream](#createnewstream) - Create a new stream
+* [Create](#create) - Create a new stream
 
-## CreateNewStream
+## Create
 
-Allows you to initiate a new <a href="https://docs.fastpix.io/docs/get-started-with-live-streaming">RTMPS</a> or <a href="https://docs.fastpix.io/docs/using-srt-to-live-stream">SRT</a> live stream on FastPix. Upon creating a stream, FastPix generates a unique `streamKey` and `srtSecret`, which can be used with any broadcasting software (like OBS) to connect to FastPix's RTMPS or SRT servers.
+Creates a new <a href="https://docs.fastpix.io/docs/get-started-with-live-streaming">RTMPS</a> or <a href="https://docs.fastpix.io/docs/using-srt-to-live-stream">SRT</a> live stream in FastPix. When you create a stream, FastPix generates a unique `streamKey` and `srtSecret` that you can use with broadcasting software such as OBS to connect to FastPix RTMPS or SRT servers. Use SRT for live streaming in unstable network conditions, as it provides error correction and encryption for a more reliable and secure broadcast.
+
 Leverage SRT for live streaming in environments with unstable networks, taking advantage of its error correction and encryption features for a resilient and secure broadcast. 
 
 <h4>How it works</h4> 
 
-1. Send a a `POST` request to this endpoint. You can configure the stream settings, including `metadata` (such as stream name and description), `reconnectWindow` (in case of disconnection), and privacy options (`public` or `private`). 
+1. Send a `POST` request to this endpoint. You can configure the stream settings, including `metadata` (such as stream name and description), `reconnectWindow` (in case of disconnection), and privacy options (`public` or `private`). 
 
 2. FastPix returns the stream details for both RTMPS and SRT configurations. These keys and IDs from the stream details are essential for connecting the broadcasting software to FastPix’s servers and transmitting the live stream to viewers.
 
-3. Once the live stream is created, we’ll shoot a `POST` message to the address you give us with the webhook event <a href="https://docs.fastpix.io/docs/live-events#videolive_streamcreated">video.live_stream.created</a>.
+3. After the live stream is created, FastPix sends a `POST` request to your specified webhook endpoint with the event <a href="https://docs.fastpix.io/docs/live-events#videolive_streamcreated">video.live_stream.created</a>.
 
 
 **Example:**
@@ -36,10 +36,15 @@ Related guide: <a href="https://docs.fastpix.io/docs/how-to-livestream">How to l
 package main
 
 import(
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+
 	"github.com/FastPix/fastpix-go/models/components"
 	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
 )
 
 func main() {
@@ -47,28 +52,53 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.StartLiveStream.CreateNewStream(ctx, components.CreateLiveStreamRequest{
-        PlaybackSettings: components.PlaybackSettings{
-            AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
-        },
+    res, err := s.StartLiveStream.Create(ctx, components.CreateLiveStreamRequest{
+        PlaybackSettings: components.PlaybackSettings{},
         InputMediaSettings: components.InputMediaSettings{
-            MediaPolicy: components.BasicAccessPolicyPublic.ToPointer(),
             Metadata: map[string]string{
-                "livestream_name": "fastpix_livestream",
+                "livestream_name": "your-livestream-name",
             },
-            EnableDvrMode: fastpixgo.Pointer(true),
         },
     })
     if err != nil {
         log.Fatal(err)
     }
     if res.LiveStreamResponseDTO != nil {
-        // handle response
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.LiveStreamResponseDTO, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.LiveStreamResponseDTO)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.LiveStreamResponseDTO, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.LiveStreamResponseDTO)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
@@ -87,9 +117,6 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.UnauthorizedError       | 401                               | application/json                  |
-| apierrors.InvalidPermissionError  | 403                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |

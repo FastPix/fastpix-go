@@ -1,6 +1,6 @@
 # WatermarkInputType
 
-Type of overlay (currently only supports 'watermark').
+Type of overlay (currently only supports "watermark").
 
 
 ## Values

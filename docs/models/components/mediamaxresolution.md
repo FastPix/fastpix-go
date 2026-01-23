@@ -12,4 +12,3 @@ The maximum resolution specified by the user for the media.
 | `MediaMaxResolutionOneThousandAndEightyp`           | 1080p                                               |
 | `MediaMaxResolutionSevenHundredAndTwentyp`          | 720p                                                |
 | `MediaMaxResolutionFourHundredAndEightyp`           | 480p                                                |
-| `MediaMaxResolutionThreeHundredAndSixtyp`           | 360p                                                |

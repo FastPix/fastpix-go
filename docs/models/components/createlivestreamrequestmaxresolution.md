@@ -1,6 +1,7 @@
 # CreateLiveStreamRequestMaxResolution
 
-Max resolution can be used to control the maximum resolution your media is encoded, stored, and streamed at.
+Defines the maximum resolution for encoding, storage, and playback of the live stream.
+
 
 
 ## Values

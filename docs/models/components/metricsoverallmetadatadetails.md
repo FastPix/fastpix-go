@@ -1,6 +1,6 @@
-# MetricsOverallMetaDataDetails
+# MetricsOverallmetadataDetails
 
-Metadata that has to be paased for metric calculations.
+metadata that has to be paased for metric calculations.
 
 
 ## Fields

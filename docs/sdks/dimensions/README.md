@@ -1,14 +1,15 @@
 # Dimensions
-(*Dimensions*)
 
 ## Overview
 
+Operations involving dimensions
+
 ### Available Operations
 
-* [ListDimensions](#listdimensions) - List the dimensions
-* [ListFilterValuesForDimension](#listfiltervaluesfordimension) - List the filter values for a dimension
+* [List](#list) - List the dimensions
+* [ListFilterValues](#listfiltervalues) - List the filter values for a dimension
 
-## ListDimensions
+## List
 
 Retrieves a list of dimensions that can be used as query parameters across various data endpoints. Each dimension has a unique id that can be used to filter data effectively. 
 
@@ -24,10 +25,15 @@ Related guides: <a href="https://docs.fastpix.io/page/what-video-data-do-we-capt
 package main
 
 import(
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+
 	"github.com/FastPix/fastpix-go/models/components"
 	fastpixgo "github.com/FastPix/fastpix-go"
-	"log"
 )
 
 func main() {
@@ -35,17 +41,46 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.Dimensions.ListDimensions(ctx)
+    res, err := s.Dimensions.List(ctx)
     if err != nil {
         log.Fatal(err)
     }
     if res.Object != nil {
-        // handle response
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.Object)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.Object)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
@@ -63,14 +98,11 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.BadRequestError         | 400                               | application/json                  |
-| apierrors.InvalidPermissionError  | 401                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |
 
-## ListFilterValuesForDimension
+## ListFilterValues
 
 This endpoint returns the filter values associated with a specific dimension, along with the total number of video views for each value. For example, it can list all `browser_name` (dimension) and show how many views occurred for all available browsers like Chrome, Safari (filter values). 
 
@@ -79,10 +111,10 @@ In order to use the <a href="https://docs.fastpix.io/docs/custom-business-metada
 
 #### Example
 
-A developer wants to know how their video content performs across different browsers. By calling this endpoint for the `device_type` dimension, they can retrieve a breakdown of video views by each device (e.g., Desktop, Mobile, Tablet). This data will help the developer understand where optimizations or troubleshooting may be necessary.
+A developer wants to know how their video content performs across different browsers. By calling this endpoint for the `device_type` dimension, they can retrieve a breakdown of video views by each device (for example, Desktop, Mobile, Tablet). This data helps the developer understand where optimizations or troubleshooting is necessary.
 
 
-Related guide: <a href="https://docs.fastpix.io/docs/understand-dashboard-ui#filters-and-timeframes">Filters and timeframes</a>
+Related guide: <a href="https://docs.fastpix.io/docs/understand-dashboard-ui#filters-and-timeframes">Filters and timespan</a>
 
 
 ### Example Usage
@@ -92,11 +124,16 @@ Related guide: <a href="https://docs.fastpix.io/docs/understand-dashboard-ui#fil
 package main
 
 import(
-	"context"
-	"github.com/FastPix/fastpix-go/models/components"
-	fastpixgo "github.com/FastPix/fastpix-go"
-	"github.com/FastPix/fastpix-go/models/operations"
+    "context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"io"
+	"bytes"
+
+	"github.com/FastPix/fastpix-go/models/components"
+	"github.com/FastPix/fastpix-go/models/operations"
+	fastpixgo "github.com/FastPix/fastpix-go"
 )
 
 func main() {
@@ -104,30 +141,59 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
 
-    res, err := s.Dimensions.ListFilterValuesForDimension(ctx, operations.DimensionsIDBrowserName, operations.ListFilterValuesForDimensionTimespanSevendays, fastpixgo.Pointer("browser_name:Chrome"))
+    res, err := s.Dimensions.ListFilterValues(ctx, operations.DimensionsIDBrowserName, operations.ListFilterValuesForDimensionTimespanTwentyFourhours.ToPointer(), fastpixgo.Pointer("browser_name:your-browser-name")) // Filter by dimension value (e.g., "browser_name:Chrome")
     if err != nil {
         log.Fatal(err)
     }
     if res.Object != nil {
-        // handle response
+        // Read raw response body to preserve API's JSON field order
+        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
+            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
+            if err == nil && len(rawBody) > 0 {
+                var buf bytes.Buffer
+                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
+                    fmt.Println(buf.String())
+                } else {
+                    fmt.Println(string(rawBody))
+                }
+            } else {
+                responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+                if err != nil {
+                    log.Printf("Error marshaling response: %v", err)
+                    fmt.Printf("Response: %+v\n", res.Object)
+                } else {
+                    fmt.Println(string(responseJSON))
+                }
+            }
+        } else {
+            responseJSON, err := json.MarshalIndent(res.Object, "", "  ")
+            if err != nil {
+                log.Printf("Error marshaling response: %v", err)
+                fmt.Printf("Response: %+v\n", res.Object)
+            } else {
+                fmt.Println(string(responseJSON))
+            }
+        }
+    } else if res.DefaultError != nil {
+        fmt.Printf("Error: %+v\n", res.DefaultError)
     }
 }
 ```
 
 ### Parameters
 
-| Parameter                                                                                                                                                                                                                                                                                                                | Type                                                                                                                                                                                                                                                                                                                     | Required                                                                                                                                                                                                                                                                                                                 | Description                                                                                                                                                                                                                                                                                                              | Example                                                                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ctx`                                                                                                                                                                                                                                                                                                                    | [context.Context](https://pkg.go.dev/context#Context)                                                                                                                                                                                                                                                                    | :heavy_check_mark:                                                                                                                                                                                                                                                                                                       | The context to use for the request.                                                                                                                                                                                                                                                                                      |                                                                                                                                                                                                                                                                                                                          |
-| `dimensionsID`                                                                                                                                                                                                                                                                                                           | [operations.DimensionsID](../../models/operations/dimensionsid.md)                                                                                                                                                                                                                                                       | :heavy_check_mark:                                                                                                                                                                                                                                                                                                       | Pass Dimensions id<br/>                                                                                                                                                                                                                                                                                                  | browser_name                                                                                                                                                                                                                                                                                                             |
-| `timespan`                                                                                                                                                                                                                                                                                                               | [operations.ListFilterValuesForDimensionTimespan](../../models/operations/listfiltervaluesfordimensiontimespan.md)                                                                                                                                                                                                       | :heavy_check_mark:                                                                                                                                                                                                                                                                                                       | This parameter specifies the time span between which the video views list should be retrieved by. You can provide either from and to unix epoch timestamps or time duration. The scope of duration is between 60 minutes to 30 days.<br/>                                                                                | 7:days                                                                                                                                                                                                                                                                                                                   |
-| `filterby`                                                                                                                                                                                                                                                                                                               | **string*                                                                                                                                                                                                                                                                                                                | :heavy_minus_sign:                                                                                                                                                                                                                                                                                                       | Pass the dimensions and their corresponding values you want to filter the views by. For excluding the values in the filter we can pass '!' before the filter value. The list of filters can be obtained from list of dimensions endpoint.<br/>Example Values : [ browser_name:Chrome , os_name:macOS , device_name:Galaxy ]<br/> | browser_name:Chrome                                                                                                                                                                                                                                                                                                      |
-| `opts`                                                                                                                                                                                                                                                                                                                   | [][operations.Option](../../models/operations/option.md)                                                                                                                                                                                                                                                                 | :heavy_minus_sign:                                                                                                                                                                                                                                                                                                       | The options for this request.                                                                                                                                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                          |
+| Parameter                                                                                                                                                                                                                                                                                                                                                                                                                        | Type                                                                                                                                                                                                                                                                                                                                                                                                                             | Required                                                                                                                                                                                                                                                                                                                                                                                                                         | Description                                                                                                                                                                                                                                                                                                                                                                                                                      | Example                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctx`                                                                                                                                                                                                                                                                                                                                                                                                                            | [context.Context](https://pkg.go.dev/context#Context)                                                                                                                                                                                                                                                                                                                                                                            | :heavy_check_mark:                                                                                                                                                                                                                                                                                                                                                                                                               | The context to use for the request.                                                                                                                                                                                                                                                                                                                                                                                              |                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `dimensionsID`                                                                                                                                                                                                                                                                                                                                                                                                                   | [operations.DimensionsID](../../models/operations/dimensionsid.md)                                                                                                                                                                                                                                                                                                                                                               | :heavy_check_mark:                                                                                                                                                                                                                                                                                                                                                                                                               | Pass Dimensions Id<br/>                                                                                                                                                                                                                                                                                                                                                                                                          | browser_name                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `timespan`                                                                                                                                                                                                                                                                                                                                                                                                                       | [*operations.ListFilterValuesForDimensionTimespan](../../models/operations/listfiltervaluesfordimensiontimespan.md)                                                                                                                                                                                                                                                                                                              | :heavy_minus_sign:                                                                                                                                                                                                                                                                                                                                                                                                               | This parameter specifies the time span between which the video views list must be retrieved by. You can provide either from and to unix epoch timestamps or time duration. The scope of duration is between 60 minutes to 30 days.<br/><br/>**Accepted formats are:**<br/><br/>array of epoch timestamps for example <br/>`timespan[]=1498867200&timespan[]=1498953600`<br/><br/>duration string for example  <br/>`timespan[]=24:hours` or `timespan[]=7:days`<br/> | 24:hours                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `filterby`                                                                                                                                                                                                                                                                                                                                                                                                                       | **string*                                                                                                                                                                                                                                                                                                                                                                                                                        | :heavy_minus_sign:                                                                                                                                                                                                                                                                                                                                                                                                               | Pass the dimensions and their corresponding values you want to filter the views by. For excluding the values in the filter we can pass "!" before the filter value. The list of filters can be obtained from list of dimensions endpoint.<br/>Example Values : [ browser_name:Chrome , os_name:macOS , !device_name:Galaxy ]<br/>                                                                                                | browser_name:Chrome                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `opts`                                                                                                                                                                                                                                                                                                                                                                                                                           | [][operations.Option](../../models/operations/option.md)                                                                                                                                                                                                                                                                                                                                                                         | :heavy_minus_sign:                                                                                                                                                                                                                                                                                                                                                                                                               | The options for this request.                                                                                                                                                                                                                                                                                                                                                                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Response
 
@@ -135,9 +201,6 @@ func main() {
 
 ### Errors
 
-| Error Type                        | Status Code                       | Content Type                      |
-| --------------------------------- | --------------------------------- | --------------------------------- |
-| apierrors.InvalidPermissionError  | 401                               | application/json                  |
-| apierrors.ViewNotFoundError       | 404                               | application/json                  |
-| apierrors.ValidationErrorResponse | 422                               | application/json                  |
-| apierrors.APIError                | 4XX, 5XX                          | \*/\*                             |
+| Error Type         | Status Code        | Content Type       |
+| ------------------ | ------------------ | ------------------ |
+| apierrors.APIError | 4XX, 5XX           | \*/\*              |
