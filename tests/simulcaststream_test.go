@@ -10,12 +10,12 @@ import (
 )
 
 type SimulcastStreamTest struct {
-	sdk *fastpixgo.FastPixSDK
+	sdk *fastpixgo.Fastpixgo
 }
 
 func setupSimulcastStreamTest(t *testing.T) *SimulcastStreamTest {
 	livestreamServerURL, _, username, password := LoadConfig()
-	
+
 	// Log the livestream server URL
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 
@@ -72,7 +72,7 @@ func TestSimulcastStream(t *testing.T) {
 		// Store the simulcast stream ID for later tests
 		if resp.SimulcastResponse.Data != nil && resp.SimulcastResponse.Data.SimulcastID != nil {
 			simulcastStreamID := *resp.SimulcastResponse.Data.SimulcastID
-			
+
 			t.Run("GetSpecificSimulcastOfStream", func(t *testing.T) {
 				resp, err := test.sdk.SimulcastStream.GetSpecificSimulcastOfStream(ctx, sourceStreamID, simulcastStreamID)
 				if err != nil {
@@ -129,4 +129,4 @@ func stringPtr(s string) *string {
 
 func boolPtr(b bool) *bool {
 	return &b
-} 
+}

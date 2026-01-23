@@ -11,7 +11,7 @@ import (
 )
 
 type InputVideoTest struct {
-	sdk *fastpixgo.FastPixSDK
+	sdk *fastpixgo.Fastpixgo
 }
 
 func setupInputVideoTest(t *testing.T) *InputVideoTest {
@@ -36,33 +36,33 @@ func TestCreateMediaFromURL(t *testing.T) {
 	ctx := context.Background()
 
 	// Create media from a public URL
-	videoInput := components.VideoInput{
-		Type: "video",
-		URL:  "https://example.com/sample-video.mp4", // Replace with a valid public video URL
+	videoInput := components.PullVideoInput{
+		Type: fastpixgo.Pointer("video"),
+		URL:  fastpixgo.Pointer("https://example.com/sample-video.mp4"), // Replace with a valid public video URL
 	}
-	input := components.CreateInputVideoInput(videoInput)
+	input := components.CreateInputPullVideoInput(videoInput)
 
 	request := &components.CreateMediaRequest{
 		Inputs:        []components.Input{input},
-		AccessPolicy:  components.CreateMediaRequestAccessPolicyPublic,
+		AccessPolicy:  components.CreateMediaRequestAccessPolicyPublic.ToPointer(),
 		MaxResolution: components.CreateMediaRequestMaxResolution("1080p").ToPointer(),
 	}
 
-	resp, err := test.sdk.InputVideo.CreateMedia(ctx, request)
+	resp, err := test.sdk.InputVideo.Create(ctx, *request)
 	if err != nil {
 		t.Fatalf("CreateMedia failed: %v", err)
 	}
 
-	if resp == nil || resp.Object == nil || resp.Object.Data == nil {
+	if resp == nil || resp.CreateMediaSuccessResponse == nil || resp.CreateMediaSuccessResponse.Data == nil {
 		t.Fatal("CreateMedia response is nil")
 	}
 
 	// Verify the response contains an ID
-	if resp.Object.Data.ID == nil {
+	if resp.CreateMediaSuccessResponse.Data.ID == nil {
 		t.Fatal("Media ID is nil in response")
 	}
 
-	t.Logf("Successfully created media with ID: %s", *resp.Object.Data.ID)
+	t.Logf("Successfully created media with ID: %s", *resp.CreateMediaSuccessResponse.Data.ID)
 }
 
 func TestDirectUploadVideoMedia(t *testing.T) {
@@ -72,32 +72,27 @@ func TestDirectUploadVideoMedia(t *testing.T) {
 
 	// Request direct upload URL
 	request := &operations.DirectUploadVideoMediaRequest{
-		CorsOrigin: "*", // Allow uploads from any origin
+		CorsOrigin: fastpixgo.Pointer("*"), // Allow uploads from any origin
 		PushMediaSettings: &operations.PushMediaSettings{
-			AccessPolicy:  operations.DirectUploadVideoMediaAccessPolicyPublic,
+			AccessPolicy:  operations.DirectUploadVideoMediaAccessPolicyPublic.ToPointer(),
 			MaxResolution: operations.MaxResolution("1080p").ToPointer(),
 		},
 	}
 
-	resp, err := test.sdk.InputVideo.DirectUploadVideoMedia(ctx, request)
+	resp, err := test.sdk.InputVideo.DirectUploadMedia(ctx, request)
 	if err != nil {
 		t.Fatalf("DirectUploadVideoMedia failed: %v", err)
 	}
 
-	if resp == nil || resp.Object == nil || resp.Object.Data == nil {
+	if resp == nil || resp.Object == nil {
 		t.Fatal("DirectUploadVideoMedia response is nil")
 	}
 
 	// Print full response details
 	t.Logf("Full Response Details:")
-	if resp.Object.Success != nil {
-		t.Logf("Success: %v", *resp.Object.Success)
-	}
-	if resp.Object.Data.ID != nil {
-		t.Logf("Upload ID: %s", *resp.Object.Data.ID)
-	}
-	if resp.Object.Data.MediaID != nil {
-		t.Logf("Media ID: %s", *resp.Object.Data.MediaID)
+	t.Logf("Success: %v", resp.Object.Success)
+	if resp.Object.Data.UploadID != nil {
+		t.Logf("Upload ID: %s", *resp.Object.Data.UploadID)
 	}
 	if resp.Object.Data.Status != nil {
 		t.Logf("Status: %s", *resp.Object.Data.Status)
@@ -125,4 +120,4 @@ func TestDirectUploadVideoMedia(t *testing.T) {
 	}
 
 	t.Logf("Successfully got upload URL: %s", *resp.Object.Data.URL)
-} 
+}

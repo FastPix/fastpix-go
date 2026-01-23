@@ -10,7 +10,7 @@ import (
 )
 
 type ManageVideosTest struct {
-	sdk *fastpixgo.FastPixSDK
+	sdk *fastpixgo.Fastpixgo
 }
 
 func setupTest(t *testing.T) *ManageVideosTest {
@@ -82,4 +82,4 @@ func TestComprehensiveMediaOperations(t *testing.T) {
 	if deleteResp == nil || deleteResp.Object == nil {
 		t.Fatal("DeleteMedia response is nil")
 	}
-} 
+}

@@ -9,12 +9,12 @@ import (
 )
 
 type StartLiveStreamTest struct {
-	sdk *fastpixgo.FastPixSDK
+	sdk *fastpixgo.Fastpixgo
 }
 
 func setupStartLiveStreamTest(t *testing.T) *StartLiveStreamTest {
 	livestreamServerURL, _, username, password := LoadConfig()
-	
+
 	// Log the livestream server URL
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 
@@ -57,4 +57,4 @@ func TestCreateNewStream(t *testing.T) {
 	}
 
 	t.Logf("Successfully created a new stream")
-} 
+}

@@ -13,8 +13,8 @@ import (
 )
 
 type PlaybackTest struct {
-	livestreamSDK *fastpixgo.FastPixSDK
-	mediaSDK      *fastpixgo.FastPixSDK
+	livestreamSDK *fastpixgo.Fastpixgo
+	mediaSDK      *fastpixgo.Fastpixgo
 	t             *testing.T
 }
 
@@ -70,7 +70,7 @@ func (pt *PlaybackTest) createMediaAsset() string {
 				Type: components.InputTypeVideoInput,
 				VideoInput: &components.VideoInput{
 					Type: "video",
-					URL: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+					URL:  "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
 				},
 			},
 		},
@@ -215,4 +215,4 @@ func TestMediaPlayback(t *testing.T) {
 			})
 		}
 	})
-} 
+}

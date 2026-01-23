@@ -11,12 +11,12 @@ import (
 )
 
 type ManageLivestreamTest struct {
-	sdk *fastpixgo.FastPixSDK
+	sdk *fastpixgo.Fastpixgo
 }
 
 func setupManageLivestreamTest(t *testing.T) *ManageLivestreamTest {
 	livestreamServerURL, _, username, password := LoadConfig()
-	
+
 	// Log the livestream server URL
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 
@@ -132,4 +132,4 @@ func TestManageLivestream(t *testing.T) {
 			t.Logf("DeleteLiveStream response: %s", string(raw))
 		}
 	})
-} 
+}
