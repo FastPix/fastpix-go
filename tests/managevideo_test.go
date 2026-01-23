@@ -35,10 +35,10 @@ func TestComprehensiveMediaOperations(t *testing.T) {
 	ctx := context.Background()
 	limit := int64(20)
 	offset := int64(1)
-	orderBy := operations.ListMediaOrderByDesc
+	orderBy := components.SortOrderDesc
 
 	// Step 1: List media to get a media ID
-	listResp, err := test.sdk.ManageVideos.ListMedia(ctx, &limit, &offset, &orderBy)
+	listResp, err := test.sdk.ManageVideos.List(ctx, &limit, &offset, &orderBy)
 	if err != nil {
 		t.Fatalf("ListMedia failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestComprehensiveMediaOperations(t *testing.T) {
 	mediaID := *listResp.Object.Data[0].ID // Dereference the media ID
 
 	// Step 2: Get media details
-	getResp, err := test.sdk.ManageVideos.GetMedia(ctx, mediaID)
+	getResp, err := test.sdk.Videos.Get(ctx, mediaID)
 	if err != nil {
 		t.Fatalf("GetMedia failed: %v", err)
 	}
@@ -60,11 +60,11 @@ func TestComprehensiveMediaOperations(t *testing.T) {
 	}
 
 	// Step 3: Update media metadata
-	updateBody := &operations.UpdatedMediaRequestBody{
-		Metadata: &operations.UpdatedMediaMetadata{},
+	updateBody := operations.UpdatedMediaRequestBody{
+		Metadata: map[string]string{},
 	}
 
-	updateResp, err := test.sdk.ManageVideos.UpdatedMedia(ctx, mediaID, updateBody)
+	updateResp, err := test.sdk.Videos.Update(ctx, mediaID, updateBody)
 	if err != nil {
 		t.Fatalf("UpdatedMedia failed: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestComprehensiveMediaOperations(t *testing.T) {
 	}
 
 	// Step 4: Delete media
-	deleteResp, err := test.sdk.ManageVideos.DeleteMedia(ctx, mediaID)
+	deleteResp, err := test.sdk.ManageVideos.Delete(ctx, mediaID)
 	if err != nil {
 		t.Fatalf("DeleteMedia failed: %v", err)
 	}

@@ -37,7 +37,7 @@ func TestSimulcastStream(t *testing.T) {
 	ctx := context.Background()
 
 	// First, get a list of livestreams to use as source
-	resp, err := test.sdk.ManageLiveStream.GetAllStreams(ctx, nil, nil, nil)
+		resp, err := test.sdk.ManageLiveStream.List(ctx, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to get livestreams: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestSimulcastStream(t *testing.T) {
 			StreamKey: stringPtr("live_1012464221_DuM8W004MoZYNxQEZ0czODgfHCFBhk"),
 		}
 
-		resp, err := test.sdk.SimulcastStream.CreateSimulcastOfStream(ctx, sourceStreamID, createReq)
+		resp, err := test.sdk.SimulcastStreams.Create(ctx, sourceStreamID, *createReq)
 		if err != nil {
 			t.Fatalf("CreateSimulcastOfStream failed: %v", err)
 		}
@@ -74,7 +74,7 @@ func TestSimulcastStream(t *testing.T) {
 			simulcastStreamID := *resp.SimulcastResponse.Data.SimulcastID
 
 			t.Run("GetSpecificSimulcastOfStream", func(t *testing.T) {
-				resp, err := test.sdk.SimulcastStream.GetSpecificSimulcastOfStream(ctx, sourceStreamID, simulcastStreamID)
+				resp, err := test.sdk.SimulcastStreams.GetSpecific(ctx, sourceStreamID, simulcastStreamID)
 				if err != nil {
 					t.Fatalf("GetSpecificSimulcastOfStream failed: %v", err)
 				}
@@ -88,11 +88,11 @@ func TestSimulcastStream(t *testing.T) {
 			})
 
 			t.Run("UpdateSpecificSimulcastOfStream", func(t *testing.T) {
-				updateReq := &components.SimulcastUpdateRequest{
+				updateReq := components.SimulcastUpdateRequest{
 					IsEnabled: boolPtr(false),
 				}
 
-				resp, err := test.sdk.SimulcastStream.UpdateSpecificSimulcastOfStream(ctx, sourceStreamID, simulcastStreamID, updateReq)
+				resp, err := test.sdk.SimulcastStreams.Update(ctx, sourceStreamID, simulcastStreamID, updateReq)
 				if err != nil {
 					t.Fatalf("UpdateSpecificSimulcastOfStream failed: %v", err)
 				}
@@ -106,7 +106,7 @@ func TestSimulcastStream(t *testing.T) {
 			})
 
 			t.Run("DeleteSimulcastOfStream", func(t *testing.T) {
-				resp, err := test.sdk.SimulcastStream.DeleteSimulcastOfStream(ctx, sourceStreamID, simulcastStreamID)
+				resp, err := test.sdk.SimulcastStream.Delete(ctx, sourceStreamID, simulcastStreamID)
 				if err != nil {
 					t.Fatalf("DeleteSimulcastOfStream failed: %v", err)
 				}

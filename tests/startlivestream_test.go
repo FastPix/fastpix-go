@@ -36,18 +36,18 @@ func TestCreateNewStream(t *testing.T) {
 
 	ctx := context.Background()
 	reconnectWindow := int64(60)
-	request := &components.CreateLiveStreamRequest{
+	request := components.CreateLiveStreamRequest{
 		PlaybackSettings: components.PlaybackSettings{
 			// Add playback settings if needed
 		},
 		InputMediaSettings: components.InputMediaSettings{
 			MaxResolution:   components.CreateLiveStreamRequestMaxResolutionOneThousandAndEightyp.ToPointer(),
 			ReconnectWindow: &reconnectWindow,
-			MediaPolicy:     components.MediaPolicyPublic.ToPointer(),
+			MediaPolicy:     components.BasicAccessPolicyPublic.ToPointer(),
 		},
 	}
 
-	resp, err := test.sdk.StartLiveStream.CreateNewStream(ctx, request)
+	resp, err := test.sdk.StartLiveStream.Create(ctx, request)
 	if err != nil {
 		t.Fatalf("CreateNewStream failed: %v", err)
 	}

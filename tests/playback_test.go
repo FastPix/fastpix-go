@@ -47,7 +47,7 @@ func setupPlaybackTest(t *testing.T) *PlaybackTest {
 }
 
 func (pt *PlaybackTest) getStreamID() string {
-	resp, err := pt.livestreamSDK.ManageLiveStream.GetAllStreams(context.Background(), nil, nil, nil)
+	resp, err := pt.livestreamSDK.ManageLiveStream.List(context.Background(), nil, nil, nil)
 	if err != nil {
 		pt.t.Fatalf("Failed to get livestreams: %v", err)
 	}
@@ -64,38 +64,35 @@ func (pt *PlaybackTest) createMediaAsset() string {
 	ctx := context.Background()
 
 	// Create a media asset from a URL
-	createReq := &components.CreateMediaRequest{
+	createReq := components.CreateMediaRequest{
 		Inputs: []components.Input{
-			{
-				Type: components.InputTypeVideoInput,
-				VideoInput: &components.VideoInput{
-					Type: "video",
-					URL:  "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-				},
-			},
+			components.CreateInputPullVideoInput(components.PullVideoInput{
+				Type: fastpixgo.Pointer("video"),
+				URL:  fastpixgo.Pointer("https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
+			}),
 		},
-		AccessPolicy: components.CreateMediaRequestAccessPolicyPublic,
+		AccessPolicy: components.CreateMediaRequestAccessPolicyPublic.ToPointer(),
 	}
 
-	resp, err := pt.mediaSDK.InputVideo.CreateMedia(ctx, createReq)
+	resp, err := pt.mediaSDK.InputVideo.Create(ctx, createReq)
 	if err != nil {
 		pt.t.Fatalf("Failed to create media asset: %v", err)
 	}
-	if resp == nil || resp.Object == nil || resp.Object.Data == nil || resp.Object.Data.ID == nil {
+	if resp == nil || resp.CreateMediaSuccessResponse == nil || resp.CreateMediaSuccessResponse.Data == nil || resp.CreateMediaSuccessResponse.Data.ID == nil {
 		pt.t.Fatal("Failed to create media asset: response is nil or missing ID")
 	}
 
-	mediaID := *resp.Object.Data.ID
+	mediaID := *resp.CreateMediaSuccessResponse.Data.ID
 	pt.t.Logf("Created media asset with ID: %s", mediaID)
 
 	// Wait for the media asset to be processed
 	for i := 0; i < 45; i++ {
 		time.Sleep(4 * time.Second)
-		getResp, err := pt.mediaSDK.ManageVideos.GetMedia(ctx, mediaID)
+		getResp, err := pt.mediaSDK.Videos.Get(ctx, mediaID)
 		if err == nil && getResp != nil && getResp.Object != nil && getResp.Object.Data != nil {
 			if getResp.Object.Data.Status != nil {
-				pt.t.Logf("Media asset status: %s", *getResp.Object.Data.Status)
-				if strings.ToLower(*getResp.Object.Data.Status) == "ready" {
+				pt.t.Logf("Media asset status: %s", string(*getResp.Object.Data.Status))
+				if strings.ToLower(string(*getResp.Object.Data.Status)) == "ready" {
 					pt.t.Logf("Media asset is ready")
 					return mediaID
 				}
@@ -116,42 +113,42 @@ func TestLiveStreamPlayback(t *testing.T) {
 	t.Run("CreatePlaybackID", func(t *testing.T) {
 		// Create a playback ID for the live stream
 		createReq := &components.PlaybackIDRequest{
-			AccessPolicy: components.PlaybackIDRequestAccessPolicyPublic.ToPointer(),
+			AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
 		}
 
-		resp, err := test.livestreamSDK.Playback.CreatePlaybackIDOfStream(ctx, streamID, createReq)
+		resp, err := test.livestreamSDK.LivePlayback.Create(ctx, streamID, *createReq)
 		if err != nil {
 			t.Fatalf("CreatePlaybackIDOfStream failed: %v", err)
 		}
-		if resp == nil || resp.PlaybackIDResponse == nil {
+		if resp == nil || resp.PlaybackIDSuccessResponse == nil {
 			t.Fatal("CreatePlaybackIDOfStream response is nil")
 		}
 
 		// Log the response
-		if raw, err := json.MarshalIndent(resp.PlaybackIDResponse, "", "  "); err == nil {
+		if raw, err := json.MarshalIndent(resp.PlaybackIDSuccessResponse, "", "  "); err == nil {
 			t.Logf("CreatePlaybackIDOfStream response: %s", string(raw))
 		}
 
 		// Store the playback ID for later tests
-		if resp.PlaybackIDResponse.Data != nil && resp.PlaybackIDResponse.Data.ID != nil {
-			playbackID := *resp.PlaybackIDResponse.Data.ID
+		if resp.PlaybackIDSuccessResponse.Data != nil && resp.PlaybackIDSuccessResponse.Data.ID != nil {
+			playbackID := *resp.PlaybackIDSuccessResponse.Data.ID
 
 			t.Run("GetPlaybackID", func(t *testing.T) {
-				resp, err := test.livestreamSDK.Playback.GetLiveStreamPlaybackID(ctx, streamID, playbackID)
+				resp, err := test.livestreamSDK.LivePlayback.GetPlaybackIDDetails(ctx, streamID, playbackID)
 				if err != nil {
 					t.Fatalf("GetLiveStreamPlaybackID failed: %v", err)
 				}
-				if resp == nil || resp.PlaybackIDResponse == nil {
+				if resp == nil || resp.PlaybackIDSuccessResponse == nil {
 					t.Fatal("GetLiveStreamPlaybackID response is nil")
 				}
 
-				if raw, err := json.MarshalIndent(resp.PlaybackIDResponse, "", "  "); err == nil {
+				if raw, err := json.MarshalIndent(resp.PlaybackIDSuccessResponse, "", "  "); err == nil {
 					t.Logf("GetLiveStreamPlaybackID response: %s", string(raw))
 				}
 			})
 
 			t.Run("DeletePlaybackID", func(t *testing.T) {
-				resp, err := test.livestreamSDK.Playback.DeletePlaybackIDOfStream(ctx, streamID, playbackID)
+				resp, err := test.livestreamSDK.LivePlayback.DeletePlaybackID(ctx, streamID, playbackID)
 				if err != nil {
 					t.Fatalf("DeletePlaybackIDOfStream failed: %v", err)
 				}
@@ -180,10 +177,10 @@ func TestMediaPlayback(t *testing.T) {
 	t.Run("CreatePlaybackID", func(t *testing.T) {
 		// Create a playback ID for the media
 		createReq := &operations.CreateMediaPlaybackIDRequestBody{
-			AccessPolicy: operations.CreateMediaPlaybackIDAccessPolicyPublic,
+			AccessPolicy: components.AccessPolicyPublic,
 		}
 
-		resp, err := test.mediaSDK.Playback.CreateMediaPlaybackID(ctx, mediaID, createReq)
+		resp, err := test.mediaSDK.Playback.Create(ctx, mediaID, createReq)
 		if err != nil {
 			t.Fatalf("CreateMediaPlaybackID failed: %v", err)
 		}
@@ -197,11 +194,11 @@ func TestMediaPlayback(t *testing.T) {
 		}
 
 		// Store the playback ID for later tests
-		if resp.Object.Data != nil && len(resp.Object.Data.PlaybackIds) > 0 {
-			playbackID := *resp.Object.Data.PlaybackIds[0].ID
+		if resp.Object.Data != nil && resp.Object.Data.ID != nil {
+			playbackID := *resp.Object.Data.ID
 
 			t.Run("DeletePlaybackID", func(t *testing.T) {
-				resp, err := test.mediaSDK.Playback.DeleteMediaPlaybackID(ctx, mediaID, playbackID)
+				resp, err := test.mediaSDK.Playback.Delete(ctx, mediaID, playbackID)
 				if err != nil {
 					t.Fatalf("DeleteMediaPlaybackID failed: %v", err)
 				}
