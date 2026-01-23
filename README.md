@@ -206,46 +206,46 @@ Upload, manage, and transform video content with comprehensive media management 
 For detailed documentation, see [FastPix Video on Demand Overview](https://docs.fastpix.io/docs/video-on-demand-overview).
 
 #### Input Video
-- [Create from URL](docs/sdks/inputvideo/README.md#create) - Upload video content from external URL
-- [Upload from Device](docs/sdks/inputvideo/README.md#directuploadmedia) - Upload video files directly from device
+- [Create from URL](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/inputvideo/README.md#create) - Upload video content from external URL
+- [Upload from Device](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/inputvideo/README.md#directuploadmedia) - Upload video files directly from device
 
 #### Manage Videos
-- [List All Media](docs/sdks/managevideos/README.md#list) - Retrieve complete list of all media files
-- [Get Media by ID](docs/sdks/videos/README.md#get) - Get detailed information for specific media
-- [Update Media](docs/sdks/videos/README.md#update) - Modify media metadata and settings
-- [Delete Media](docs/sdks/managevideos/README.md#delete) - Remove media files from library
-- [Cancel Upload](docs/sdks/managevideos/README.md#cancelupload) - Stop ongoing media upload process
-- [Get Input Info](docs/sdks/managevideos/README.md#getinputinfo) - Retrieve detailed input information
-- [List Uploads](docs/sdks/managevideos/README.md#listunuseduploadurls) - Get all available upload URLs
-- [List Clips](docs/sdks/managevideos/README.md#getmediaclips) - Get all clips of a media
+- [List All Media](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#list) - Retrieve complete list of all media files
+- [Get Media by ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#get) - Get detailed information for specific media
+- [Update Media](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#update) - Modify media metadata and settings
+- [Delete Media](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#delete) - Remove media files from library
+- [Cancel Upload](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#cancelupload) - Stop ongoing media upload process
+- [Get Input Info](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#getinputinfo) - Retrieve detailed input information
+- [List Uploads](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#listunuseduploadurls) - Get all available upload URLs
+- [List Clips](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#getmediaclips) - Get all clips of a media
 
 #### Playback
-- [Create Playback ID](docs/sdks/playback/README.md#create) - Generate secure playback identifier
-- [List Playback IDs](docs/sdks/playback/README.md#list) - Get all playback IDs for a media
-- [Delete Playback ID](docs/sdks/playback/README.md#delete) - Remove playback access
-- [Get Playback ID](docs/sdks/playback/README.md#getbyid) - Retrieve playback configuration details
-- [Update Domain Restrictions](docs/sdks/playback/README.md#updatedomainrestrictions) - Update domain restrictions for a playback ID
-- [Update User-Agent Restrictions](docs/sdks/playbackids/README.md#updateuseragentrestrictions) - Update user-agent restrictions for a playback ID
+- [Create Playback ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playback/README.md#create) - Generate secure playback identifier
+- [List Playback IDs](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playback/README.md#list) - Get all playback IDs for a media
+- [Delete Playback ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playback/README.md#delete) - Remove playback access
+- [Get Playback ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playback/README.md#getbyid) - Retrieve playback configuration details
+- [Update Domain Restrictions](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playback/README.md#updatedomainrestrictions) - Update domain restrictions for a playback ID
+- [Update User-Agent Restrictions](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playbackids/README.md#updateuseragentrestrictions) - Update user-agent restrictions for a playback ID
 
 #### Playlist
-- [Create Playlist](docs/sdks/playlists/README.md#create) - Create new video playlist
-- [List Playlists](docs/sdks/playlists/README.md#list) - Get all available playlists
-- [Get Playlist](docs/sdks/playlist/README.md#get) - Retrieve specific playlist details
-- [Update Playlist](docs/sdks/playlists/README.md#update) - Modify playlist settings and metadata
-- [Delete Playlist](docs/sdks/playlists/README.md#delete) - Remove playlist from library
-- [Add Media](docs/sdks/playlist/README.md#addmedia) - Add media items to playlist
-- [Reorder Media](docs/sdks/playlist/README.md#changemediaorder) - Change order of media in playlist
-- [Remove Media](docs/sdks/playlists/README.md#deletemedia) - Remove media from playlist
+- [Create Playlist](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlists/README.md#create) - Create new video playlist
+- [List Playlists](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlists/README.md#list) - Get all available playlists
+- [Get Playlist](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlist/README.md#get) - Retrieve specific playlist details
+- [Update Playlist](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlists/README.md#update) - Modify playlist settings and metadata
+- [Delete Playlist](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlists/README.md#delete) - Remove playlist from library
+- [Add Media](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlist/README.md#addmedia) - Add media items to playlist
+- [Reorder Media](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlist/README.md#changemediaorder) - Change order of media in playlist
+- [Remove Media](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/playlists/README.md#deletemedia) - Remove media from playlist
 
 #### Signing Keys
-- [Create Key](docs/sdks/signingkeys/README.md#create) - Generate new signing key pair
-- [List Keys](docs/sdks/signingkeys/README.md#list) - Get all available signing keys
-- [Delete Key](docs/sdks/signingkeys/README.md#delete) - Remove signing key from system
-- [Get Key](docs/sdks/signingkeys/README.md#getbyid) - Retrieve specific signing key details
+- [Create Key](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/signingkeys/README.md#create) - Generate new signing key pair
+- [List Keys](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/signingkeys/README.md#list) - Get all available signing keys
+- [Delete Key](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/signingkeys/README.md#delete) - Remove signing key from system
+- [Get Key](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/signingkeys/README.md#getbyid) - Retrieve specific signing key details
 
 #### DRM Configurations
-- [List DRM Configs](docs/sdks/drmconfigurations/README.md#list) - Get all DRM configuration options
-- [Get DRM Config](docs/sdks/drmconfigurations/README.md#getbyid) - Retrieve specific DRM configuration
+- [List DRM Configs](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/drmconfigurations/README.md#list) - Get all DRM configuration options
+- [Get DRM Config](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/drmconfigurations/README.md#getbyid) - Retrieve specific DRM configuration
 
 ### Live API
 
@@ -254,28 +254,28 @@ Stream, manage, and transform live video content with real-time broadcasting cap
 For detailed documentation, see [FastPix Live Stream Overview](https://docs.fastpix.io/docs/live-stream-overview).
 
 #### Start Live Stream
-- [Create Stream](docs/sdks/startlivestream/README.md#create) - Initialize new live streaming session
+- [Create Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/startlivestream/README.md#create) - Initialize new live streaming session
 
 #### Manage Live Stream
-- [List Streams](docs/sdks/managelivestream/README.md#list) - Retrieve all active live streams
-- [Get Viewer Count](docs/sdks/livestreams/README.md#getviewercount) - Get real-time viewer statistics
-- [Get Stream](docs/sdks/livestreams/README.md#getbyid) - Retrieve detailed stream information
-- [Delete Stream](docs/sdks/livestreams/README.md#delete) - Terminate and remove live stream
-- [Update Stream](docs/sdks/managelivestream/README.md#updatelivestream) - Modify stream settings and configuration
-- [Enable Stream](docs/sdks/managelivestream/README.md#enable) - Activate live streaming
-- [Disable Stream](docs/sdks/livestreams/README.md#disable) - Pause live streaming
-- [Complete Stream](docs/sdks/managelivestream/README.md#complete) - Finalize and archive stream
+- [List Streams](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managelivestream/README.md#list) - Retrieve all active live streams
+- [Get Viewer Count](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/livestreams/README.md#getviewercount) - Get real-time viewer statistics
+- [Get Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/livestreams/README.md#getbyid) - Retrieve detailed stream information
+- [Delete Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/livestreams/README.md#delete) - Terminate and remove live stream
+- [Update Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managelivestream/README.md#updatelivestream) - Modify stream settings and configuration
+- [Enable Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managelivestream/README.md#enable) - Activate live streaming
+- [Disable Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/livestreams/README.md#disable) - Pause live streaming
+- [Complete Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managelivestream/README.md#complete) - Finalize and archive stream
 
 #### Live Playback
-- [Create Playback ID](docs/sdks/liveplayback/README.md#create) - Generate secure live playback access
-- [Delete Playback ID](docs/sdks/liveplayback/README.md#deleteplaybackid) - Revoke live playback access
-- [Get Playback ID](docs/sdks/liveplayback/README.md#getplaybackiddetails) - Retrieve live playback configuration
+- [Create Playback ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/liveplayback/README.md#create) - Generate secure live playback access
+- [Delete Playback ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/liveplayback/README.md#deleteplaybackid) - Revoke live playback access
+- [Get Playback ID](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/liveplayback/README.md#getplaybackiddetails) - Retrieve live playback configuration
 
 #### Simulcast Stream
-- [Create Simulcast](docs/sdks/simulcaststreams/README.md#create) - Set up multi-platform streaming
-- [Delete Simulcast](docs/sdks/simulcaststream/README.md#delete) - Remove simulcast configuration
-- [Get Simulcast](docs/sdks/simulcaststreams/README.md#getspecific) - Retrieve simulcast settings
-- [Update Simulcast](docs/sdks/simulcaststreams/README.md#update) - Modify simulcast parameters
+- [Create Simulcast](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/simulcaststreams/README.md#create) - Set up multi-platform streaming
+- [Delete Simulcast](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/simulcaststream/README.md#delete) - Remove simulcast configuration
+- [Get Simulcast](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/simulcaststreams/README.md#getspecific) - Retrieve simulcast settings
+- [Update Simulcast](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/simulcaststreams/README.md#update) - Modify simulcast parameters
 
 ### Video Data API
 
@@ -284,22 +284,22 @@ Monitor video performance and quality with comprehensive analytics and real-time
 For detailed documentation, see [FastPix Video Data Overview](https://docs.fastpix.io/docs/video-data-overview).
 
 #### Metrics
-- [List Breakdown Values](docs/sdks/metrics/README.md#listbreakdownvalues) - Get detailed breakdown of metrics by dimension
-- [List Overall Values](docs/sdks/metrics/README.md#listoverallvalues) - Get aggregated metric values across all content
-- [Get Timeseries Data](docs/sdks/metrics/README.md#gettimeseriesdata) - Retrieve time-based metric trends and patterns
-- [Compare Values](docs/sdks/metrics/README.md#listcomparisonvalues) - List comparison values
+- [List Breakdown Values](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/metrics/README.md#listbreakdownvalues) - Get detailed breakdown of metrics by dimension
+- [List Overall Values](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/metrics/README.md#listoverallvalues) - Get aggregated metric values across all content
+- [Get Timeseries Data](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/metrics/README.md#gettimeseriesdata) - Retrieve time-based metric trends and patterns
+- [Compare Values](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/metrics/README.md#listcomparisonvalues) - List comparison values
 
 #### Views
-- [List Video Views](docs/sdks/views/README.md#listvideoviews) - Get comprehensive list of video viewing sessions
-- [Get View Details](docs/sdks/views/README.md#getdetails) - Retrieve detailed information about specific video views
-- [List Top Content](docs/sdks/views/README.md#listbytopcontent) - Find your most popular and engaging content
+- [List Video Views](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/views/README.md#listvideoviews) - Get comprehensive list of video viewing sessions
+- [Get View Details](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/views/README.md#getdetails) - Retrieve detailed information about specific video views
+- [List Top Content](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/views/README.md#listbytopcontent) - Find your most popular and engaging content
 
 #### Dimensions
-- [List Dimensions](docs/sdks/dimensions/README.md#list) - Get available data dimensions for filtering and analysis
-- [List Filter Values](docs/sdks/dimensions/README.md#listfiltervalues) - Get specific values for a particular dimension
+- [List Dimensions](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/dimensions/README.md#list) - Get available data dimensions for filtering and analysis
+- [List Filter Values](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/dimensions/README.md#listfiltervalues) - Get specific values for a particular dimension
 
 #### Errors
-- [List Errors](docs/sdks/errors/README.md#list) - Get list of playback errors
+- [List Errors](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/errors/README.md#list) - Get list of playback errors
 
 ### Transformations
 
@@ -309,33 +309,33 @@ Transform and enhance your video content with powerful AI and editing capabiliti
 
 Enhance video content with AI-powered features including moderation, summarization, and intelligent categorization.
 
-- [Generate Summary](docs/sdks/invideoai/README.md#generatesummary) - Create AI-generated video summaries
-- [Update Chapters](docs/sdks/invideoaifeatures/README.md#updatechapters) - Automatically generate video chapter markers
-- [Extract Entities](docs/sdks/invideoaifeatures/README.md#updatemedianamedentities) - Identify and extract named entities from content
-- [Enable Moderation](docs/sdks/invideoaifeatures/README.md#updatemoderation) - Activate content moderation and safety checks
+- [Generate Summary](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/invideoai/README.md#generatesummary) - Create AI-generated video summaries
+- [Update Chapters](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/invideoaifeatures/README.md#updatechapters) - Automatically generate video chapter markers
+- [Extract Entities](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/invideoaifeatures/README.md#updatemedianamedentities) - Identify and extract named entities from content
+- [Enable Moderation](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/invideoaifeatures/README.md#updatemoderation) - Activate content moderation and safety checks
 
 #### Media Clips
 
-- [List Live Clips](docs/sdks/videos/README.md#listliveclips) - Get all clips of a live stream
-- [List Media Clips](docs/sdks/managevideos/README.md#getmediaclips) - Retrieve all clips associated with a source media
+- [List Live Clips](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#listliveclips) - Get all clips of a live stream
+- [List Media Clips](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#getmediaclips) - Retrieve all clips associated with a source media
 
 #### Subtitles
 
-- [Generate Subtitles](docs/sdks/managevideos/README.md#generatesubtitletrack) - Create automatic subtitles for media
+- [Generate Subtitles](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#generatesubtitletrack) - Create automatic subtitles for media
 
 #### Media Tracks
 
-- [Add Track](docs/sdks/videos/README.md#addmediatrack) - Add audio or subtitle tracks to media
-- [Update Track](docs/sdks/managevideos/README.md#updatetrack) - Modify existing audio or subtitle tracks
-- [Delete Track](docs/sdks/videos/README.md#deletetrack) - Remove audio or subtitle tracks
+- [Add Track](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#addmediatrack) - Add audio or subtitle tracks to media
+- [Update Track](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#updatetrack) - Modify existing audio or subtitle tracks
+- [Delete Track](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#deletetrack) - Remove audio or subtitle tracks
 
 #### Access Control
 
-- [Update Source Access](docs/sdks/videos/README.md#updatesourceaccess) - Control access permissions for media source
+- [Update Source Access](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#updatesourceaccess) - Control access permissions for media source
 
 #### Format Support
 
-- [Update MP4 Support](docs/sdks/videos/README.md#updatemp4support) - Configure MP4 download capabilities
+- [Update MP4 Support](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#updatemp4support) - Configure MP4 download capabilities
 
 <!-- End Available Resources and Operations [operations] -->
 
