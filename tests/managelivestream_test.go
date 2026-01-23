@@ -39,7 +39,7 @@ func TestManageLivestream(t *testing.T) {
 	ctx := context.Background()
 
 	// List livestreams
-	resp, err := test.sdk.ManageLiveStream.GetAllStreams(ctx, nil, nil, nil)
+	resp, err := test.sdk.ManageLiveStream.List(ctx, nil, nil, nil)
 	if err != nil {
 		fmt.Printf("GetAllStreams error: %T: %v\n", err, err)
 		if resp == nil {
@@ -92,7 +92,7 @@ func TestManageLivestream(t *testing.T) {
 	}
 
 	t.Run("GetLiveStreamByID", func(t *testing.T) {
-		resp, err := test.sdk.ManageLiveStream.GetLiveStreamByID(ctx, streamID)
+		resp, err := test.sdk.LiveStreams.GetByID(ctx, streamID)
 		if err != nil {
 			t.Fatalf("GetLiveStreamByID failed: %v", err)
 		}
@@ -105,7 +105,7 @@ func TestManageLivestream(t *testing.T) {
 	})
 
 	t.Run("UpdateLiveStream", func(t *testing.T) {
-		patch := &components.PatchLiveStreamRequest{
+		patch := components.PatchLiveStreamRequest{
 			ReconnectWindow: stream.ReconnectWindow, // no-op update, just for test
 		}
 		resp, err := test.sdk.ManageLiveStream.UpdateLiveStream(ctx, streamID, patch)
@@ -121,7 +121,7 @@ func TestManageLivestream(t *testing.T) {
 	})
 
 	t.Run("DeleteLiveStream", func(t *testing.T) {
-		resp, err := test.sdk.ManageLiveStream.DeleteLiveStream(ctx, streamID)
+		resp, err := test.sdk.LiveStreams.Delete(ctx, streamID)
 		if err != nil {
 			t.Fatalf("DeleteLiveStream failed: %v", err)
 		}
