@@ -143,12 +143,12 @@ func main() {
     )
 
     // your-playlist-id: Playlist ID returned from create playlist API
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     res, err := s.Playlist.AddMedia(ctx, "your-playlist-id", components.MediaIdsRequest{
         MediaIds: []string{
-            "your-video-id",
-            "your-video-id-2",
-            "your-video-id-3",
+            "your-media-id",
+            "your-media-id-2",
+            "your-media-id-3",
         },
     })
     if err != nil {
@@ -247,12 +247,12 @@ func main() {
     )
 
     // your-playlist-id: Playlist ID returned from create playlist API
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     res, err := s.Playlist.ChangeMediaOrder(ctx, "your-playlist-id", components.MediaIdsRequest{
         MediaIds: []string{
-            "your-video-id",
-            "your-video-id-2",
-            "your-video-id-3",
+            "your-media-id",
+            "your-media-id-2",
+            "your-media-id-3",
         },
     })
     if err != nil {

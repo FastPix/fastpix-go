@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 ---
+## [1.1.1]
+
+- Replaced documentation placeholders from `your-video-id` to `your-media-id`.
+
 ## [1.1.0]
 
 ### Fixed

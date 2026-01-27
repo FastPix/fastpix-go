@@ -441,10 +441,10 @@ func main() {
     )
 
     // your-playlist-id: Playlist ID returned from create playlist API
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     res, err := s.Playlists.DeleteMedia(ctx, "your-playlist-id", &components.MediaIdsRequest{
         MediaIds: []string{
-            "your-video-id",
+            "your-media-id",
         },
     })
     if err != nil {

@@ -167,8 +167,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Videos.Get(ctx, "your-video-id")
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Videos.Get(ctx, "your-media-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -212,7 +212,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-video-id                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                      |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
 ### Response
@@ -273,8 +273,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Videos.Update(ctx, "your-video-id", operations.UpdatedMediaRequestBody{
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Videos.Update(ctx, "your-media-id", operations.UpdatedMediaRequestBody{
         Metadata: map[string]string{
             "user": "your-metadata-value",
         },
@@ -323,7 +323,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-video-id                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                      |
 | `body`                                                                                    | [operations.UpdatedMediaRequestBody](../../models/operations/updatedmediarequestbody.md)  | :heavy_check_mark:                                                                        | N/A                                                                                       |                                                                                           |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
@@ -395,8 +395,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Videos.AddMediaTrack(ctx, "your-video-id", operations.AddMediaTrackRequestBody{
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Videos.AddMediaTrack(ctx, "your-media-id", operations.AddMediaTrackRequestBody{
         Tracks: components.AddTrackRequest{},
     })
     if err != nil {
@@ -513,9 +513,9 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     // your-track-id: Track ID returned from add track API
-    res, err := s.Videos.DeleteTrack(ctx, "your-video-id", "your-track-id")
+    res, err := s.Videos.DeleteTrack(ctx, "your-media-id", "your-track-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -559,7 +559,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-video-id                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                      |
 | `trackID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-track-id                                                      |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
@@ -616,8 +616,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Videos.UpdateSourceAccess(ctx, "your-video-id", operations.UpdatedSourceAccessRequestBody{
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Videos.UpdateSourceAccess(ctx, "your-media-id", operations.UpdatedSourceAccessRequestBody{
         SourceAccess: true,
     })
     if err != nil {
@@ -739,8 +739,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Videos.UpdateMp4Support(ctx, "your-video-id", operations.UpdatedMp4SupportRequestBody{})
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Videos.UpdateMp4Support(ctx, "your-media-id", operations.UpdatedMp4SupportRequestBody{})
     if err != nil {
         log.Fatal(err)
     }

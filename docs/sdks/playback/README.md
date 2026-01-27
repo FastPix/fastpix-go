@@ -62,8 +62,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Playback.Create(ctx, "your-video-id", &operations.CreateMediaPlaybackIDRequestBody{
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Playback.Create(ctx, "your-media-id", &operations.CreateMediaPlaybackIDRequestBody{
         AccessPolicy: components.AccessPolicyPublic,
         DrmConfigurationID: fastpixgo.Pointer("your-drm-configuration-id"), // DRM configuration ID returned from create DRM configuration API
         Resolution: operations.ResolutionOneThousandAndEightyp.ToPointer(),
@@ -111,7 +111,7 @@ func main() {
 | Parameter                                                                                                   | Type                                                                                                        | Required                                                                                                    | Description                                                                                                 | Example                                                                                                     |
 | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `ctx`                                                                                                       | [context.Context](https://pkg.go.dev/context#Context)                                                       | :heavy_check_mark:                                                                                          | The context to use for the request.                                                                         |                                                                                                             |
-| `mediaID`                                                                                                   | *string*                                                                                                    | :heavy_check_mark:                                                                                          | The unique identifier assigned to the media when created. The value must be a valid UUID.                   | your-video-id                                                                        |
+| `mediaID`                                                                                                   | *string*                                                                                                    | :heavy_check_mark:                                                                                          | The unique identifier assigned to the media when created. The value must be a valid UUID.                   | your-media-id                                                                        |
 | `body`                                                                                                      | [*operations.CreateMediaPlaybackIDRequestBody](../../models/operations/createmediaplaybackidrequestbody.md) | :heavy_minus_sign:                                                                                          | Request body for creating playback id for an media                                                          |                                                                                                             |
 | `opts`                                                                                                      | [][operations.Option](../../models/operations/option.md)                                                    | :heavy_minus_sign:                                                                                          | The options for this request.                                                                               |                                                                                                             |
 
@@ -165,8 +165,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.Playback.List(ctx, "your-video-id")
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.Playback.List(ctx, "your-media-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -210,7 +210,7 @@ func main() {
 | Parameter                                                | Type                                                     | Required                                                 | Description                                              | Example                                                  |
 | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
 | `ctx`                                                    | [context.Context](https://pkg.go.dev/context#Context)    | :heavy_check_mark:                                       | The context to use for the request.                      |                                                          |
-| `mediaID`                                                | *string*                                                 | :heavy_check_mark:                                       | N/A                                                      | your-video-id                     |
+| `mediaID`                                                | *string*                                                 | :heavy_check_mark:                                       | N/A                                                      | your-media-id                     |
 | `opts`                                                   | [][operations.Option](../../models/operations/option.md) | :heavy_minus_sign:                                       | The options for this request.                            |                                                          |
 
 ### Response
@@ -262,9 +262,9 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     // your-playback-id: Playback ID returned from create playback ID API
-    res, err := s.Playback.Delete(ctx, "your-video-id", "your-playback-id")
+    res, err := s.Playback.Delete(ctx, "your-media-id", "your-playback-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -362,9 +362,9 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     // your-playback-id: Playback ID returned from create playback ID API
-    res, err := s.Playback.GetByID(ctx, "your-video-id", "your-playback-id")
+    res, err := s.Playback.GetByID(ctx, "your-media-id", "your-playback-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -408,7 +408,7 @@ func main() {
 | Parameter                                                | Type                                                     | Required                                                 | Description                                              | Example                                                  |
 | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
 | `ctx`                                                    | [context.Context](https://pkg.go.dev/context#Context)    | :heavy_check_mark:                                       | The context to use for the request.                      |                                                          |
-| `mediaID`                                                | *string*                                                 | :heavy_check_mark:                                       | N/A                                                      | your-video-id                     |
+| `mediaID`                                                | *string*                                                 | :heavy_check_mark:                                       | N/A                                                      | your-media-id                     |
 | `playbackID`                                             | *string*                                                 | :heavy_check_mark:                                       | N/A                                                      | your-playback-id                     |
 | `opts`                                                   | [][operations.Option](../../models/operations/option.md) | :heavy_minus_sign:                                       | The options for this request.                            |                                                          |
 
@@ -465,9 +465,9 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     // your-playback-id: Playback ID returned from create playback ID API
-    res, err := s.Playback.UpdateDomainRestrictions(ctx, "your-video-id", "your-playback-id", operations.UpdateDomainRestrictionsRequestBody{
+    res, err := s.Playback.UpdateDomainRestrictions(ctx, "your-media-id", "your-playback-id", operations.UpdateDomainRestrictionsRequestBody{
         Allow: []string{
             "your-allowed-domain.com",
             "your-allowed-domain-2.com",
@@ -519,7 +519,7 @@ func main() {
 | Parameter                                                                                                        | Type                                                                                                             | Required                                                                                                         | Description                                                                                                      | Example                                                                                                          |
 | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `ctx`                                                                                                            | [context.Context](https://pkg.go.dev/context#Context)                                                            | :heavy_check_mark:                                                                                               | The context to use for the request.                                                                              |                                                                                                                  |
-| `mediaID`                                                                                                        | *string*                                                                                                         | :heavy_check_mark:                                                                                               | N/A                                                                                                              | your-video-id                                                                             |
+| `mediaID`                                                                                                        | *string*                                                                                                         | :heavy_check_mark:                                                                                               | N/A                                                                                                              | your-media-id                                                                             |
 | `playbackID`                                                                                                     | *string*                                                                                                         | :heavy_check_mark:                                                                                               | N/A                                                                                                              | your-playback-id                                                                             |
 | `body`                                                                                                           | [operations.UpdateDomainRestrictionsRequestBody](../../models/operations/updatedomainrestrictionsrequestbody.md) | :heavy_check_mark:                                                                                               | N/A                                                                                                              |                                                                                                                  |
 | `opts`                                                                                                           | [][operations.Option](../../models/operations/option.md)                                                         | :heavy_minus_sign:                                                                                               | The options for this request.                                                                                    |                                                                                                                  |

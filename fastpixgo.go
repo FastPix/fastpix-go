@@ -193,9 +193,9 @@ func WithTimeout(timeout time.Duration) SDKOption {
 // New creates a new instance of the SDK with the provided options
 func New(opts ...SDKOption) *Fastpixgo {
 	sdk := &Fastpixgo{
-		SDKVersion: "1.1.0",
+		SDKVersion: "1.1.1",
 		sdkConfiguration: config.SDKConfiguration{
-			UserAgent:  "fastpix-sdk/go 1.1.0 2.797.1 1.0.0 github.com/FastPix/fastpix-go",
+			UserAgent:  "fastpix-sdk/go 1.1.1 2.797.1 1.0.0 github.com/FastPix/fastpix-go",
 			ServerList: ServerList,
 		},
 		hooks: hooks.New(),

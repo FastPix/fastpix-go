@@ -162,8 +162,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.ManageVideos.Delete(ctx, "your-video-id")
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.ManageVideos.Delete(ctx, "your-media-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -207,7 +207,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-video-id                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                      |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
 ### Response
@@ -385,9 +385,9 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     // your-track-id: Track ID returned from add track API
-    res, err := s.ManageVideos.UpdateTrack(ctx, "your-video-id", "your-track-id", components.UpdateTrackRequest{
+    res, err := s.ManageVideos.UpdateTrack(ctx, "your-media-id", "your-track-id", components.UpdateTrackRequest{
         LanguageName: fastpixgo.Pointer("french"),
     })
     if err != nil {
@@ -434,7 +434,7 @@ func main() {
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
 | `trackID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-track-id                                                      |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-video-id                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                      |
 | `body`                                                                                    | [components.UpdateTrackRequest](../../models/components/updatetrackrequest.md)            | :heavy_check_mark:                                                                        | N/A                                                                                       |                                                                                           |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
@@ -492,8 +492,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.ManageVideos.GetMediaSummary(ctx, "your-video-id")
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.ManageVideos.GetMediaSummary(ctx, "your-media-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -596,8 +596,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.ManageVideos.GetInputInfo(ctx, "your-video-id")
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.ManageVideos.GetInputInfo(ctx, "your-media-id")
     if err != nil {
         log.Fatal(err)
     }
@@ -810,9 +810,9 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
+    // your-media-id: FastPix Media ID returned from upload/create API
     // your-language-id: Language ID for subtitle generation
-    res, err := s.ManageVideos.GenerateSubtitleTrack(ctx, "your-video-id", "your-language-id", components.TrackSubtitlesGenerateRequest{
+    res, err := s.ManageVideos.GenerateSubtitleTrack(ctx, "your-media-id", "your-language-id", components.TrackSubtitlesGenerateRequest{
         LanguageName: fastpixgo.Pointer("Italian"),
     })
     if err != nil {
@@ -923,8 +923,8 @@ func main() {
         }),
     )
 
-    // your-video-id: FastPix Video ID returned from upload/create API
-    res, err := s.ManageVideos.GetMediaClips(ctx, "your-video-id", fastpixgo.Pointer[int64](5), fastpixgo.Pointer[int64](20), components.SortOrderDesc.ToPointer())
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.ManageVideos.GetMediaClips(ctx, "your-media-id", fastpixgo.Pointer[int64](5), fastpixgo.Pointer[int64](20), components.SortOrderDesc.ToPointer())
     if err != nil {
         log.Fatal(err)
     }
