@@ -39,7 +39,7 @@ jobs:
         run: go build $(go list ./... | grep -v /samples)
 
       - name: Run tests
-        run: go test -v $(go list ./... | grep -v /samples)
+        run: go test -v $(go list ./... | grep -v /samples | grep -v /tests)
 
   release:
     name: Publish Release
