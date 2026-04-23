@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 ---
+## [1.1.2]
+
+### Fixed
+- Fixed data event field remapping in hooks.
+
 ## [1.1.1]
 
 - Replaced documentation placeholders from `your-video-id` to `your-media-id`.
