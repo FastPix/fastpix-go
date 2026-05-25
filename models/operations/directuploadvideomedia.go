@@ -621,7 +621,7 @@ func (d *DirectUploadVideoMediaAccessRestrictions) GetUserAgents() *DirectUpload
 // PushMediaSettings - Configuration settings for uploading and processing media on the FastPix platform.
 // These settings define how the uploaded video is handled, including access control, resolution, DRM, and optional metadata.
 // For a complete explanation of how media uploads and processing work, refer to the
-// <a href="https://docs.fastpix.io/docs/video-on-demand-overview" target="_blank">FastPix Video on Demand Overview</a>.
+// <a href="https://fastpix.com/docs/get-started/overview" target="_blank">FastPix Video on Demand Overview</a>.
 type PushMediaSettings struct {
 	// Determines if access to the streamed content is kept private, drm or available to all.
 	AccessPolicy *DirectUploadVideoMediaAccessPolicy `default:"public" json:"accessPolicy"`
@@ -819,7 +819,7 @@ type DirectUploadVideoMediaRequest struct {
 	// Configuration settings for uploading and processing media on the FastPix platform.
 	// These settings define how the uploaded video is handled, including access control, resolution, DRM, and optional metadata.
 	// For a complete explanation of how media uploads and processing work, refer to the
-	// <a href="https://docs.fastpix.io/docs/video-on-demand-overview" target="_blank">FastPix Video on Demand Overview</a>.
+	// <a href="https://fastpix.com/docs/get-started/overview" target="_blank">FastPix Video on Demand Overview</a>.
 	//
 	PushMediaSettings *PushMediaSettings `json:"pushMediaSettings,omitzero"`
 }
@@ -875,7 +875,7 @@ type DirectUploadVideoMediaResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
 	// Direct upload created successfully
 	Object *DirectUploadVideoMediaResponseBody
-	// See the range of possible <a href="https://docs.fastpix.io/reference/error-codes">error</a> responses and their status codes.
+	// See the range of possible <a href="https://fastpix.com/docs/error-codes/error-codes">error</a> responses and their status codes.
 	DefaultError *components.DefaultError
 }
 

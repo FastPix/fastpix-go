@@ -60,7 +60,7 @@ type GetVideoViewDetailsResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
 	// Get a video view by id
 	Object *GetVideoViewDetailsResponseBody
-	// See the range of possible <a href="https://docs.fastpix.io/reference/error-codes">error</a> responses and their status codes.
+	// See the range of possible <a href="https://fastpix.com/docs/error-codes/error-codes">error</a> responses and their status codes.
 	DefaultError *components.DefaultError
 }
 

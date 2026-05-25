@@ -281,7 +281,7 @@ func (s *ManageLiveStream) List(ctx context.Context, limit *int64, offset *int64
 //
 // A creator disables a livestream to pause it temporarily. Later, they decide to continue the session. By calling this endpoint with the stream's ID, they can re-enable and restart the same livestream.
 //
-// Related guide <a href="https://docs.fastpix.io/docs/manage-streams">Manage streams</a>
+// Related guide <a href="https://fastpix.com/docs/manage-live-streams/create-and-manage-live-streams">Manage streams</a>
 func (s *ManageLiveStream) Enable(ctx context.Context, streamID string, opts ...operations.Option) (*operations.EnableLiveStreamResponse, error) {
 	request := operations.EnableLiveStreamRequest{
 		StreamID: streamID,
@@ -516,7 +516,7 @@ func (s *ManageLiveStream) Enable(ctx context.Context, streamID string, opts ...
 //
 // A virtual event ends, and the system or host needs to close the livestream to prevent further streaming. This endpoint ensures the livestream status is changed from `active` to `idle`, indicating it's officially completed.
 //
-// Related guide <a href="https://docs.fastpix.io/docs/manage-streams">Manage streams</a>
+// Related guide <a href="https://fastpix.com/docs/manage-live-streams/create-and-manage-live-streams">Manage streams</a>
 func (s *ManageLiveStream) Complete(ctx context.Context, streamID string, opts ...operations.Option) (*operations.CompleteLiveStreamResponse, error) {
 	request := operations.CompleteLiveStreamRequest{
 		StreamID: streamID,
@@ -743,7 +743,7 @@ func (s *ManageLiveStream) Complete(ctx context.Context, streamID string, opts .
 // UpdateLiveStream - Update a stream
 // This endpoint allows you to modify the parameters of an existing live stream, such as its `metadata` (title, description) or the `reconnectWindow`. It’s useful for making changes to a stream that has already been created but not yet ended. After the live stream is disabled, you cannot update a stream.
 //
-//	 The updated stream parameters and the `streamId` needs to be shared in the request, and FastPix returns the updated stream details. After the update, <a href="https://docs.fastpix.io/docs/live-events#videolive_streamupdated">video.live_stream.updated</a> webhook event notifies your system.
+//	 The updated stream parameters and the `streamId` needs to be shared in the request, and FastPix returns the updated stream details. After the update, <a href="https://fastpix.com/docs/live-stream-events/live-events#videolive_streamupdated">video.live_stream.updated</a> webhook event notifies your system.
 //
 //	#### Example
 //
@@ -751,7 +751,7 @@ func (s *ManageLiveStream) Complete(ctx context.Context, streamID string, opts .
 //
 //
 //
-//	 Related guide: <a href="https://docs.fastpix.io/docs/manage-streams">Manage streams</a>
+//	 Related guide: <a href="https://fastpix.com/docs/manage-live-streams/create-and-manage-live-streams">Manage streams</a>
 func (s *ManageLiveStream) UpdateLiveStream(ctx context.Context, streamID string, body components.PatchLiveStreamRequest, opts ...operations.Option) (*operations.UpdateLiveStreamResponse, error) {
 	request := operations.UpdateLiveStreamRequest{
 		StreamID: streamID,

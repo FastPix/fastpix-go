@@ -3,7 +3,7 @@
 Configuration settings for uploading and processing media on the FastPix platform.  
 These settings define how the uploaded video is handled, including access control, resolution, DRM, and optional metadata.  
 For a complete explanation of how media uploads and processing work, refer to the  
-<a href="https://docs.fastpix.io/docs/video-on-demand-overview" target="_blank">FastPix Video on Demand Overview</a>.
+<a href="https://fastpix.com/docs/get-started/overview" target="_blank">FastPix Video on Demand Overview</a>.
 
 
 

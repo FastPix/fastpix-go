@@ -20,7 +20,7 @@ This endpoint retrieves the DRM configuration (DRM ID) associated with a workspa
 **Example:**  
 A media service provider may retrieve DRM configuration for a workspace to create DRM content.
 
-Related guide: <a href="https://docs.fastpix.io/docs/secure-playback-with-drm">Manage DRM configuration</a>
+Related guide: <a href="https://fastpix.com/docs/video-security/set-up-drm-encryption">Manage DRM configuration</a>
 
 
 ### Example Usage
@@ -118,7 +118,7 @@ This endpoint retrieves a DRM configuration ID. It is used to fetch the DRM-rela
 1. Make a GET request to this endpoint, replacing `{drmConfigurationId}` with the UUID of the DRM configuration.  
 2. The response contains the associated DRM configuration ID.
 
-Related guide: <a href="https://docs.fastpix.io/docs/secure-playback-with-drm">Manage DRM configuration</a>
+Related guide: <a href="https://fastpix.com/docs/video-security/set-up-drm-encryption">Manage DRM configuration</a>
 
 
 ### Example Usage

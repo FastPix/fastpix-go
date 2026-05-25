@@ -205,7 +205,7 @@ client := fastpixgo.New(
 ### Getting Help
 
 - Check the [main README](../README.md) for general SDK information
-- Review the [API documentation](https://docs.fastpix.io) for endpoint details
+- Review the [API documentation](https://fastpix.com/docs) for endpoint details
 - Contact FastPix support for account-specific issues
 
 ## License

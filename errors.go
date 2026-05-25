@@ -51,7 +51,7 @@ func newErrors(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *hoo
 // * **count:** The number of occurrences of the specific error.
 // * **code:** The error code associated with the specific error.
 //
-// Related guide: <a href="https://docs.fastpix.io/docs/track-playback-errors">Troubleshoot errors</a>
+// Related guide: <a href="https://fastpix.com/docs/working-with-video-data/troubleshoot-playback-errors">Troubleshoot errors</a>
 func (s *Errors) List(ctx context.Context, timespan *operations.ListErrorsTimespan, filterby *string, limit *int64, opts ...operations.Option) (*operations.ListErrorsResponse, error) {
 	request := operations.ListErrorsRequest{
 		Timespan: timespan,

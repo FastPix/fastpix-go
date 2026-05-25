@@ -68,3 +68,15 @@ Thumbs.db
 # Lock files (if using alternative package managers)
 Gopkg.lock
 glide.lock
+
+# tests/ endpoint-validation dev tools (Node deps + per-run generated output)
+tests/node_modules/
+tests/package-lock.json
+tests/artifacts/
+tests/artifacts-non-get/
+tests/GET_ENDPOINTS_OPENAPI_RESPONSE_VALIDATION_REPORT.md
+tests/GET_ENDPOINTS_OPENAPI_RESPONSE_FIX_SUGGESTIONS.md
+tests/NON_GET_ENDPOINTS_VALIDATION_REPORT.md
+# Stale Go test-run output artifacts
+tests/test_report.json
+tests/test_report.txt

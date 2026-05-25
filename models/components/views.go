@@ -791,7 +791,7 @@ type Views struct {
 	// Player Software Version indicates the version number of the player software installed.
 	//
 	PlayerSoftwareVersion optionalnullable.OptionalNullable[string] `json:"playerSoftwareVersion,omitzero"`
-	// Specifies the domain or source from which the player was loaded or embedded (for example, stream.fastpix.io or a customer’s custom domain). This helps identify the playback origin and differentiate between various deployment environments.
+	// Specifies the domain or source from which the player was loaded or embedded (for example, stream.fastpix.com or a customer’s custom domain). This helps identify the playback origin and differentiate between various deployment environments.
 	//
 	PlayerSourceDomain optionalnullable.OptionalNullable[string] `json:"playerSourceDomain,omitzero"`
 	// Player Source Height denotes the vertical dimension, measured in pixels, of the source video content being transmitted to the player.

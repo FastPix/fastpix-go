@@ -51,7 +51,7 @@ func newSigningKeys(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks
 // **Use case:** A developer building a video subscription service wants to ensure that only authorized users can access premium content. By generating a signing key, the developer can issue signed JSON Web Tokens (JWTs) to authenticate and authorize users. These tokens can be validated by FastPix using the stored public key.
 //
 // **Detailed example:**  You are building a video-on-demand platform that restricts access based on user subscriptions. To ensure only subscribed users can stream content, you generate a signing key using this API. Each time a user logs in, you create a JWT signed with the private key. When the user attempts to play a video, FastPix uses the public key to verify the token and confirms that the user is authorized.<br/>
-// Related guide: <a href="https://docs.fastpix.io/docs/secure-playback-with-jwts">Create and use signing keys</a>
+// Related guide: <a href="https://fastpix.com/docs/video-security/secure-media-access-with-jwts">Create and use signing keys</a>
 func (s *SigningKeys) Create(ctx context.Context, opts ...operations.Option) (*operations.CreateSigningKeyResponse, error) {
 	o := operations.Options{}
 	supportedOptions := []string{

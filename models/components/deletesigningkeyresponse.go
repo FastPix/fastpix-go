@@ -6,9 +6,31 @@
 
 package components
 
+// DeleteSigningKeyData holds the details returned when a signing key is deleted.
+type DeleteSigningKeyData struct {
+	// A human-readable message describing the result of the delete operation.
+	Message *string `json:"message,omitzero"`
+}
+
+func (d *DeleteSigningKeyData) GetMessage() *string {
+	if d == nil {
+		return nil
+	}
+	return d.Message
+}
+
 type DeleteSigningKeyResponse struct {
+	// Details about the delete operation.
+	Data *DeleteSigningKeyData `json:"data,omitzero"`
 	// Shows the request status. Returns true for success and false for failure.
 	Success *bool `json:"success,omitzero"`
+}
+
+func (d *DeleteSigningKeyResponse) GetData() *DeleteSigningKeyData {
+	if d == nil {
+		return nil
+	}
+	return d.Data
 }
 
 func (d *DeleteSigningKeyResponse) GetSuccess() *bool {

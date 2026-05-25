@@ -42,7 +42,7 @@ func (e *AddTrackRequestType) UnmarshalJSON(data []byte) error {
 // AddTrackRequest - Contains details about the track being added to the media file.
 type AddTrackRequest struct {
 	// The direct URL of the track file. It must point to a valid audio or subtitle file.
-	URL *string `default:"https://static.fastpix.io/music-1.mp3" json:"url"`
+	URL *string `default:"https://static.fastpix.com/music-1.mp3" json:"url"`
 	// Specifies the type of track being added. It can be either `audio` or `subtitle`.
 	Type *AddTrackRequestType `default:"audio" json:"type"`
 	// The BCP 47 language code representing the track’s language.

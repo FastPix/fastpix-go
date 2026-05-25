@@ -20,6 +20,8 @@ type VideoTrackForGetAll struct {
 	Width *float64 `json:"width,omitzero"`
 	// Track height denotes the range of height applicable to a specific track. Currently, this setting can be modified only for video tracks.
 	Height *float64 `json:"height,omitzero"`
+	// The frame rate (frames per second) of the video track, returned as a string (e.g. "24.000"). Applicable to video tracks only.
+	FrameRate *string `json:"frameRate,omitzero"`
 	// Indicates the current state of the track. 'available' means the track has been processed successfully and is ready to be used or played.
 	Status *string `json:"status,omitzero"`
 }
@@ -61,6 +63,13 @@ func (v *VideoTrackForGetAll) GetHeight() *float64 {
 		return nil
 	}
 	return v.Height
+}
+
+func (v *VideoTrackForGetAll) GetFrameRate() *string {
+	if v == nil {
+		return nil
+	}
+	return v.FrameRate
 }
 
 func (v *VideoTrackForGetAll) GetStatus() *string {

@@ -179,7 +179,7 @@ type PullVideoInput struct {
 	//
 	// While FastPix can handle various audio and video formats and codecs, using standard and widely supported formats helps achieve optimal processing speed.
 	//
-	URL *string `default:"https://static.fastpix.io/fp-sample-video.mp4" json:"url"`
+	URL *string `default:"https://static.fastpix.com/fp-sample-video.mp4" json:"url"`
 	// Start time indicates where encoding must begin within the video file. For example, if you want to encode a segment from 3 minutes (180 seconds) to 6 minutes (360 seconds) in a 10-minute (600 seconds) video, the start time is 3 minutes (180 seconds). Note: Start time is always mentioned in seconds.
 	//
 	StartTime *int64 `json:"startTime,omitzero"`

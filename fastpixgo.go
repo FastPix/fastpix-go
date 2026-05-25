@@ -23,7 +23,7 @@ import (
 // ServerList contains the list of servers available to the SDK
 var ServerList = []string{
 	// FastPix Video APIs
-	"https://api.fastpix.io/v1/",
+	"https://api.fastpix.com/v1/",
 }
 
 // HTTPClient provides an interface for supplying the SDK with a custom HTTP client
@@ -193,9 +193,9 @@ func WithTimeout(timeout time.Duration) SDKOption {
 // New creates a new instance of the SDK with the provided options
 func New(opts ...SDKOption) *Fastpixgo {
 	sdk := &Fastpixgo{
-		SDKVersion: "1.1.2",
+		SDKVersion: "1.1.3",
 		sdkConfiguration: config.SDKConfiguration{
-			UserAgent:  "fastpix-sdk/go 1.1.2 2.797.1 1.0.0 github.com/FastPix/fastpix-go",
+			UserAgent:  "fastpix-sdk/go 1.1.3 2.797.1 1.0.0 github.com/FastPix/fastpix-go",
 			ServerList: ServerList,
 		},
 		hooks: hooks.New(),

@@ -621,7 +621,7 @@ func (c *CreateMediaRequestAccessRestrictions) GetUserAgents() *CreateMediaReque
 
 type CreateMediaRequest struct {
 	// Add one input object at a time. For example, first add a **VideoInput** object.   If you also need a watermark, click **Add item** again and select **WatermarkInput**.   Repeat this process for **AudioInput** or **SubtitleInput** as needed. For a complete explanation of how media uploads from URL and processing work, refer to the
-	//         <a href="https://docs.fastpix.io/docs/video-on-demand-overview" target="_blank">FastPix Video on Demand Overview</a>.
+	//         <a href="https://fastpix.com/docs/get-started/overview" target="_blank">FastPix Video on Demand Overview</a>.
 	//
 	Inputs []Input `json:"inputs"`
 	// You can search for videos with specific key value pairs using metadata, when you tag a video in "key" : "value" pairs. Dynamic metadata allows you to define a key that allows any value pair. You can have maximum of 255 characters and upto 10 entries are allowed.

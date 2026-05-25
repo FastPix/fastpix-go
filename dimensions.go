@@ -39,9 +39,9 @@ func newDimensions(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks 
 // List the dimensions
 // Retrieves a list of dimensions that can be used as query parameters across various data endpoints. Each dimension has a unique id that can be used to filter data effectively.
 //
-// The dimensions retrieved from this endpoint can be used in conjunction with the <a href="https://docs.fastpix.io/reference/list_video_views">list video views</a> and <a href="https://docs.fastpix.io/reference/list_by_top_content">list by top content</a> endpoints to filter results based on specific criteria. For example, you can filter views by `browser_name`, `os_name`, `device_type`, and more.
+// The dimensions retrieved from this endpoint can be used in conjunction with the <a href="https://fastpix.com/docs/video-data-api/views/list-video-views">list video views</a> and <a href="https://fastpix.com/docs/video-data-api/views/list-by-top-content">list by top content</a> endpoints to filter results based on specific criteria. For example, you can filter views by `browser_name`, `os_name`, `device_type`, and more.
 //
-// Related guides: <a href="https://docs.fastpix.io/page/what-video-data-do-we-capture#/">What Video Data do we capture?</a> ,   <a href="https://docs.fastpix.io/docs/user-passable-metadata-1">Use passable dimensions</a>
+// Related guides: <a href="https://fastpix.com/docs/concepts/what-video-data-do-we-capture#/">What Video Data do we capture?</a> ,   <a href="https://fastpix.com/docs/working-with-video-data/pass-custom-metadata-to-metrics">Use passable dimensions</a>
 func (s *Dimensions) List(ctx context.Context, opts ...operations.Option) (*operations.ListDimensionsResponse, error) {
 	o := operations.Options{}
 	supportedOptions := []string{
@@ -264,13 +264,13 @@ func (s *Dimensions) List(ctx context.Context, opts ...operations.Option) (*oper
 // ListFilterValues - List the filter values for a dimension
 // This endpoint returns the filter values associated with a specific dimension, along with the total number of video views for each value. For example, it can list all `browser_name` (dimension) and show how many views occurred for all available browsers like Chrome, Safari (filter values).
 //
-// In order to use the <a href="https://docs.fastpix.io/docs/custom-business-metadata">Custom Dimensions</a>, you must enable them in the dashboard under settings option based on the plan you have opted for.
+// In order to use the <a href="https://fastpix.com/docs/working-with-video-data/use-custom-dimensions">Custom Dimensions</a>, you must enable them in the dashboard under settings option based on the plan you have opted for.
 //
 // #### Example
 //
 // A developer wants to know how their video content performs across different browsers. By calling this endpoint for the `device_type` dimension, they can retrieve a breakdown of video views by each device (for example, Desktop, Mobile, Tablet). This data helps the developer understand where optimizations or troubleshooting is necessary.
 //
-// Related guide: <a href="https://docs.fastpix.io/docs/understand-dashboard-ui#filters-and-timeframes">Filters and timespan</a>
+// Related guide: <a href="https://fastpix.com/docs/working-with-video-data/explore-the-dashboard#filters-and-timeframes">Filters and timespan</a>
 func (s *Dimensions) ListFilterValues(ctx context.Context, dimensionsID operations.DimensionsID, timespan *operations.ListFilterValuesForDimensionTimespan, filterby *string, opts ...operations.Option) (*operations.ListFilterValuesForDimensionResponse, error) {
 	request := operations.ListFilterValuesForDimensionRequest{
 		DimensionsID: dimensionsID,

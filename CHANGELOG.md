@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 ---
+## [1.1.3]
+
+### Changed — FastPix `.io` → `.com` migration
+
+FastPix is moving its hosts and documentation to the `.com` TLD. This release updates every reference in the SDK and its docs:
+
+| Old (`.io`) | New (`.com`) |
+|---|---|
+| `api.fastpix.io` | `api.fastpix.com` |
+| `stream.fastpix.io` | `stream.fastpix.com` |
+| `images.fastpix.io` | `images.fastpix.com` |
+| `static.fastpix.io` | `static.fastpix.com` |
+| `docs.fastpix.io/...` | `fastpix.com/docs/...` |
+
+- The default server URL is now `https://api.fastpix.com/v1/` (was `https://api.fastpix.io/v1/`). If you rely on SDK defaults, no code change is required — upgrading and rebuilding is enough.
+- If you pass an explicit override (e.g. `fastpixgo.New(fastpixgo.WithServerURL("https://api.fastpix.io/v1/"))`), change it to `https://api.fastpix.com/v1/`.
+- All README and per-service documentation links now point at `https://fastpix.com/docs/...`.
+
+The `.io` hosts still serve traffic during the transition but are slated for deprecation — update any hard-coded `.io` references (server URL, playback/asset URLs) in your application.
+
+### Fixed
+- Added missing `frameRate` field to video tracks in the list media response (`VideoTrackForGetAll`).
+- Added missing `data.message` field to the delete signing key response (`DeleteSigningKeyResponse`).
+
 ## [1.1.2]
 
 ### Fixed

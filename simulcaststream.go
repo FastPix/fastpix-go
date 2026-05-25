@@ -37,7 +37,7 @@ func newSimulcastStream(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, h
 // Delete a simulcast
 // Deletes a simulcast using its unique simulcastId, which you received during the simulcast creation process. Deleting a simulcast stops the broadcast to the associated platform, while the parent stream continues if it’s live. This action can’t be undone, and you must create a new simulcast to resume streaming to the same platform.
 //
-// Webhook event: <a href="https://docs.fastpix.io/docs/live-events#videolive_streamsimulcast_targetdeleted">video.live_stream.simulcast_target.deleted</a>
+// Webhook event: <a href="https://fastpix.com/docs/live-stream-events/live-events#videolive_streamsimulcast_targetdeleted">video.live_stream.simulcast_target.deleted</a>
 //
 // #### Example
 // A broadcaster may need to stop simulcasting to one platform while keeping the stream active on others. For example, a tech company is simulcasting a product launch across multiple platforms. Midway through the event, they decide to stop the simulcast on Facebook due to performance issues but continue streaming on YouTube. They use this API to delete the Facebook simulcast target.

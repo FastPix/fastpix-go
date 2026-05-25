@@ -43,11 +43,11 @@ func newInVideoAI(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *
 // 3. Include the `summaryLength` parameter, specify the desired length of the summary in words (for example, 120 words), this determines how concise or detailed the summary will be. If no specific summary length is provided, the default length will be 100 words.
 // 4. The response includes the updated media data and confirmation of the changes applied.
 //
-// You can use the <a href="https://docs.fastpix.io/docs/ai-events#videomediaaisummaryready">video.mediaAI.summary.ready</a> webhook event to track and notify about the summary generation.
+// You can use the <a href="https://fastpix.com/docs/ai-events/in-video-ai-events#videomediaaisummaryready">video.mediaAI.summary.ready</a> webhook event to track and notify about the summary generation.
 //
 // **Use case**: This is particularly useful when a user uploads a video and later chooses to generate a summary without needing to re-upload the video.
 //
-// Related guide: <a href="https://docs.fastpix.io/docs/generate-video-summary">Video summary</a>
+// Related guide: <a href="https://fastpix.com/docs/video-intelligence/generate-a-video-summary">Video summary</a>
 func (s *InVideoAI) GenerateSummary(ctx context.Context, mediaID string, body operations.UpdateMediaSummaryRequestBody, opts ...operations.Option) (*operations.UpdateMediaSummaryResponse, error) {
 	request := operations.UpdateMediaSummaryRequest{
 		MediaID: mediaID,

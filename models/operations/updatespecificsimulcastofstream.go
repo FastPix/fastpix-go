@@ -44,7 +44,7 @@ type UpdateSpecificSimulcastOfStreamResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
 	// Stream's simulcast details fetched successfully
 	SimulcastUpdateResponse *components.SimulcastUpdateResponse
-	// See the range of possible <a href="https://docs.fastpix.io/reference/error-codes">error</a> responses and their status codes.
+	// See the range of possible <a href="https://fastpix.com/docs/error-codes/error-codes">error</a> responses and their status codes.
 	DefaultError *components.DefaultError
 }
 

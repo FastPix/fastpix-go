@@ -26,7 +26,7 @@ This endpoint returns the total number of playback errors that occurred, along w
 * **code:** The error code associated with the specific error. 
 
 
-Related guide: <a href="https://docs.fastpix.io/docs/track-playback-errors">Troubleshoot errors</a>
+Related guide: <a href="https://fastpix.com/docs/working-with-video-data/troubleshoot-playback-errors">Troubleshoot errors</a>
 
 
 ### Example Usage

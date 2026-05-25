@@ -26,7 +26,7 @@ Retrieves a list of all media clips generated from a specific livestream. Each m
 Suppose you’re hosting a live gaming event and want to showcase key moments from the stream — such as top plays or final match highlights. You can use this endpoint to fetch all clips generated from that livestream, display them in your dashboard, or use them for post-event editing and sharing.
 
 
-Related guide: <a href="https://docs.fastpix.io/docs/instant-live-clipping">Instant live clipping</a>
+Related guide: <a href="https://fastpix.com/docs/edit-and-transform-live-stream/clip-moments-from-a-live-stream">Instant live clipping</a>
 
 
 ### Example Usage
@@ -132,7 +132,7 @@ By calling this endpoint, you can retrieve detailed information about a specific
    - **status** – Indicates whether the media is still *Processing* or has transitioned to *Ready*.
    - **playbackId** – A unique identifier that allows you to stream the media once it is *Ready*.  
      You can construct the stream URL as follows:  
-     `https://stream.fastpix.io/<playbackId>.m3u8`
+     `https://stream.fastpix.com/<playbackId>.m3u8`
 
 #### Example
 
@@ -238,7 +238,7 @@ This endpoint allows you to update specific parameters of an existing media file
 
 3. The response returns the updated media data, confirming the changes. 
 
-4. Monitor the <a href="https://docs.fastpix.io/docs/media-events#videomediaupdated">video.media.updated</a> webhook event to track the update status in your system.
+4. Monitor the <a href="https://fastpix.com/docs/vod-events/media-events#videomediaupdated">video.media.updated</a> webhook event to track the update status in your system.
 
 #### Example
 If a user uploads a video and later needs to change the title, add a new description, or update tags, you can use this endpoint to update the media metadata without re-uploading the entire video.
@@ -353,17 +353,17 @@ This endpoint allows you to add an audio or subtitle track to an existing media 
 
 #### Webhook events
 
-1. After successfully adding a track, your system must receive the webhook event <a href="https://docs.fastpix.io/docs/transform-media-events#videomediatrackcreated">video.media.track.created</a>.
+1. After successfully adding a track, your system must receive the webhook event <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediatrackcreated">video.media.track.created</a>.
 
-2. Once the track is processed and ready, you must receive the webhook event <a href="https://docs.fastpix.io/docs/transform-media-events#videomediatrackready">video.media.track.ready</a>.
+2. Once the track is processed and ready, you must receive the webhook event <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediatrackready">video.media.track.ready</a>.
 
-3. Finally, an update event <a href="https://docs.fastpix.io/docs/media-events#videomediaupdated">video.media.updated</a> must notify your system about the media's updated status.
+3. Finally, an update event <a href="https://fastpix.com/docs/vod-events/media-events#videomediaupdated">video.media.updated</a> must notify your system about the media's updated status.
 
 
 #### Example
-Suppose you have a video uploaded to the FastPix platform, and you want to add an Italian audio track to it. By calling this API, you can attach an external audio file (https://static.fastpix.io/music-1.mp3) to the media file. Similarly, if you need to add subtitles in different languages, you can specify type: `subtitle` with the corresponding subtitle `url`, `languageCode` and `languageName`.
+Suppose you have a video uploaded to the FastPix platform, and you want to add an Italian audio track to it. By calling this API, you can attach an external audio file (https://static.fastpix.com/music-1.mp3) to the media file. Similarly, if you need to add subtitles in different languages, you can specify type: `subtitle` with the corresponding subtitle `url`, `languageCode` and `languageName`.
 
-Related guides: <a href="https://docs.fastpix.io/docs/manage-subtitle-tracks">Add own subtitle tracks</a>, <a href="https://docs.fastpix.io/docs/manage-audio-tracks">Add own audio tracks</a>
+Related guides: <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/add-subtitles-to-a-video">Add own subtitle tracks</a>, <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/add-audio-to-a-video">Add own audio tracks</a>
 
 
 ### Example Usage
@@ -472,7 +472,7 @@ This endpoint allows you to delete an existing audio or subtitle track from a me
 
 1. After successfully deleting a track, your system must receive the webhook event **video.media.track.deleted**.
 
-2. Once the media file is updated to reflect the track removal, a <a href="https://docs.fastpix.io/docs/media-events#videomediaupdated">video.media.updated</a> event must be triggered.
+2. Once the media file is updated to reflect the track removal, a <a href="https://fastpix.com/docs/vod-events/media-events#videomediaupdated">video.media.updated</a> event must be triggered.
 
 
 #### Example
@@ -482,7 +482,7 @@ Suppose you uploaded an audio track in Italian for a video but later realize it'
   - The content owner requests the removal of a specific subtitle or audio track.
   - A new version of the track gets uploaded to replace the existing one.
 
-Related guides: <a href="https://docs.fastpix.io/docs/manage-subtitle-tracks">Add own subtitle tracks</a>, <a href="https://docs.fastpix.io/docs/manage-audio-tracks">Add own audio tracks</a>
+Related guides: <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/add-subtitles-to-a-video">Add own subtitle tracks</a>, <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/add-audio-to-a-video">Add own audio tracks</a>
 
 
 ### Example Usage
@@ -584,7 +584,7 @@ This endpoint allows you to update the `sourceAccess` setting of an existing med
 2. Include the updated `sourceAccess` parameter in the request body.
 
 3. You receive a response confirming the update to the media’s source access status.
-4. Webhook events: <a href="https://docs.fastpix.io/docs/transform-media-events#videomediasourceready">video.media.source.ready</a>, <a href="https://docs.fastpix.io/docs/transform-media-events#videomediasourcedeleted">video.media.source.deleted</a>
+4. Webhook events: <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediasourceready">video.media.source.ready</a>, <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediasourcedeleted">video.media.source.deleted</a>
 
 
 ### Example Usage
@@ -701,13 +701,13 @@ This endpoint allows you to update the `mp4Support` setting of an existing media
 
 #### Webhook events
 
-- <a href="https://docs.fastpix.io/docs/transform-media-events#videomediamp4supportready">video.media.mp4Support.ready</a> – Triggered when the MP4 support setting is successfully updated.
+- <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediamp4supportready">video.media.mp4Support.ready</a> – Triggered when the MP4 support setting is successfully updated.
 
 #### Example
-Suppose you have a video uploaded to the FastPix platform, and you want to allow users to download the video in MP4 format. By setting "mp4Support": "capped_4k", the system generates an MP4 rendition of the video up to 4K resolution, making it available for download through the stream URL(`https://stream.fastpix.io/{playbackId}/{capped-4k.mp4 | audio.m4a}`). If you want users to stream only the audio from the media file, you can set "mp4Support": "audioOnly". This provides an audio-only stream URL that allows users to listen to the media without video. By setting "mp4Support": "audioOnly,capped_4k", both options are enabled. Users can download the MP4 video and also stream just the audio version of the media. 
+Suppose you have a video uploaded to the FastPix platform, and you want to allow users to download the video in MP4 format. By setting "mp4Support": "capped_4k", the system generates an MP4 rendition of the video up to 4K resolution, making it available for download through the stream URL(`https://stream.fastpix.com/{playbackId}/{capped-4k.mp4 | audio.m4a}`). If you want users to stream only the audio from the media file, you can set "mp4Support": "audioOnly". This provides an audio-only stream URL that allows users to listen to the media without video. By setting "mp4Support": "audioOnly,capped_4k", both options are enabled. Users can download the MP4 video and also stream just the audio version of the media. 
 
 
-Related guide: <a href="https://docs.fastpix.io/docs/mp4-support-for-offline-viewing">Use MP4 support for offline viewing</a>
+Related guide: <a href="https://fastpix.com/docs/playback-and-delivery/enable-mp4-support-for-offline-viewing">Use MP4 support for offline viewing</a>
 
 
 ### Example Usage

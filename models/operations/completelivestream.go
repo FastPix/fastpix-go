@@ -27,7 +27,7 @@ type CompleteLiveStreamResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
 	// Stream details updated successfully
 	LiveStreamDeleteResponse *components.LiveStreamDeleteResponse
-	// See the range of possible <a href="https://docs.fastpix.io/reference/error-codes">error</a> responses and their status codes.
+	// See the range of possible <a href="https://fastpix.com/docs/error-codes/error-codes">error</a> responses and their status codes.
 	DefaultError *components.DefaultError
 }
 

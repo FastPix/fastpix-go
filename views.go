@@ -45,7 +45,7 @@ func newViews(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *hook
 //
 //  2. Specify the timespan for which you want to retrieve the video views using the `timespan[]` parameter.
 //
-//  3. Filter the views based on dimensions such as browser, device, video title, viewer ID, etc., using the `filterby[]` parameter. Get the dimensions by calling <a href="https://docs.fastpix.io/reference/list_dimensions">list the dimensions</a> endpoint.
+//  3. Filter the views based on dimensions such as browser, device, video title, viewer ID, etc., using the `filterby[]` parameter. Get the dimensions by calling <a href="https://fastpix.com/docs/video-data-api/dimensions/list-dimensions">list the dimensions</a> endpoint.
 //
 //  4. Paginate the results using the `limit` and `offset` parameters.
 //
@@ -53,13 +53,13 @@ func newViews(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *hook
 //
 //  6. You receive a response containing the list of video views matching the specified criteria.
 //
-// Each view in the response includes a unique `viewId`. You can use this `viewId` with the  <a href="https://docs.fastpix.io/reference/get_video_view_details">Get Video View Details</a> endpoint to retrieve more detailed information about that specific view.
+// Each view in the response includes a unique `viewId`. You can use this `viewId` with the  <a href="https://fastpix.com/docs/video-data-api/views/get-video-view-details">Get Video View Details</a> endpoint to retrieve more detailed information about that specific view.
 //
 // #### Example
 //
 // If you manage a video streaming service and want to analyze content performance across devices and browsers. By calling the List Video Views endpoint with filters such as `browser_name` and `device_type`, you can identify which platforms are most popular with your audience. This information helps optimize content for widely used platforms and troubleshoot playback issues on less common devices.
 //
-//	Related guide: <a href="https://docs.fastpix.io/docs/audience-metrics">Audience metrics</a>, <a href="https://docs.fastpix.io/docs/understand-dashboard-ui#1-views-dashboard">Views dashboard</a>
+//	Related guide: <a href="https://fastpix.com/docs/concepts/audience-metrics">Audience metrics</a>, <a href="https://fastpix.com/docs/working-with-video-data/explore-the-dashboard#1-views-dashboard">Views dashboard</a>
 func (s *Views) ListVideoViews(ctx context.Context, request operations.ListVideoViewsRequest, opts ...operations.Option) (*operations.ListVideoViewsResponse, error) {
 	o := operations.Options{}
 	supportedOptions := []string{
@@ -292,7 +292,7 @@ func (s *Views) ListVideoViews(ctx context.Context, request operations.ListVideo
 //
 // If a developer receives a report of a poor viewing experience for a specific user. By using this endpoint with the users `viewId`, the developer can retrieve metrics like buffering duration, playback errors, and session length. This data allows the developer to pinpoint issues (such as poor connectivity or a browser-specific problem) and take steps to improve the user experience.
 //
-// Related guide: <a href="https://docs.fastpix.io/page/what-video-data-do-we-capture#/">What Video Data do we capture?</a>
+// Related guide: <a href="https://fastpix.com/docs/concepts/what-video-data-do-we-capture#/">What Video Data do we capture?</a>
 func (s *Views) GetDetails(ctx context.Context, viewID string, opts ...operations.Option) (*operations.GetVideoViewDetailsResponse, error) {
 	request := operations.GetVideoViewDetailsRequest{
 		ViewID: viewID,
@@ -531,7 +531,7 @@ func (s *Views) GetDetails(ctx context.Context, viewID string, opts ...operation
 //
 //  5. You receive a response containing the list of top video views matching the specified criteria.
 //
-//     Related guide: <a href="https://docs.fastpix.io/page/how-to-get-top-performing-content">Get top-performing content</a>
+//     Related guide: <a href="https://fastpix.com/docs/working-with-video-data/identify-top-performing-content">Get top-performing content</a>
 func (s *Views) ListByTopContent(ctx context.Context, timespan *operations.ListByTopContentTimespan, filterby *string, limit *int64, opts ...operations.Option) (*operations.ListByTopContentResponse, error) {
 	request := operations.ListByTopContentRequest{
 		Timespan: timespan,

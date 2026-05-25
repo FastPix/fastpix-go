@@ -149,7 +149,7 @@ func (p *Placement) GetYMargin() *string {
 // WatermarkInput - Contains configuration details for applying a watermark overlay to a video.
 // The watermark is placed over the media content during processing.
 // For detailed setup steps and customization options, refer to the
-// <a href="https://docs.fastpix.io/docs/watermark-your-videos" target="_blank">FastPix Watermark Guide</a>.
+// <a href="https://fastpix.com/docs/edit-and-transform-videos/add-a-watermark-to-a-video" target="_blank">FastPix Watermark Guide</a>.
 type WatermarkInput struct {
 	// Type of overlay (currently only supports "watermark").
 	Type WatermarkInputType `json:"type"`

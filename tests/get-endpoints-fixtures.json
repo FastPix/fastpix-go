@@ -1,0 +1,179 @@
+{
+  "operations": {
+    "list-media": {
+      "query": {
+        "limit": 1,
+        "offset": 1,
+        "orderBy": "desc"
+      }
+    },
+    "list-live-clips": {
+      "pathParams": {
+        "livestreamId": "04f2ff997551bfeb99db3e099e8e85c8"
+      }
+    },
+    "get-media": {
+      "pathParams": {
+        "mediaId": "66b74bdb-c868-4fc8-bc16-ad8e2dfcbc36"
+      }
+    },
+    "get-media-summary": {
+      "pathParams": {
+        "mediaId": "66b74bdb-c868-4fc8-bc16-ad8e2dfcbc36"
+      }
+    },
+    "retrieveMediaInputInfo": {
+      "pathParams": {
+        "mediaId": "66b74bdb-c868-4fc8-bc16-ad8e2dfcbc36"
+      }
+    },
+    "list-playback-ids": {
+      "pathParams": {
+        "mediaId": "66b74bdb-c868-4fc8-bc16-ad8e2dfcbc36"
+      }
+    },
+    "list-uploads": {
+      "query": {
+        "limit": 5,
+        "offset": 1,
+        "orderBy": "desc"
+      }
+    },
+    "get-media-clips": {
+      "pathParams": {
+        "mediaId": "66b74bdb-c868-4fc8-bc16-ad8e2dfcbc36"
+      }
+    },
+    "get-all-playlists": {
+      "query": {
+        "limit": 5,
+        "offset": 1
+      }
+    },
+    "get-playback-id": {
+      "pathParams": {
+        "mediaId": "66b74bdb-c868-4fc8-bc16-ad8e2dfcbc36",
+        "playbackId": "fad6fa6b-c7bc-42aa-85f7-3105d71b5f98"
+      }
+    },
+    "get-playlist-by-id": {
+      "pathParams": {
+        "playlistId": "323a3ef5-7d80-4bbc-b5af-c86f6f0d44cd"
+      }
+    },
+    "getDrmConfiguration": {
+      "query": {
+        "limit": 10,
+        "offset": 1
+      }
+    },
+    "getDrmConfigurationById": {
+      "pathParams": {
+        "drmConfigurationId": "your-drm-configuration-id"
+      }
+    },
+    "get-all-streams": {
+      "query": {
+        "limit": 5,
+        "offset": 1,
+        "orderBy": "desc"
+      }
+    },
+    "get-live-stream-by-id": {
+      "pathParams": {
+        "streamId": "04f2ff997551bfeb99db3e099e8e85c8"
+      }
+    },
+    "get-live-stream-viewer-count-by-id": {
+      "pathParams": {
+        "streamId": "04f2ff997551bfeb99db3e099e8e85c8"
+      }
+    },
+    "get-live-stream-playback-id": {
+      "pathParams": {
+        "streamId": "04f2ff997551bfeb99db3e099e8e85c8",
+        "playbackId": "e3d28adb-df80-4a57-adf5-46522ffa3eff"
+      }
+    },
+    "get-specific-simulcast-of-stream": {
+      "pathParams": {
+        "streamId": "04f2ff997551bfeb99db3e099e8e85c8",
+        "simulcastId": "c0da2202b40efcc3dd25718c40aba9c8"
+      }
+    },
+    "list_signing_keys": {
+      "query": {
+        "limit": 5,
+        "offset": 1
+      }
+    },
+    "get-signing_key_by_id": {
+      "pathParams": {
+        "signingKeyId": "3186f963-75ea-4ad3-819f-6a6ad3caf6db"
+      }
+    },
+    "list_video_views": {
+      "query": {
+        "timespan": "24:hours",
+        "limit": 5,
+        "offset": 1
+      }
+    },
+    "get_video_view_details": {
+      "pathParams": {
+        "viewId": "b4d6cf48-f23d-4c85-9e70-2877fb662f0b"
+      }
+    },
+    "list_by_top_content": {
+      "query": {
+        "timespan": "24:hours",
+        "limit": 5
+      }
+    },
+    "list_dimensions": {},
+    "list_filter_values_for_dimension": {
+      "pathParams": {
+        "dimensionsId": "browser_name"
+      }
+    },
+    "list_breakdown_values": {
+      "pathParams": {
+        "metricId": "quality_of_experience_score"
+      },
+      "query": {
+        "timespan": "24:hours",
+        "groupBy": "browser_name"
+      }
+    },
+    "list_overall_values": {
+      "pathParams": {
+        "metricId": "quality_of_experience_score"
+      },
+      "query": {
+        "timespan": "24:hours"
+      }
+    },
+    "get_timeseries_data": {
+      "pathParams": {
+        "metricId": "quality_of_experience_score"
+      },
+      "query": {
+        "timespan": "24:hours",
+        "groupBy": "hour"
+      }
+    },
+    "list_comparison_values": {
+      "query": {
+        "timespan": "24:hours",
+        "dimension": "browser_name",
+        "value": "Chrome"
+      }
+    },
+    "list_errors": {
+      "query": {
+        "timespan": "24:hours",
+        "limit": 5
+      }
+    }
+  }
+}

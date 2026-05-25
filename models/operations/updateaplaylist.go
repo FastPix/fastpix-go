@@ -35,7 +35,7 @@ type UpdateAPlaylistResponse struct {
 	HTTPMeta components.HTTPMetadata `json:"-"`
 	// Playlist updated successfully
 	PlaylistCreatedResponse *components.PlaylistCreatedResponse
-	// See the range of possible <a href="https://docs.fastpix.io/reference/error-codes">error</a> responses and their status codes.
+	// See the range of possible <a href="https://fastpix.com/docs/error-codes/error-codes">error</a> responses and their status codes.
 	DefaultError *components.DefaultError
 }
 
