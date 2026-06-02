@@ -20,6 +20,16 @@ import (
 	"net/http"
 	"net/url"
 )
+const errApplyOptions = "error applying option: %w"
+const errGeneratingURL = "error generating URL: %w"
+const errCreatingRequest = "error creating request: %w"
+const UserAgent = "User-Agent"
+const errAPIError = "API error occurred"
+const ApplicationJson = "application/json"
+const errSendingRequest = "error sending request: %w"
+const errNoResponse = "error sending request: no response"
+const contentType = "Content-Type"
+
 
 type ManageVideos struct {
 	rootSDK          *Fastpixgo
@@ -59,7 +69,7 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -71,7 +81,7 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 	}
 	opURL, err := url.JoinPath(baseURL, "/on-demand")
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -97,10 +107,10 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
 		return nil, fmt.Errorf("error populating query params: %w", err)
@@ -156,9 +166,9 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -183,9 +193,9 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -215,7 +225,7 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -232,23 +242,23 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -265,7 +275,7 @@ func (s *ManageVideos) List(ctx context.Context, limit *int64, offset *int64, or
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -299,7 +309,7 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -311,7 +321,7 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -337,10 +347,10 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
@@ -392,9 +402,9 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -419,9 +429,9 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -451,7 +461,7 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -468,23 +478,23 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -501,7 +511,7 @@ func (s *ManageVideos) Delete(ctx context.Context, mediaID string, opts ...opera
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -537,7 +547,7 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -549,7 +559,7 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/upload/{uploadId}/cancel", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -575,10 +585,10 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 
 	req, err := http.NewRequestWithContext(ctx, "PUT", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
@@ -630,9 +640,9 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -657,9 +667,9 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -689,7 +699,7 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -706,23 +716,23 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -739,7 +749,7 @@ func (s *ManageVideos) CancelUpload(ctx context.Context, uploadID string, opts .
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -790,7 +800,7 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -802,7 +812,7 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/tracks/{trackId}", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -832,12 +842,12 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 
 	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+		req.Header.Set(contentType, reqContentType)
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -890,9 +900,9 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -917,9 +927,9 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -949,7 +959,7 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -966,23 +976,23 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -999,7 +1009,7 @@ func (s *ManageVideos) UpdateTrack(ctx context.Context, trackID string, mediaID 
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -1033,7 +1043,7 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -1045,7 +1055,7 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/summary", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -1071,10 +1081,10 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
@@ -1126,9 +1136,9 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1153,9 +1163,9 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1185,7 +1195,7 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1202,23 +1212,23 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1235,7 +1245,7 @@ func (s *ManageVideos) GetMediaSummary(ctx context.Context, mediaID string, opts
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -1270,7 +1280,7 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -1282,7 +1292,7 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/input-info", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -1308,10 +1318,10 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
@@ -1363,9 +1373,9 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1390,9 +1400,9 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1422,7 +1432,7 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1439,23 +1449,23 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1472,7 +1482,7 @@ func (s *ManageVideos) GetInputInfo(ctx context.Context, mediaID string, opts ..
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -1510,7 +1520,7 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -1522,7 +1532,7 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 	}
 	opURL, err := url.JoinPath(baseURL, "/on-demand/uploads")
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -1548,10 +1558,10 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
 		return nil, fmt.Errorf("error populating query params: %w", err)
@@ -1607,9 +1617,9 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1634,9 +1644,9 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1666,7 +1676,7 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1683,23 +1693,23 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1716,7 +1726,7 @@ func (s *ManageVideos) ListUnusedUploadUrls(ctx context.Context, limit *int64, o
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -1757,7 +1767,7 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return nil, fmt.Errorf(errApplyOptions, err)
 		}
 	}
 
@@ -1769,7 +1779,7 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/tracks/{trackId}/generate-subtitles", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
@@ -1799,12 +1809,12 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 
 	req, err := http.NewRequestWithContext(ctx, "POST", opURL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+		req.Header.Set(contentType, reqContentType)
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -1857,9 +1867,9 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1884,9 +1894,9 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 		httpRes, err = s.sdkConfiguration.Client.Do(req)
 		if err != nil || httpRes == nil {
 			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
+				err = fmt.Errorf(errSendingRequest, err)
 			} else {
-				err = fmt.Errorf("error sending request: no response")
+				err = fmt.Errorf(errNoResponse)
 			}
 
 			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -1916,7 +1926,7 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1933,23 +1943,23 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -1966,7 +1976,7 @@ func (s *ManageVideos) GenerateSubtitleTrack(ctx context.Context, mediaID string
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
@@ -2104,9 +2114,9 @@ func (s *ManageVideos) GetMediaClips(ctx context.Context, mediaID string, offset
 			httpRes, err := s.sdkConfiguration.Client.Do(req)
 			if err != nil || httpRes == nil {
 				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
+					err = fmt.Errorf(errSendingRequest, err)
 				} else {
-					err = fmt.Errorf("error sending request: no response")
+					err = fmt.Errorf(errNoResponse)
 				}
 
 				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
@@ -2163,7 +2173,7 @@ func (s *ManageVideos) GetMediaClips(ctx context.Context, mediaID string, offset
 	switch {
 	case httpRes.StatusCode == 200:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -2180,23 +2190,23 @@ func (s *ManageVideos) GetMediaClips(ctx context.Context, mediaID string, offset
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		return nil, apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 	default:
 		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
+		case utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`):
 			rawBody, err := utils.ConsumeRawBody(httpRes)
 			if err != nil {
 				return nil, err
@@ -2213,7 +2223,7 @@ func (s *ManageVideos) GetMediaClips(ctx context.Context, mediaID string, offset
 			if err != nil {
 				return nil, err
 			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)), httpRes.StatusCode, string(rawBody), httpRes)
 		}
 	}
 
