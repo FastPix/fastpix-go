@@ -103,7 +103,7 @@ func populateFormStructFields(cfg FormPopulateConfig, rctx reflectContext, formV
     if len(items) > 0 {
         formValues.Add(cfg.ParamName, strings.Join(items, rctx.delimiter))
     }
-
+}
 func addExplodedStructField(fieldName string, valType reflect.Value, formValues url.Values) {
     if valType.Kind() == reflect.Slice || valType.Kind() == reflect.Array {
         for i := 0; i < valType.Len(); i++ {
