@@ -86,131 +86,25 @@ func (e *LanguageCode) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
-	switch v {
-	case "ar-SA":
-		fallthrough
-	case "bn-BD":
-		fallthrough
-	case "bn-IN":
-		fallthrough
-	case "ca-ES":
-		fallthrough
-	case "cs-CZ":
-		fallthrough
-	case "da-DK":
-		fallthrough
-	case "de-AT":
-		fallthrough
-	case "de-CH":
-		fallthrough
-	case "de-DE":
-		fallthrough
-	case "el-GR":
-		fallthrough
-	case "en-AU":
-		fallthrough
-	case "en-CA":
-		fallthrough
-	case "en-GB":
-		fallthrough
-	case "en-IE":
-		fallthrough
-	case "en-IN":
-		fallthrough
-	case "en-NZ":
-		fallthrough
-	case "en-US":
-		fallthrough
-	case "en-ZA":
-		fallthrough
-	case "es-AR":
-		fallthrough
-	case "es-CL":
-		fallthrough
-	case "es-CO":
-		fallthrough
-	case "es-ES":
-		fallthrough
-	case "es-MX":
-		fallthrough
-	case "es-US":
-		fallthrough
-	case "fi-FI":
-		fallthrough
-	case "fr-BE":
-		fallthrough
-	case "fr-CA":
-		fallthrough
-	case "fr-CH":
-		fallthrough
-	case "fr-FR":
-		fallthrough
-	case "he-IL":
-		fallthrough
-	case "hi-IN":
-		fallthrough
-	case "hr-HR":
-		fallthrough
-	case "hu-HU":
-		fallthrough
-	case "id-ID":
-		fallthrough
-	case "it-CH":
-		fallthrough
-	case "it-IT":
-		fallthrough
-	case "ja-JP":
-		fallthrough
-	case "ko-KR":
-		fallthrough
-	case "ms-MY":
-		fallthrough
-	case "nb-NO":
-		fallthrough
-	case "nl-BE":
-		fallthrough
-	case "nl-NL":
-		fallthrough
-	case "no-NO":
-		fallthrough
-	case "pl-PL":
-		fallthrough
-	case "pt-BR":
-		fallthrough
-	case "pt-PT":
-		fallthrough
-	case "ro-RO":
-		fallthrough
-	case "ru-RU":
-		fallthrough
-	case "sk-SK":
-		fallthrough
-	case "sv-SE":
-		fallthrough
-	case "ta-IN":
-		fallthrough
-	case "ta-LK":
-		fallthrough
-	case "te-IN":
-		fallthrough
-	case "th-TH":
-		fallthrough
-	case "tr-TR":
-		fallthrough
-	case "uk-UA":
-		fallthrough
-	case "vi-VN":
-		fallthrough
-	case "bg-BG":
-		fallthrough
-	case "zh-CN":
-		fallthrough
-	case "zh-HK":
-		fallthrough
-	case "zh-TW":
-		*e = LanguageCode(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for LanguageCode: %v", v)
-	}
+	var validLanguageCodes = map[string]struct{}{
+	"ar-SA": {}, "bn-BD": {}, "bn-IN": {}, "ca-ES": {}, "cs-CZ": {},
+	"da-DK": {}, "de-AT": {}, "de-CH": {}, "de-DE": {}, "el-GR": {},
+	"en-AU": {}, "en-CA": {}, "en-GB": {}, "en-IE": {}, "en-IN": {},
+	"en-NZ": {}, "en-US": {}, "en-ZA": {}, "es-AR": {}, "es-CL": {},
+	"es-CO": {}, "es-ES": {}, "es-MX": {}, "es-US": {}, "fi-FI": {},
+	"fr-BE": {}, "fr-CA": {}, "fr-CH": {}, "fr-FR": {}, "he-IL": {},
+	"hi-IN": {}, "hr-HR": {}, "hu-HU": {}, "id-ID": {}, "it-CH": {},
+	"it-IT": {}, "ja-JP": {}, "ko-KR": {}, "ms-MY": {}, "nb-NO": {},
+	"nl-BE": {}, "nl-NL": {}, "no-NO": {}, "pl-PL": {}, "pt-BR": {},
+	"pt-PT": {}, "ro-RO": {}, "ru-RU": {}, "sk-SK": {}, "sv-SE": {},
+	"ta-IN": {}, "ta-LK": {}, "te-IN": {}, "th-TH": {}, "tr-TR": {},
+	"uk-UA": {}, "vi-VN": {}, "bg-BG": {}, "zh-CN": {}, "zh-HK": {},
+	"zh-TW": {},
+}
+
+if _, ok := validLanguageCodes[v]; ok {
+	*e = LanguageCode(v)
+	return nil
+}
+return fmt.Errorf("invalid value for LanguageCode: %v", v)
 }

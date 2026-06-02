@@ -74,9 +74,9 @@ func MustDateFromString(str string) Date {
 func (d Date) GetTime() time.Time {
 	return d.Time
 }
-
+const dateLayout = "2006-01-02"
 func (d Date) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, d.Time.Format("2006-01-02"))), nil
+	return []byte(fmt.Sprintf(`"%s"`, d.Time.Format(dateLayout))), nil
 }
 
 func (d *Date) UnmarshalJSON(data []byte) error {
@@ -85,10 +85,10 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 	str := string(data)
 	str = strings.Trim(str, `"`)
 
-	d.Time, err = time.Parse("2006-01-02", str)
+	d.Time, err = time.Parse(dateLayout, str)
 	return err
 }
 
 func (d Date) String() string {
-	return d.Time.Format("2006-01-02")
+	return d.Time.Format(dateLayout)
 }

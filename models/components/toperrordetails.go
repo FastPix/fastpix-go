@@ -66,15 +66,15 @@ func (u *TopErrorDetailsPercentage) UnmarshalJSON(data []byte) error {
 			Value: &number,
 		})
 	}
-
+    const errNotSupported = "could not unmarshal `%s` into any supported union types for TopErrorDetailsPercentage"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for TopErrorDetailsPercentage", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for TopErrorDetailsPercentage", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -88,7 +88,7 @@ func (u *TopErrorDetailsPercentage) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for TopErrorDetailsPercentage", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u TopErrorDetailsPercentage) MarshalJSON() ([]byte, error) {
@@ -157,14 +157,15 @@ func (u *UniqueViewersEffectedPercentage) UnmarshalJSON(data []byte) error {
 		})
 	}
 
+    const errNotSupported = "could not unmarshal `%s` into any supported union types for UniqueViewersEffectedPercentage"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for UniqueViewersEffectedPercentage", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for UniqueViewersEffectedPercentage", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -178,7 +179,7 @@ func (u *UniqueViewersEffectedPercentage) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for UniqueViewersEffectedPercentage", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u UniqueViewersEffectedPercentage) MarshalJSON() ([]byte, error) {

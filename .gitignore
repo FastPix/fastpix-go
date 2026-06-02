@@ -80,3 +80,5 @@ tests/NON_GET_ENDPOINTS_VALIDATION_REPORT.md
 # Stale Go test-run output artifacts
 tests/test_report.json
 tests/test_report.txt
+
+node_modules/@types/node

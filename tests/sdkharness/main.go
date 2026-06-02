@@ -423,10 +423,11 @@ func dispatch(s *fastpixgo.Fastpixgo, op string, req map[string]any) (any, error
 		return s.Errors.List(ctx, ts, nil, i64(req, "limit"))
 
 	// --------------------------- POST (create) ---------------------------
+	const sdk-validate ="sdk-validate"
 	case "create-media":
 		return s.InputVideo.Create(ctx, components.CreateMediaRequest{
 			Inputs:   []components.Input{components.CreateInputPullVideoInput(components.PullVideoInput{})},
-			Metadata: map[string]string{"source": "sdk-validate"},
+			Metadata: map[string]string{"source": sdk-validate},
 		})
 	case "create_signing_key":
 		return s.SigningKeys.Create(ctx)
@@ -440,7 +441,7 @@ func dispatch(s *fastpixgo.Fastpixgo, op string, req map[string]any) (any, error
 	case "create-new-stream":
 		return s.StartLiveStream.Create(ctx, components.CreateLiveStreamRequest{
 			PlaybackSettings:   components.PlaybackSettings{},
-			InputMediaSettings: components.InputMediaSettings{Metadata: map[string]string{"name": "sdk-validate"}},
+			InputMediaSettings: components.InputMediaSettings{Metadata: map[string]string{"name": sdk-validate}},
 		})
 	case "create-media-playback-id":
 		// Request an explicit resolution so the API returns a non-null

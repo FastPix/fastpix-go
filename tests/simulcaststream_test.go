@@ -15,8 +15,6 @@ type SimulcastStreamTest struct {
 
 func setupSimulcastStreamTest(t *testing.T) *SimulcastStreamTest {
 	livestreamServerURL, _, username, password := LoadConfig()
-
-	// Log the livestream server URL
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 
 	sdk := fastpixgo.New(
@@ -26,18 +24,14 @@ func setupSimulcastStreamTest(t *testing.T) *SimulcastStreamTest {
 			Password: &password,
 		}),
 	)
-
-	return &SimulcastStreamTest{
-		sdk: sdk,
-	}
+	return &SimulcastStreamTest{sdk: sdk}
 }
 
 func TestSimulcastStream(t *testing.T) {
 	test := setupSimulcastStreamTest(t)
 	ctx := context.Background()
 
-	// First, get a list of livestreams to use as source
-		resp, err := test.sdk.ManageLiveStream.List(ctx, nil, nil, nil)
+	resp, err := test.sdk.ManageLiveStream.List(ctx, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to get livestreams: %v", err)
 	}
@@ -45,84 +39,92 @@ func TestSimulcastStream(t *testing.T) {
 		t.Fatal("No livestreams available for testing")
 	}
 
-	// Use the first stream as source
-	sourceStream := resp.GetStreamsResponse.Data[0]
-	sourceStreamID := *sourceStream.StreamID
+	sourceStreamID := *resp.GetStreamsResponse.Data[0].StreamID
 
 	t.Run("CreateSimulcastOfStream", func(t *testing.T) {
-		// Create a simulcast stream using the working RTMP URL and stream key format
-		createReq := &components.SimulcastRequest{
-			URL:       stringPtr("rtmp://hyd01.contribute.live-video.net/app/"),
-			StreamKey: stringPtr("live_1012464221_DuM8W004MoZYNxQEZ0czODgfHCFBhk"),
-		}
-
-		resp, err := test.sdk.SimulcastStreams.Create(ctx, sourceStreamID, *createReq)
-		if err != nil {
-			t.Fatalf("CreateSimulcastOfStream failed: %v", err)
-		}
-		if resp == nil || resp.SimulcastResponse == nil {
-			t.Fatal("CreateSimulcastOfStream response is nil")
-		}
-
-		// Log the response
-		if raw, err := json.MarshalIndent(resp.SimulcastResponse, "", "  "); err == nil {
-			t.Logf("CreateSimulcastOfStream response: %s", string(raw))
-		}
-
-		// Store the simulcast stream ID for later tests
-		if resp.SimulcastResponse.Data != nil && resp.SimulcastResponse.Data.SimulcastID != nil {
-			simulcastStreamID := *resp.SimulcastResponse.Data.SimulcastID
-
-			t.Run("GetSpecificSimulcastOfStream", func(t *testing.T) {
-				resp, err := test.sdk.SimulcastStreams.GetSpecific(ctx, sourceStreamID, simulcastStreamID)
-				if err != nil {
-					t.Fatalf("GetSpecificSimulcastOfStream failed: %v", err)
-				}
-				if resp == nil || resp.SimulcastResponse == nil {
-					t.Fatal("GetSpecificSimulcastOfStream response is nil")
-				}
-
-				if raw, err := json.MarshalIndent(resp.SimulcastResponse, "", "  "); err == nil {
-					t.Logf("GetSpecificSimulcastOfStream response: %s", string(raw))
-				}
-			})
-
-			t.Run("UpdateSpecificSimulcastOfStream", func(t *testing.T) {
-				updateReq := components.SimulcastUpdateRequest{
-					IsEnabled: boolPtr(false),
-				}
-
-				resp, err := test.sdk.SimulcastStreams.Update(ctx, sourceStreamID, simulcastStreamID, updateReq)
-				if err != nil {
-					t.Fatalf("UpdateSpecificSimulcastOfStream failed: %v", err)
-				}
-				if resp == nil || resp.SimulcastUpdateResponse == nil {
-					t.Fatal("UpdateSpecificSimulcastOfStream response is nil")
-				}
-
-				if raw, err := json.MarshalIndent(resp.SimulcastUpdateResponse, "", "  "); err == nil {
-					t.Logf("UpdateSpecificSimulcastOfStream response: %s", string(raw))
-				}
-			})
-
-			t.Run("DeleteSimulcastOfStream", func(t *testing.T) {
-				resp, err := test.sdk.SimulcastStream.Delete(ctx, sourceStreamID, simulcastStreamID)
-				if err != nil {
-					t.Fatalf("DeleteSimulcastOfStream failed: %v", err)
-				}
-				if resp == nil || resp.SimulcastdeleteResponse == nil {
-					t.Fatal("DeleteSimulcastOfStream response is nil")
-				}
-
-				if raw, err := json.MarshalIndent(resp.SimulcastdeleteResponse, "", "  "); err == nil {
-					t.Logf("DeleteSimulcastOfStream response: %s", string(raw))
-				}
-			})
-		}
+		testCreateSimulcastOfStream(t, ctx, test, sourceStreamID)
 	})
 }
 
-// Helper functions for creating pointers to primitive types
+func testCreateSimulcastOfStream(t *testing.T, ctx context.Context, test *SimulcastStreamTest, sourceStreamID string) {
+	createReq := &components.SimulcastRequest{
+		URL:       stringPtr("rtmp://hyd01.contribute.live-video.net/app/"),
+		StreamKey: stringPtr("live_1012464221_DuM8W004MoZYNxQEZ0czODgfHCFBhk"),
+	}
+
+	resp, err := test.sdk.SimulcastStreams.Create(ctx, sourceStreamID, *createReq)
+	if err != nil {
+		t.Fatalf("CreateSimulcastOfStream failed: %v", err)
+	}
+	if resp == nil || resp.SimulcastResponse == nil {
+		t.Fatal("CreateSimulcastOfStream response is nil")
+	}
+
+	if raw, err := json.MarshalIndent(resp.SimulcastResponse, "", "  "); err == nil {
+		t.Logf("CreateSimulcastOfStream response: %s", string(raw))
+	}
+
+	if resp.SimulcastResponse.Data == nil || resp.SimulcastResponse.Data.SimulcastID == nil {
+		return
+	}
+
+	simulcastStreamID := *resp.SimulcastResponse.Data.SimulcastID
+
+	t.Run("GetSpecificSimulcastOfStream", func(t *testing.T) {
+		testGetSpecificSimulcastOfStream(t, ctx, test, sourceStreamID, simulcastStreamID)
+	})
+
+	t.Run("UpdateSpecificSimulcastOfStream", func(t *testing.T) {
+		testUpdateSpecificSimulcastOfStream(t, ctx, test, sourceStreamID, simulcastStreamID)
+	})
+
+	t.Run("DeleteSimulcastOfStream", func(t *testing.T) {
+		testDeleteSimulcastOfStream(t, ctx, test, sourceStreamID, simulcastStreamID)
+	})
+}
+
+func testGetSpecificSimulcastOfStream(t *testing.T, ctx context.Context, test *SimulcastStreamTest, sourceStreamID, simulcastStreamID string) {
+	resp, err := test.sdk.SimulcastStreams.GetSpecific(ctx, sourceStreamID, simulcastStreamID)
+	if err != nil {
+		t.Fatalf("GetSpecificSimulcastOfStream failed: %v", err)
+	}
+	if resp == nil || resp.SimulcastResponse == nil {
+		t.Fatal("GetSpecificSimulcastOfStream response is nil")
+	}
+	if raw, err := json.MarshalIndent(resp.SimulcastResponse, "", "  "); err == nil {
+		t.Logf("GetSpecificSimulcastOfStream response: %s", string(raw))
+	}
+}
+
+func testUpdateSpecificSimulcastOfStream(t *testing.T, ctx context.Context, test *SimulcastStreamTest, sourceStreamID, simulcastStreamID string) {
+	updateReq := components.SimulcastUpdateRequest{
+		IsEnabled: boolPtr(false),
+	}
+	resp, err := test.sdk.SimulcastStreams.Update(ctx, sourceStreamID, simulcastStreamID, updateReq)
+	if err != nil {
+		t.Fatalf("UpdateSpecificSimulcastOfStream failed: %v", err)
+	}
+	if resp == nil || resp.SimulcastUpdateResponse == nil {
+		t.Fatal("UpdateSpecificSimulcastOfStream response is nil")
+	}
+	if raw, err := json.MarshalIndent(resp.SimulcastUpdateResponse, "", "  "); err == nil {
+		t.Logf("UpdateSpecificSimulcastOfStream response: %s", string(raw))
+	}
+}
+
+func testDeleteSimulcastOfStream(t *testing.T, ctx context.Context, test *SimulcastStreamTest, sourceStreamID, simulcastStreamID string) {
+	resp, err := test.sdk.SimulcastStream.Delete(ctx, sourceStreamID, simulcastStreamID)
+	if err != nil {
+		t.Fatalf("DeleteSimulcastOfStream failed: %v", err)
+	}
+	if resp == nil || resp.SimulcastdeleteResponse == nil {
+		t.Fatal("DeleteSimulcastOfStream response is nil")
+	}
+	if raw, err := json.MarshalIndent(resp.SimulcastdeleteResponse, "", "  "); err == nil {
+		t.Logf("DeleteSimulcastOfStream response: %s", string(raw))
+	}
+}
+
 func stringPtr(s string) *string {
 	return &s
 }
