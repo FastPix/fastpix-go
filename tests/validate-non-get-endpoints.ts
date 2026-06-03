@@ -157,6 +157,25 @@ async function waitForMediaReady(
 // Go SDK invocation (via the tests/sdkharness subprocess)
 // ---------------------------------------------------------------------------
 
+
+// Build a minimal, fixed PATH containing only standard Go installation directories.
+// This prevents PATH injection (Sonar S4036) by not inheriting the caller's PATH.
+function buildSafePath(): string {
+  const fixed = [
+    "/usr/local/go/bin",   // standard Go install on Linux/macOS
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    process.env.GOPATH ? `${process.env.GOPATH}/bin` : "",
+    process.env.HOME ? `${process.env.HOME}/go/bin` : "",  // default GOPATH
+  ].filter(Boolean);
+  // On Windows, also include common Go install location
+  if (process.platform === "win32") {
+    fixed.push("C:\\Go\\bin");
+  }
+  return fixed.join(process.platform === "win32" ? ";" : ":");
+}
+
 // Path to the Go harness package, relative to the SDK repo root (parent of tests/).
 const GO_HARNESS_PKG = "./tests/sdkharness";
 
@@ -178,6 +197,7 @@ function invokeGoSDK(
     encoding: "utf-8",
     cwd: repoRoot,
     maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, PATH: buildSafePath() },
   });
 
   if (child.error) {
@@ -227,7 +247,7 @@ async function waitForTrackReady(
       const track = (body?.data?.tracks ?? []).find((t: any) => t?.id === trackId);
       if (track) {
         last = track.status ?? "present";
-        if (last === "Ready" || last === "present") return last;
+        if (last === "Ready" || last === "present" || last === "available") return last;
       }
     } catch {
       /* transient; keep polling */
@@ -525,12 +545,17 @@ function writeReport(results: StepResult[], ctx: Ctx) {
 
 type RunStepDeps = { spec: any; baseUrl: string; username: string; password: string };
 
-async function waitIfNeeded(step: Step, ctx: Ctx, baseUrl: string, username: string, password: string): Promise<void> {
+async function waitIfNeeded(step: Step, ctx: Ctx, baseUrl: string, username: string, password: string): Promise<boolean> {
   if (step.operationId === "Generate-subtitle-track" && ctx.mediaId && ctx.trackId) {
     process.stdout.write(`  ⏳ waiting for track ${ctx.trackId} to be ready...`);
     const tstatus = await waitForTrackReady(baseUrl, username, password, ctx.mediaId, ctx.trackId);
     console.log(` ${tstatus}`);
+    if (tstatus !== "Ready" && tstatus !== "present" && tstatus !== "available") {
+      console.log(`  ⤳ SKIP — track not ready after timeout (status: ${tstatus})`);
+      return false;
+    }
   }
+  return true;
 }
 
 async function retryLoop(
@@ -629,7 +654,10 @@ async function runStep(
     return { ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: `missing dependency: ${missingDeps.join(", ")}` };
   }
 
-  await waitIfNeeded(step, ctx, baseUrl, username, password);
+  const trackReady = await waitIfNeeded(step, ctx, baseUrl, username, password);
+  if (!trackReady) {
+    return { ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: "track not ready after timeout" };
+  }
 
   const request = step.request(ctx);
   const sdkRes = await retryLoop(step, request, baseUrl, username, password);

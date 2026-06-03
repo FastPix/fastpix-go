@@ -236,6 +236,25 @@ type GoSDKResult =
   | { ok: true; value: any }
   | { ok: false; error: any };
 
+
+// Build a minimal, fixed PATH containing only standard Go installation directories.
+// This prevents PATH injection (Sonar S4036) by not inheriting the caller's PATH.
+function buildSafePath(): string {
+  const fixed = [
+    "/usr/local/go/bin",   // standard Go install on Linux/macOS
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    process.env.GOPATH ? `${process.env.GOPATH}/bin` : "",
+    process.env.HOME ? `${process.env.HOME}/go/bin` : "",  // default GOPATH
+  ].filter(Boolean);
+  // On Windows, also include common Go install location
+  if (process.platform === "win32") {
+    fixed.push("C:\\Go\\bin");
+  }
+  return fixed.join(process.platform === "win32" ? ";" : ":");
+}
+
 // Path to the Go harness package, relative to the SDK repo root (the parent of
 // tests/). `go run` is executed with cwd = repo root so the harness resolves
 // the local module's packages.
@@ -260,6 +279,7 @@ function invokeGoSDK(
     encoding: "utf-8",
     cwd: repoRoot,
     maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, PATH: buildSafePath() },
   });
 
   if (child.error) {
