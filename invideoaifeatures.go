@@ -24,15 +24,8 @@ import (
 
 const (
 	errApplyingOption    = "error applying option: %w"
-	errGeneratingURL     = "error generating URL: %w"
-	errCreatingRequest   = "error creating request: %w"
-	errSendingRequest    = "error sending request: %w"
-	errNoResponse        = "error sending request: no response"
-	errUnknownContentType = "unknown content-type received: %s"
 	userAgent            = "User-Agent"
 	applicationJSON      = "application/json"
-	contentType          = "Content-Type"
-	errAPIError          = "API error occurred"
 )
 
 type InVideoAIFeatures struct {

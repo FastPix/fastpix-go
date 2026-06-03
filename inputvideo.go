@@ -23,13 +23,7 @@ import (
 	"github.com/FastPix/fastpix-go/retry"
 )
 
-const (
-	contentType                 = "Content-Type"
-	errSendingRequest           = "error sending request: %w"
-	errUnknownContentType       = "unknown content-type received: %s"
-	errSendingRequestNoResponse = "error sending request: no response"
-	errAPIError                 = "API error occurred"
-)
+
 
 type InputVideo struct {
 	rootSDK          *Fastpixgo
@@ -277,7 +271,7 @@ func ivFormatSendError(err error) error {
 	if err != nil {
 		return fmt.Errorf(errSendingRequest, err)
 	}
-	return fmt.Errorf(errSendingRequestNoResponse)
+	return fmt.Errorf(errNoResponse)
 }
 
 func (s *InputVideo) ivExecuteWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {

@@ -20,16 +20,6 @@ import (
 	"net/http"
 )
 
-const errApplyOptions = "error applying option: %w"
-const errGeneratingURL = "error generating URL: %w"
-const errCreatingRequest = "error creating request: %w"
-const UserAgent = "User-Agent"
-const errAPIError = "API error occurred"
-const ApplicationJson = "application/json"
-const errSendingRequest = "error sending request: %w"
-const errNoResponse = "error sending request: no response"
-const contentType = "Content-Type"
-
 type LivePlayback struct {
 	rootSDK          *Fastpixgo
 	sdkConfiguration config.SDKConfiguration

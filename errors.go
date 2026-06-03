@@ -22,8 +22,6 @@ import (
 	"github.com/FastPix/fastpix-go/retry"
 )
 
-const contentType = "Content-Type"
-
 // Errors - Operations involving errors
 type Errors struct {
 	rootSDK          *Fastpixgo

@@ -23,11 +23,7 @@ import (
 )
 
 const (
-	errSendingRequest            = "error sending request: %w"
-	errSendingRequestNoResponse  = "error sending request: no response"
-	errGeneratingURL             = "error generating URL: %w"
 	errContentType               = "unknown content-type received: %s"
-	errAPIError                  = "API error occurred"
 	dimContentType               = "Content-Type"
 )
 
@@ -275,7 +271,7 @@ func dimFormatSendError(err error) error {
 	if err != nil {
 		return fmt.Errorf(errSendingRequest, err)
 	}
-	return fmt.Errorf(errSendingRequestNoResponse)
+	return fmt.Errorf(errNoResponse)
 }
 
 func (s *Dimensions) dimExecuteWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {

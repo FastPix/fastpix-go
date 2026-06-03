@@ -21,21 +21,9 @@ import (
 	"net/url"
 )
 
-const errApplyOptions = "error applying option: %w"
-const errGeneratingURL = "error generating URL: %w"
-const errCreatingRequest = "error creating request: %w"
-const UserAgent = "User-Agent"
-const errAPIError = "API error occurred"
-const ApplicationJson = "application/json"
-const errSendingRequest = "error sending request: %w"
-const errNoResponse = "error sending request: no response"
-const contentType = "Content-Type"
-
 // errUnknownContentType is the format string for unexpected content-type errors.
 // S1192 fix: referenced by all four methods; declaring it once removes the
 // duplicate string literal that was inlined in each method body.
-const errUnknownContentType = "unknown content-type received: %s"
-
 // retryCodes lists the HTTP status codes that trigger an automatic retry.
 // S1192 fix: the identical []string{"429","500","502","503","504"} slice literal
 // appeared in all four method bodies; a single package-level var removes the duplication.
