@@ -237,23 +237,27 @@ type GoSDKResult =
   | { ok: false; error: any };
 
 
-// Build a minimal, fixed PATH containing only standard Go installation directories.
-// This prevents PATH injection (Sonar S4036) by not inheriting the caller's PATH.
-function buildSafePath(): string {
-  const fixed = [
-    "/usr/local/go/bin",   // standard Go install on Linux/macOS
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-    process.env.GOPATH ? `${process.env.GOPATH}/bin` : "",
-    process.env.HOME ? `${process.env.HOME}/go/bin` : "",  // default GOPATH
-  ].filter(Boolean);
-  // On Windows, also include common Go install location
-  if (process.platform === "win32") {
-    fixed.push("C:\\Go\\bin");
+// Resolve the absolute path to the go binary from fixed, known locations.
+// Using an absolute path in spawnSync avoids PATH-based executable lookup entirely,
+// fully resolving Sonar S4036.
+function resolveAbsoluteGoBinary(): string {
+  const candidates = process.platform === "win32"
+    ? [
+        String.raw`C:\Go\bin\go.exe`,
+        String.raw`C:\Program Files\Go\bin\go.exe`,
+      ]
+    : [
+        "/usr/local/go/bin/go",
+        "/usr/bin/go",
+        "/usr/local/bin/go",
+      ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
   }
-  return fixed.join(process.platform === "win32" ? ";" : ":");
+  return "/usr/local/go/bin/go";
 }
+
+const GO_BINARY = resolveAbsoluteGoBinary();
 
 // Path to the Go harness package, relative to the SDK repo root (the parent of
 // tests/). `go run` is executed with cwd = repo root so the harness resolves
@@ -273,13 +277,21 @@ function invokeGoSDK(
   password: string,
 ): GoSDKResult {
   const repoRoot = join(__dirname, "..");
+  mkdirSync(join(repoRoot, ".gotmp"), { recursive: true });
 
-  const child = spawnSync("go", ["run", GO_HARNESS_PKG], {
+  const child = spawnSync(GO_BINARY, ["run", GO_HARNESS_PKG], {
     input: JSON.stringify({ operationId, request: request ?? {}, baseUrl, username, password }),
     encoding: "utf-8",
     cwd: repoRoot,
     maxBuffer: 10 * 1024 * 1024,
-    env: { ...process.env, PATH: buildSafePath() },
+    env: {
+      HOME: process.env.HOME ?? "",
+      GOPATH: process.env.GOPATH ?? "",
+      GOROOT: process.env.GOROOT ?? "",
+      GOCACHE: process.env.GOCACHE ?? "",
+      GOTMPDIR: join(repoRoot, ".gotmp"),
+      USERPROFILE: process.env.USERPROFILE ?? "",
+    },
   });
 
   if (child.error) {
