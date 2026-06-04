@@ -272,21 +272,31 @@ func populateDeepObjectParamsStruct(qsValues url.Values, priorScope string, stru
 }
 
 func populateFormParams(tag *paramTag, objType reflect.Type, objValue reflect.Value, delimiter string, defaultValue *string, allowEmptyValue map[string]struct{}) url.Values {
-	return populateForm(tag.ParamName, tag.Explode, objType, objValue, delimiter, defaultValue, allowEmptyValue, func(fieldType reflect.StructField) string {
-		qpTag := parseQueryParamTag(fieldType)
-		if qpTag == nil {
-			return ""
-		}
-
-		// When inline is true, use the parent's param name instead of the field's own name.
-		// This allows union/oneOf wrapper types to serialize their values directly under
-		// the parent's query parameter name.
-		if qpTag.Inline {
-			return tag.ParamName
-		}
-
-		return qpTag.ParamName
-	})
+	cfg := FormPopulateConfig{
+		ParamName:       tag.ParamName,
+		DefaultValue:    defaultValue,
+		AllowEmptyValue: allowEmptyValue,
+		GetFieldName: func(fieldType reflect.StructField) string {
+			qpTag := parseQueryParamTag(fieldType)
+			if qpTag == nil {
+				return ""
+			}
+			// When inline is true, use the parent's param name instead of the field's own name.
+			// This allows union/oneOf wrapper types to serialize their values directly under
+			// the parent's query parameter name.
+			if qpTag.Inline {
+				return tag.ParamName
+			}
+			return qpTag.ParamName
+		},
+	}
+	rctx := reflectContext{
+		objType:   objType,
+		objValue:  objValue,
+		delimiter: delimiter,
+		explode:   tag.Explode,
+	}
+	return populateForm(cfg, rctx)
 }
 
 type paramTag struct {

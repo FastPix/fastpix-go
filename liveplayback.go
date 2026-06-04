@@ -56,19 +56,6 @@ func (s *LivePlayback) resolveRetryConfig(o operations.Options) *retry.Config {
 	return s.sdkConfiguration.RetryConfig
 }
 
-// unknownContentTypeError returns a standardised API error for unexpected content types.
-func unknownContentTypeError(httpRes *http.Response) error {
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return err
-	}
-	return apierrors.NewAPIError(
-		fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)),
-		httpRes.StatusCode,
-		string(rawBody),
-		httpRes,
-	)
-}
 
 // consumeAPIError reads the body and wraps it in a generic API error.
 func consumeAPIError(httpRes *http.Response) error {

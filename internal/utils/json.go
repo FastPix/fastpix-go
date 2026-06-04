@@ -56,8 +56,54 @@ func MarshalJSON(v interface{}, tag reflect.StructTag, topLevel bool) ([]byte, e
 	return marshalModelFields(typ, val, v)
 }
 
+// orderedFields accumulates marshaled JSON members in the order their struct
+// fields are declared. We deliberately avoid marshaling a map[string]... here
+// because encoding/json sorts map keys alphabetically, which would discard the
+// struct's field order (e.g. emitting `data` before `success`). Preserving
+// declaration order keeps the wire shape aligned with the OpenAPI/API response.
+type orderedFields struct {
+	keys map[string]int // key -> index in members, for additionalProperties overrides
+	vals []orderedMember
+}
+
+type orderedMember struct {
+	key string
+	raw json.RawMessage
+}
+
+func (o *orderedFields) set(key string, raw json.RawMessage) {
+	if o.keys == nil {
+		o.keys = map[string]int{}
+	}
+	if idx, ok := o.keys[key]; ok {
+		o.vals[idx].raw = raw
+		return
+	}
+	o.keys[key] = len(o.vals)
+	o.vals = append(o.vals, orderedMember{key: key, raw: raw})
+}
+
+func (o *orderedFields) marshal() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, m := range o.vals {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		key, err := json.Marshal(m.key)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(key)
+		buf.WriteByte(':')
+		buf.Write(m.raw)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
 func marshalModelFields(typ reflect.Type, val reflect.Value, v interface{}) ([]byte, error) {
-	out := map[string]json.RawMessage{}
+	out := &orderedFields{}
 
 	for i := 0; i < typ.NumField(); i++ {
 		if err := marshalField(typ.Field(i), val.Field(i), i, typ, val, out); err != nil {
@@ -65,10 +111,10 @@ func marshalModelFields(typ reflect.Type, val reflect.Value, v interface{}) ([]b
 		}
 	}
 
-	return json.Marshal(out)
+	return out.marshal()
 }
 
-func marshalField(field reflect.StructField, fieldVal reflect.Value, i int, typ reflect.Type, val reflect.Value, out map[string]json.RawMessage) error {
+func marshalField(field reflect.StructField, fieldVal reflect.Value, i int, typ reflect.Type, val reflect.Value, out *orderedFields) error {
 	fieldName, omitEmpty, omitZero := parseJSONTag(field)
 
 	if shouldSkipField(field, fieldVal, fieldName, omitEmpty, omitZero) {
@@ -84,7 +130,7 @@ func marshalField(field reflect.StructField, fieldVal reflect.Value, i int, typ 
 		return err
 	}
 
-	out[fieldName] = r
+	out.set(fieldName, r)
 	return nil
 }
 
@@ -139,7 +185,7 @@ func shouldSkipByOmitTag(field reflect.StructField, fieldVal reflect.Value, omit
 	return omitEmpty && isEmptyContainer(field.Type, fieldVal)
 }
 
-func marshalAdditionalProperties(field reflect.StructField, fieldVal reflect.Value, out map[string]json.RawMessage) error {
+func marshalAdditionalProperties(field reflect.StructField, fieldVal reflect.Value, out *orderedFields) error {
 	if isNil(field.Type, fieldVal) {
 		return nil
 	}
@@ -154,7 +200,7 @@ func marshalAdditionalProperties(field reflect.StructField, fieldVal reflect.Val
 		if err != nil {
 			return err
 		}
-		out[key.String()] = r
+		out.set(key.String(), r)
 	}
 
 	return nil

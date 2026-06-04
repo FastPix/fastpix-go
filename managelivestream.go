@@ -13,7 +13,6 @@ import (
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
-	"github.com/FastPix/fastpix-go/models/apierrors"
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
@@ -45,48 +44,8 @@ func newManageLiveStream(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, 
 
 // ── shared infrastructure ────────────────────────────────────────────────────
 
-// unknownContentTypeError builds a standardised error for unexpected content types.
-// S1871 fix: replaces the four identical inner-switch default branches that each
-// inlined the same ConsumeRawBody + NewAPIError pattern.
-func unknownContentTypeError(httpRes *http.Response) error {
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return err
-	}
-	return apierrors.NewAPIError(
-		fmt.Sprintf(errUnknownContentType, httpRes.Header.Get(contentType)),
-		httpRes.StatusCode,
-		string(rawBody),
-		httpRes,
-	)
-}
 
-// consumeAPIError reads the body and wraps it in a generic API error.
-// S1871 fix: replaces the four pairs of identical 4xx / 5xx cases, now merged
-// into a single ">= 400 && < 600" branch that delegates here.
-func consumeAPIError(httpRes *http.Response) error {
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return err
-	}
-	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
-}
 
-// parseDefaultError decodes a DefaultError body after verifying the content-type.
-func parseDefaultError(httpRes *http.Response) (*components.DefaultError, error) {
-	if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
-		return nil, unknownContentTypeError(httpRes)
-	}
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return nil, err
-	}
-	var out components.DefaultError
-	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
 
 // applyOptions validates and collects variadic option funcs.
 func (s *ManageLiveStream) applyOptions(opts []operations.Option) (operations.Options, error) {
@@ -335,7 +294,7 @@ func (s *ManageLiveStream) parseListResponse(req *http.Request, httpRes *http.Re
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}
@@ -424,7 +383,7 @@ func (s *ManageLiveStream) parseEnableResponse(req *http.Request, httpRes *http.
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}
@@ -513,7 +472,7 @@ func (s *ManageLiveStream) parseCompleteResponse(req *http.Request, httpRes *htt
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}
@@ -612,7 +571,7 @@ func (s *ManageLiveStream) parseUpdateResponse(req *http.Request, httpRes *http.
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}

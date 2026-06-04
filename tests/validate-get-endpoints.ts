@@ -37,6 +37,7 @@ const OpenAPIResponseValidator =
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// eslint-disable-next-line no-console
 
 type Fixture = {
   operations: Record<
@@ -93,8 +94,21 @@ function safeFileSlug(input: string): string {
   return input.replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {} as Record<string, unknown>);
+  }
+  return value;
+}
+
 function toPrettyJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(sortKeysDeep(value), null, 2);
 }
 
 function preview(text: string): string {
@@ -114,6 +128,7 @@ function writeArtifactFiles(
 } {
   const artifactsDir = join(__dirname, ARTIFACTS_DIRNAME);
   mkdirSync(artifactsDir, { recursive: true });
+  // eslint-disable-next-line no-console
 
   const slug = safeFileSlug(operationId);
   const apiFilename = `${slug}.api.json`;
@@ -247,14 +262,16 @@ function resolveAbsoluteGoBinary(): string {
         String.raw`C:\Program Files\Go\bin\go.exe`,
       ]
     : [
-        "/usr/local/go/bin/go",
-        "/usr/bin/go",
+        "/opt/homebrew/bin/go",        // Homebrew on Apple Silicon / Intel Mac
+        "/usr/local/go/bin/go",        // Standard Go install on Linux/macOS
         "/usr/local/bin/go",
+        "/usr/bin/go",
+        "/home/linuxbrew/.linuxbrew/bin/go", // Homebrew on Linux
       ];
   for (const p of candidates) {
     if (existsSync(p)) return p;
   }
-  return "/usr/local/go/bin/go";
+  return "/opt/homebrew/bin/go";
 }
 
 const GO_BINARY = resolveAbsoluteGoBinary();
@@ -1044,7 +1061,10 @@ function invokeSDK(ep: EndpointInfo, fixtures: Fixture | null, baseUrl: string, 
   if (sdk.ok) return { sdkParseOk: true, sdkParseError: undefined, sdkPrinted: sdk.value, sdkValueForDiff: sdk.value };
   // eslint-disable-next-line no-console
   console.error(`  ⚠️  Go SDK call failed: ${sdk.error?.message ?? "Go SDK call failed"}`);
-  return { sdkParseOk: false, sdkParseError: sdk.error?.message ?? "Go SDK call failed", sdkPrinted: sdk.error, sdkValueForDiff: null };
+  // Persist just the raw API error body (when present) as the SDK artifact so it
+  // matches the .api.json byte-for-byte, instead of the harness error envelope
+  // ({name, message, statusCode, bodyJson}).
+  return { sdkParseOk: false, sdkParseError: sdk.error?.message ?? "Go SDK call failed", sdkPrinted: sdk.error?.bodyJson ?? sdk.error, sdkValueForDiff: null };
 }
 
 type DiffResult = { missingInSDK: string[]; missingInAPI: string[]; emptyArraysOmittedInSDK: string[]; emptyArraysOmittedInAPI: string[] };
@@ -1074,26 +1094,33 @@ async function processEndpoint(
   username: string,
   password: string,
 ): Promise<EndpointResult> {
+  let rawBody: any = null;
+  let sdkPrinted: any = null;
+  let result: EndpointResult;
+
   try {
     const { url, note } = buildUrl(baseUrl, ep, fixtures);
-    const { httpStatus, rawBody, requestError } = await fetchApiResponse(url, username, password);
+    const fetchRes = await fetchApiResponse(url, username, password);
+    rawBody = fetchRes.rawBody;
+    const { httpStatus, requestError } = fetchRes;
     const { openapiValid, openapiErrors } = validateApiResponse(spec, ep, httpStatus, rawBody, requestError);
-    const { sdkParseOk, sdkParseError, sdkPrinted, sdkValueForDiff } = invokeSDK(ep, fixtures, baseUrl, username, password);
+    const sdkRes = invokeSDK(ep, fixtures, baseUrl, username, password);
+    sdkPrinted = sdkRes.sdkPrinted;
+    const { sdkParseOk, sdkParseError, sdkValueForDiff } = sdkRes;
     const { missingInSDK, missingInAPI, emptyArraysOmittedInSDK, emptyArraysOmittedInAPI } = computeDiff(ep.operationId, rawBody, sdkValueForDiff);
     const pass = openapiValid && sdkParseOk && missingInSDK.length === 0 && missingInAPI.length === 0;
-    const artifacts = writeArtifactFiles(ep.operationId, rawBody, sdkPrinted);
-    return {
+    result = {
       endpoint: ep.path, operationId: ep.operationId, method: "GET",
       openapiValid, openapiErrors, sdkParseOk, sdkParseError,
       missingInSDK, missingInAPI, emptyArraysOmittedInSDK, emptyArraysOmittedInAPI,
-      apiResponseFile: artifacts.apiPath, sdkResponseFile: artifacts.sdkPath,
-      apiResponsePreview: artifacts.apiPreview, sdkResponsePreview: artifacts.sdkPreview,
+      apiResponseFile: undefined, sdkResponseFile: undefined,
+      apiResponsePreview: undefined, sdkResponsePreview: undefined,
       status: pass ? "PASS" : "FAIL", note, fixSuggestions: undefined,
     };
   } catch (error: any) {
     // eslint-disable-next-line no-console
     console.error(`  ✗ Unexpected error processing ${ep.operationId}:`, error?.message ?? String(error));
-    return {
+    result = {
       endpoint: ep.path, operationId: ep.operationId, method: "GET",
       openapiValid: false, openapiErrors: [{ message: `Unexpected error: ${error?.message ?? String(error)}` }],
       sdkParseOk: false, sdkParseError: error?.message ?? String(error),
@@ -1101,6 +1128,15 @@ async function processEndpoint(
       status: "FAIL", note: "Unexpected error during processing", fixSuggestions: undefined,
     };
   }
+
+  // Write artifacts OUTSIDE try/catch so they always get written
+  const artifacts = writeArtifactFiles(ep.operationId, rawBody, sdkPrinted);
+  result.apiResponseFile = artifacts.apiPath;
+  result.sdkResponseFile = artifacts.sdkPath;
+  result.apiResponsePreview = artifacts.apiPreview;
+  result.sdkResponsePreview = artifacts.sdkPreview;
+
+  return result;
 }
 const ENV_FALLBACK_USER = "your-access-token";
 const ENV_FALLBACK_PASS = "your-secret-key";

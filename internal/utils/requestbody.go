@@ -438,13 +438,23 @@ func populateFormDataFieldByStyle(tag *formTag, field reflect.StructField, field
 }
 
 func populateFormStyleField(tag *formTag, field reflect.StructField, fieldType reflect.Type, valType reflect.Value, dataValues url.Values) error {
-	values := populateForm(tag.Name, tag.Explode, fieldType, valType, ",", nil, nil, func(sf reflect.StructField) string {
-		t := parseFormTag(field)
-		if t == nil {
-			return ""
-		}
-		return t.Name
-	})
+	cfg := FormPopulateConfig{
+		ParamName: tag.Name,
+		GetFieldName: func(sf reflect.StructField) string {
+			t := parseFormTag(field)
+			if t == nil {
+				return ""
+			}
+			return t.Name
+		},
+	}
+	rctx := reflectContext{
+		objType:   fieldType,
+		objValue:  valType,
+		delimiter: ",",
+		explode:   tag.Explode,
+	}
+	values := populateForm(cfg, rctx)
 	for k, v := range values {
 		for _, vv := range v {
 			dataValues.Add(k, vv)

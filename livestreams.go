@@ -13,7 +13,6 @@ import (
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
-	"github.com/FastPix/fastpix-go/models/apierrors"
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
@@ -36,47 +35,8 @@ func newLiveStreams(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks
 
 // ── shared infrastructure ────────────────────────────────────────────────────
 
-// unknownContentTypeError builds a standardised error for unexpected content types.
-// S1871 fix: replaces the four identical inner-switch default branches.
-func unknownContentTypeError(httpRes *http.Response) error {
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return err
-	}
-	return apierrors.NewAPIError(
-		fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)),
-		httpRes.StatusCode,
-		string(rawBody),
-		httpRes,
-	)
-}
 
-// consumeAPIError reads the body and wraps it in a generic API error.
-// S1871 fix: replaces the four pairs of identical 4xx / 5xx cases — merged
-// into a single ">= 400 && < 600" case that delegates here.
-func consumeAPIError(httpRes *http.Response) error {
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return err
-	}
-	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
-}
 
-// parseDefaultError decodes a DefaultError body, checking the content-type first.
-func parseDefaultError(httpRes *http.Response) (*components.DefaultError, error) {
-	if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
-		return nil, unknownContentTypeError(httpRes)
-	}
-	rawBody, err := utils.ConsumeRawBody(httpRes)
-	if err != nil {
-		return nil, err
-	}
-	var out components.DefaultError
-	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
 
 // resolveRetryConfig picks the effective retry configuration.
 func (s *LiveStreams) resolveRetryConfig(o operations.Options) *retry.Config {
@@ -325,7 +285,7 @@ func (s *LiveStreams) parseGetViewerCountResponse(req *http.Request, httpRes *ht
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}
@@ -409,7 +369,7 @@ func (s *LiveStreams) parseGetByIDResponse(req *http.Request, httpRes *http.Resp
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}
@@ -498,7 +458,7 @@ func (s *LiveStreams) parseDeleteResponse(req *http.Request, httpRes *http.Respo
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}
@@ -585,7 +545,7 @@ func (s *LiveStreams) parseDisableResponse(req *http.Request, httpRes *http.Resp
 		return nil, consumeAPIError(httpRes)
 
 	default:
-		defaultErr, err := parseDefaultError(httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
 		if err != nil {
 			return nil, err
 		}

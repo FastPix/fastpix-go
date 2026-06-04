@@ -7,7 +7,6 @@
 package fastpixgo
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/FastPix/fastpix-go/internal/config"

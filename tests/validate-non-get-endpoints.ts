@@ -110,8 +110,21 @@ function safeFileSlug(input: string): string {
   return input.replace(/[^a-zA-Z0-9_.-]+/g, "_");
 }
 
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {} as Record<string, unknown>);
+  }
+  return value;
+}
+
 function toPrettyJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(sortKeysDeep(value), null, 2);
 }
 
 function preview(text: string): string {
@@ -168,14 +181,16 @@ function resolveAbsoluteGoBinary(): string {
         String.raw`C:\Program Files\Go\bin\go.exe`,
       ]
     : [
-        "/usr/local/go/bin/go",
+        "/opt/homebrew/bin/go",        // Homebrew on Apple Silicon Mac
+        "/usr/local/go/bin/go",        // Standard Go install on Linux/macOS
         "/usr/bin/go",
         "/usr/local/bin/go",
+        "/home/linuxbrew/.linuxbrew/bin/go", // Homebrew on Linux
       ];
   for (const p of candidates) {
     if (existsSync(p)) return p;
   }
-  return "/usr/local/go/bin/go";
+  return "/opt/homebrew/bin/go";
 }
 
 const GO_BINARY = resolveAbsoluteGoBinary();

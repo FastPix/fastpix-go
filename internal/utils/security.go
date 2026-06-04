@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	securityTagKey = "security"
+	securityTagKey  = "security"
+	errNotSupported = "not supported"
 )
 
 var validSecurityTypes = map[string]struct{}{
