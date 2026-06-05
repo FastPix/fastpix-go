@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 ---
+## [1.1.4]
+
+### Changed
+
+- **SDK version bump: `1.1.3` → `1.1.4`.**
+  A maintenance release that updates the SDK's internal version identifiers.
+  It contains no functional, API, or behavioral changes and is fully
+  backward compatible with `1.1.3`.
+
+  Updated identifiers:
+  - `SDKVersion` constant — now reports `1.1.4`.
+  - `User-Agent` header — outbound requests now identify as
+    `fastpix-sdk/go 1.1.4`.
+
+### Compatibility
+
+- No changes to public types, method signatures, request/response models,
+  default server URLs, hooks, or retry logic.
+- No action required for existing integrations — update the dependency and
+  rebuild.
+
+---
 ## [1.1.3]
 
 ### Changed — FastPix `.io` → `.com` migration

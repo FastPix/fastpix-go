@@ -119,7 +119,7 @@ func testGetLiveStreamByID(t *testing.T, ctx context.Context, test *ManageLivest
 	}
 }
 
-func testUpdateLiveStream(t *testing.T, ctx context.Context, test *ManageLivestreamTest, streamID string, stream components.LiveStreamData) {
+func testUpdateLiveStream(t *testing.T, ctx context.Context, test *ManageLivestreamTest, streamID string, stream components.GetCreateLiveStreamResponseDTO) {
 	patch := components.PatchLiveStreamRequest{
 		ReconnectWindow: stream.ReconnectWindow,
 	}

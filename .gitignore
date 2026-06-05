@@ -81,4 +81,14 @@ tests/NON_GET_ENDPOINTS_VALIDATION_REPORT.md
 tests/test_report.json
 tests/test_report.txt
 
-node_modules/@types/node
+node_modules/
+
+# Local scratch / manual smoke-test code (not part of the published SDK)
+tests/test-project/
+
+# Compiled SDK test harness binary
+sdkharness
+
+# Generated/working spec files and scratch dirs
+fixed*.yaml
+.gotmp/

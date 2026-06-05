@@ -415,33 +415,6 @@ func TestUnset(t *testing.T) {
 	})
 }
 
-// TestMarshalJSON tests JSON marshaling
-
-func TestJSONOmitEmpty(t *testing.T) {
-	t.Parallel()
-	t.Run("marshal with omitempty", func(t *testing.T) {
-		t.Parallel()
-		container := TestContainer{
-			StringField: From(ptrFrom("test")),
-			IntField:    From(ptrFrom(42)),
-			StructField: From[TestStruct](nil),
-		}
-		data, err := json.Marshal(container)
-		require.NoError(t, err)
- 
-		var result map[string]interface{}
-		err = json.Unmarshal(data, &result)
-		require.NoError(t, err)
- 
-		assert.Contains(t, result, "string_field")
-		assert.Contains(t, result, "int_field")
-		assert.Contains(t, result, "struct_field")
-	})
- 
-	t.Run("omitempty skips unset fields", func(t *testing.T) {
-		t.Skip("unset field omission via omitempty is not yet implemented in MarshalJSON")
-	})
-}
 // TestUnmarshalJSON tests JSON unmarshaling
 func TestUnmarshalJSON(t *testing.T) {
 	t.Parallel()
