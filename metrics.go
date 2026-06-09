@@ -7,13 +7,11 @@
 package fastpixgo
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
-	"github.com/FastPix/fastpix-go/models/apierrors"
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
@@ -36,993 +34,358 @@ func newMetrics(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *ho
 	}
 }
 
-// ListBreakdownValues - List breakdown values
-// Retrieves breakdown values for a specified metric and timespan, allowing you to analyze the performance of your content based on various dimensions. It provides insights into how different factors contribute to the overall metrics.
-//
-// #### How it works
-//
-//  1. Before using this endpoint, you can call the <a href="https://fastpix.com/docs/video-data-api/dimensions/list-dimensions">List Dimensions</a> endpoint to retrieve all available dimensions that can be used in your query.
-//
-//  2. Send a `GET` request to this endpoint with the required `metricId` and other query parameters.
-//
-//  3. You receive a response containing the breakdown values for the specified metric, grouped and filtered according to your parameters.
-//
-//  4. Upon successful retrieval, the response includes the breakdown values based on the specified parameters. Note that the time values ( `totalWatchTime` and `totalPlayingTime` ) are in milliseconds
-//
-// #### Example
-//
-// A developer wants to analyze how watch time varies across different device types. By calling this endpoint for the `playing_time` metric and filtering by `device_type`, they can understand how engagement differs between mobile, desktop, and tablet users. This data guides optimization efforts for different platforms.
-//
-// #### Key fields in response
-//
-//   - **views:** The count of views based based on the applied filters.
-//
-//   - **value:** The specific metric value calculated based on the applied filters.
-//
-//   - **totalWatchTime:** Total time watched across all views, represented in milliseconds.
-//
-//   - **totalPlayTime:** Total time spent playing the video, represented in milliseconds.
-//
-//   - **field:** The grouping field value based on the groupBy parameter.
-//
-// Related guide: <a href="https://fastpix.com/docs/concepts/understand-data-definitions">Understand data definitions</a>
-func (s *Metrics) ListBreakdownValues(ctx context.Context, request operations.ListBreakdownValuesRequest, opts ...operations.Option) (*operations.ListBreakdownValuesResponse, error) {
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+func (s *Metrics) resolveBaseURLMetrics(o operations.Options) string {
+	if o.ServerURL != nil {
+		return *o.ServerURL
 	}
+	return utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
+}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+func (s *Metrics) resolveRetryConfigMetrics(o operations.Options) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return s.sdkConfiguration.RetryConfig
+}
+
+func (s *Metrics) prepareRequestMetrics(ctx context.Context, req *http.Request, o operations.Options) error {
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
+	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+		return err
+	}
+	for k, v := range o.SetHeaders {
+		req.Header.Set(k, v)
+	}
+	return nil
+}
+
+func (s *Metrics) retryAttemptMetrics(hookCtx hooks.HookContext, req *http.Request) (*http.Response, error) {
+	if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
+		copyBody, err := req.GetBody()
+		if err != nil {
+			return nil, err
 		}
+		req.Body = copyBody
+	}
+	var err error
+	req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, classifyHookError(err)
+	}
+	res, doErr := s.sdkConfiguration.Client.Do(req)
+	return s.handleDoErrorMetrics(hookCtx, res, doErr)
+}
+
+func (s *Metrics) handleDoErrorMetrics(hookCtx hooks.HookContext, res *http.Response, doErr error) (*http.Response, error) {
+	if doErr != nil {
+		doErr = fmt.Errorf(errSendingRequest, doErr)
+		_, doErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, doErr)
+		return nil, doErr
+	}
+	if res == nil {
+		noRes := fmt.Errorf(errNoResponse)
+		_, noRes = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, noRes)
+		return nil, noRes
+	}
+	return res, nil
+}
+
+func (s *Metrics) executeWithRetryMetrics(ctx context.Context, hookCtx hooks.HookContext, req *http.Request, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.retryAttemptMetrics(hookCtx, req)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *Metrics) executeWithoutRetryMetrics(hookCtx hooks.HookContext, req *http.Request) (*http.Response, error) {
+	var err error
+	req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+	res, doErr := s.sdkConfiguration.Client.Do(req)
+	if doErr != nil || res == nil {
+		return s.handleDoErrorMetrics(hookCtx, res, doErr)
+	}
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, res.StatusCode) {
+		altRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, res, nil)
+		if err != nil {
+			return nil, err
+		}
+		if altRes != nil {
+			return altRes, nil
+		}
+		return res, nil
+	}
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, res)
+}
+
+func (s *Metrics) executeRequestMetrics(ctx context.Context, hookCtx hooks.HookContext, req *http.Request, retryConfig *retry.Config) (*http.Response, error) {
+	if retryConfig != nil {
+		return s.executeWithRetryMetrics(ctx, hookCtx, req, retryConfig)
+	}
+	return s.executeWithoutRetryMetrics(hookCtx, req)
+}
+
+// ListBreakdownValues - List breakdown values
+func (s *Metrics) ListBreakdownValues(ctx context.Context, request operations.ListBreakdownValuesRequest, opts ...operations.Option) (*operations.ListBreakdownValuesResponse, error) {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
+	baseURL := s.resolveBaseURLMetrics(o)
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/data/metrics/{metricId}/breakdown", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "list_breakdown_values",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
+		SDK: s.rootSDK, SDKConfiguration: s.sdkConfiguration,
+		BaseURL: baseURL, Context: ctx, OperationID: "list_breakdown_values",
+		OAuth2Scopes: nil, SecuritySource: s.sdkConfiguration.Security,
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
+	if t := firstNonNilDuration(o.Timeout, s.sdkConfiguration.Timeout); t != nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		ctx, cancel = context.WithTimeout(ctx, *t)
 		defer cancel()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
-		return nil, fmt.Errorf("error populating query params: %w", err)
+		return nil, fmt.Errorf(errPopulatingQueryParams, err)
 	}
-
-	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+	if err := s.prepareRequestMetrics(ctx, req, o); err != nil {
 		return nil, err
 	}
 
-	for k, v := range o.SetHeaders {
-		req.Header.Set(k, v)
+	httpRes, err := s.executeRequestMetrics(ctx, hookCtx, req, s.resolveRetryConfigMetrics(o))
+	if err != nil {
+		return nil, err
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	res := &operations.ListBreakdownValuesResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
-	}
-
+	res := &operations.ListBreakdownValuesResponse{HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes}}
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.ListBreakdownValuesResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out operations.ListBreakdownValuesResponseBody
+		if err := parseJSONBody(httpRes, &out); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = &out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, handleAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }
 
 // ListOverallValues - List overall values
-// Retrieves overall values for a specified metric, providing summary statistics that help you understand the performance of your content. The response includes key metrics such as `totalWatchTime`, `uniqueViews`, `totalPlayTime` and `totalViews`.
-//
-// #### How it works
-//
-//  1. Before using this endpoint, you can call the <a href="https://fastpix.com/docs/video-data-api/dimensions/list-dimensions">list dimensions</a> endpoint to retrieve all available dimensions that can be used in your query.
-//
-//  2. Send a `GET` request to this endpoint with the required `metricId` and other query parameters.
-//
-//  3. You receive a response containing the overall values for the specified metric, which may vary based on the applied filters.
-//
-// #### Key fields in response
-//
-//   - **value:** The specific metric value calculated based on the applied filters.
-//
-//   - **totalWatchTime:** Total time watched across all views, represented in milliseconds.
-//
-//   - **uniqueViews:** The count of unique viewers who interacted with the content.
-//
-//   - **totalViews:** The total number of views recorded.
-//
-//   - **totalPlayTime:** Total time spent playing the video, represented in milliseconds.
-//
-//   - **globalValue:** A global metric value that reflects the overall performance of the specified metric across the entire dataset for the given timespan. This value is not affected by specific filters.
-//
-//     Related guide: <a href="https://fastpix.com/docs/concepts/understand-data-definitions">Understand data definitions</a>
 func (s *Metrics) ListOverallValues(ctx context.Context, metricID operations.ListOverallValuesMetricID, measurement *string, timespan *operations.ListOverallValuesTimespan, filterby *string, opts ...operations.Option) (*operations.ListOverallValuesResponse, error) {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	request := operations.ListOverallValuesRequest{
 		MetricID:    metricID,
 		Measurement: measurement,
 		Timespan:    timespan,
 		Filterby:    filterby,
 	}
-
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
-
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
+	baseURL := s.resolveBaseURLMetrics(o)
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/data/metrics/{metricId}/overall", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "list_overall_values",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
+		SDK: s.rootSDK, SDKConfiguration: s.sdkConfiguration,
+		BaseURL: baseURL, Context: ctx, OperationID: "list_overall_values",
+		OAuth2Scopes: nil, SecuritySource: s.sdkConfiguration.Security,
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
+	if t := firstNonNilDuration(o.Timeout, s.sdkConfiguration.Timeout); t != nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		ctx, cancel = context.WithTimeout(ctx, *t)
 		defer cancel()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
-		return nil, fmt.Errorf("error populating query params: %w", err)
+		return nil, fmt.Errorf(errPopulatingQueryParams, err)
 	}
-
-	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+	if err := s.prepareRequestMetrics(ctx, req, o); err != nil {
 		return nil, err
 	}
 
-	for k, v := range o.SetHeaders {
-		req.Header.Set(k, v)
+	httpRes, err := s.executeRequestMetrics(ctx, hookCtx, req, s.resolveRetryConfigMetrics(o))
+	if err != nil {
+		return nil, err
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	res := &operations.ListOverallValuesResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
-	}
-
+	res := &operations.ListOverallValuesResponse{HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes}}
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.ListOverallValuesResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out operations.ListOverallValuesResponseBody
+		if err := parseJSONBody(httpRes, &out); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = &out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, handleAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }
 
 // GetTimeseriesData - Get timeseries data
-// This endpoint retrieves timeseries data for a specified metric, providing insights into how the metric values change over time. The response includes an array of data points, each representing the metrics value at specific intervals.
-//
-// #### Key fields in response
-//
-// * **intervalTime:** The timestamp for the data point indicating when the metric value was recorded.
-// * **metricValue:** The value of the specified metric at the given interval, reflecting the performance or engagement level during that time.
-// * **numberOfViews:** The total number of views recorded during that interval, providing context for the metric value.
 func (s *Metrics) GetTimeseriesData(ctx context.Context, request operations.GetTimeseriesDataRequest, opts ...operations.Option) (*operations.GetTimeseriesDataResponse, error) {
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
+	baseURL := s.resolveBaseURLMetrics(o)
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/data/metrics/{metricId}/timeseries", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "get_timeseries_data",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
+		SDK: s.rootSDK, SDKConfiguration: s.sdkConfiguration,
+		BaseURL: baseURL, Context: ctx, OperationID: "get_timeseries_data",
+		OAuth2Scopes: nil, SecuritySource: s.sdkConfiguration.Security,
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
+	if t := firstNonNilDuration(o.Timeout, s.sdkConfiguration.Timeout); t != nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		ctx, cancel = context.WithTimeout(ctx, *t)
 		defer cancel()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
-		return nil, fmt.Errorf("error populating query params: %w", err)
+		return nil, fmt.Errorf(errPopulatingQueryParams, err)
 	}
-
-	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+	if err := s.prepareRequestMetrics(ctx, req, o); err != nil {
 		return nil, err
 	}
 
-	for k, v := range o.SetHeaders {
-		req.Header.Set(k, v)
+	httpRes, err := s.executeRequestMetrics(ctx, hookCtx, req, s.resolveRetryConfigMetrics(o))
+	if err != nil {
+		return nil, err
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	res := &operations.GetTimeseriesDataResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
-	}
-
+	res := &operations.GetTimeseriesDataResponse{HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes}}
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.GetTimeseriesDataResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out operations.GetTimeseriesDataResponseBody
+		if err := parseJSONBody(httpRes, &out); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = &out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, handleAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }
 
 // ListComparisonValues - List comparison values
-// This endpoint lets you to compare multiple metrics across specified dimensions. You can specify the metrics you want to compare in the query parameters, and the response includes the relevant metrics for the specified dimensions.
-//
-// #### Key fields in response
-//
-// * **value:** The specific metric value calculated based on the applied filters.
-// * **type:** The data unit or format type (for example, "number", "milliseconds", "percentage").
-// * **name:** The display name of the metric (for example, "Views", "Overall Score").
-// * **metric:** The metric field represents the name of the Key Performance Indicator (KPI) being tracked or analyzed. It identifies a specific measurable aspect of the video playback experience, such as buffering time, video start failure rate, or playback quality.
-// * **items:** Nested breakdown of related metrics for more detailed analysis.
-// * **measurement:** Defines the aggregation type (for example, "avg", "sum", "median", "95th").
-//
-// #### How it works
-//
-//  1. Before making a request to this endpoint, call the <a href="https://fastpix.com/docs/video-data-api/dimensions/list-dimensions">list dimensions</a> endpoint to obtain all available dimensions that can be used for comparison.
-//
-//  2. Send a `GET` request to this endpoint with the desired metrics specified in the query parameters.
-//
-//  3. You Receive a response containing the comparison values for the specified metrics across the selected dimensions.
-//
-//     Related guide: <a href="https://fastpix.com/docs/working-with-video-data/explore-the-dashboard#compare-metrics">Compare metrics in dashboard</a>
 func (s *Metrics) ListComparisonValues(ctx context.Context, timespan *operations.ListComparisonValuesTimespan, filterby *string, dimension *operations.Dimension, value *string, opts ...operations.Option) (*operations.ListComparisonValuesResponse, error) {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	request := operations.ListComparisonValuesRequest{
 		Timespan:  timespan,
 		Filterby:  filterby,
 		Dimension: dimension,
 		Value:     value,
 	}
-
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
-
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
+	baseURL := s.resolveBaseURLMetrics(o)
 	opURL, err := url.JoinPath(baseURL, "/data/metrics/comparison")
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
 	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "list_comparison_values",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
+		SDK: s.rootSDK, SDKConfiguration: s.sdkConfiguration,
+		BaseURL: baseURL, Context: ctx, OperationID: "list_comparison_values",
+		OAuth2Scopes: nil, SecuritySource: s.sdkConfiguration.Security,
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
+	if t := firstNonNilDuration(o.Timeout, s.sdkConfiguration.Timeout); t != nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		ctx, cancel = context.WithTimeout(ctx, *t)
 		defer cancel()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
-		return nil, fmt.Errorf("error populating query params: %w", err)
+		return nil, fmt.Errorf(errPopulatingQueryParams, err)
 	}
-
-	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+	if err := s.prepareRequestMetrics(ctx, req, o); err != nil {
 		return nil, err
 	}
 
-	for k, v := range o.SetHeaders {
-		req.Header.Set(k, v)
+	httpRes, err := s.executeRequestMetrics(ctx, hookCtx, req, s.resolveRetryConfigMetrics(o))
+	if err != nil {
+		return nil, err
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	res := &operations.ListComparisonValuesResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
-	}
-
+	res := &operations.ListComparisonValuesResponse{HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes}}
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.ListComparisonValuesResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out operations.ListComparisonValuesResponseBody
+		if err := parseJSONBody(httpRes, &out); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = &out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, handleAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }

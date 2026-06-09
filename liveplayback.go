@@ -34,703 +34,475 @@ func newLivePlayback(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hook
 	}
 }
 
+// applyTimeout attaches a deadline to ctx when a timeout is configured.
+// When no timeout is set, context.WithCancel is used so the returned cancel
+// is always a real, non-empty function — avoiding go:S1186 (empty func body).
+func (s *LivePlayback) applyTimeout(ctx context.Context, o operations.Options) (context.Context, context.CancelFunc) {
+	timeout := o.Timeout
+	if timeout == nil {
+		timeout = s.sdkConfiguration.Timeout
+	}
+	if timeout != nil {
+		return context.WithTimeout(ctx, *timeout)
+	}
+	return context.WithCancel(ctx)
+}
+
+// resolveRetryConfig picks the effective retry configuration.
+func (s *LivePlayback) resolveRetryConfig(o operations.Options) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return s.sdkConfiguration.RetryConfig
+}
+
+
+// consumeAPIError reads the body and wraps it in a generic API error.
+func consumeAPIError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
+}
+
+// parseDefaultResponse decodes an unexpected-but-successful status into DefaultError.
+func parseDefaultResponse(httpRes *http.Response) (*components.DefaultError, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
+		return nil, unknownContentTypeError(httpRes)
+	}
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
+	var out components.DefaultError
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// --- executeWithRetry helpers (S3776 fix for line 50) ---
+
+// executeSingleAttempt performs one HTTP attempt inside the retry loop.
+// Extracting this reduces the cognitive complexity of executeWithRetry by
+// eliminating the nested branch tree inside the func() closure.
+func (s *LivePlayback) executeSingleAttempt(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
+		copyBody, copyErr := req.GetBody()
+		if copyErr != nil {
+			return nil, copyErr
+		}
+		req.Body = copyBody
+	}
+
+	var hookErr error
+	req, hookErr = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if hookErr != nil {
+		if retry.IsPermanentError(hookErr) || retry.IsTemporaryError(hookErr) {
+			return nil, hookErr
+		}
+		return nil, retry.Permanent(hookErr)
+	}
+
+	res, doErr := s.sdkConfiguration.Client.Do(req)
+	if doErr != nil || res == nil {
+		return s.wrapSendError(hookCtx, doErr)
+	}
+	return res, nil
+}
+
+// wrapSendError normalises a nil-response or transport error and calls AfterError.
+func (s *LivePlayback) wrapSendError(hookCtx hooks.HookContext, doErr error) (*http.Response, error) {
+	if doErr != nil {
+		doErr = fmt.Errorf(errSendingRequest, doErr)
+	} else {
+		doErr = fmt.Errorf(errNoResponse)
+	}
+	_, doErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, doErr)
+	return nil, doErr
+}
+
+// executeWithRetry runs the HTTP request with retry logic applied.
+// S3776 fix: the closure now delegates to executeSingleAttempt, keeping this
+// function's own branch count well below the threshold.
+func (s *LivePlayback) executeWithRetry(
+	ctx context.Context,
+	req *http.Request,
+	hookCtx hooks.HookContext,
+	retryConfig *retry.Config,
+) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config: retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.executeSingleAttempt(req, hookCtx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+// executeDirect runs the HTTP request without retry logic.
+func (s *LivePlayback) executeDirect(
+	ctx context.Context,
+	req *http.Request,
+	hookCtx hooks.HookContext,
+) (*http.Response, error) {
+	var hookErr error
+	req, hookErr = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if hookErr != nil {
+		return nil, hookErr
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		return s.wrapSendError(hookCtx, err)
+	}
+
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
+		updatedRes, afterErr := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
+		if afterErr != nil {
+			return nil, afterErr
+		}
+		if updatedRes != nil {
+			return updatedRes, nil
+		}
+		return httpRes, nil
+	}
+
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+// doRequest dispatches to executeWithRetry or executeDirect based on whether retryConfig is set.
+func (s *LivePlayback) doRequest(
+	ctx context.Context,
+	req *http.Request,
+	hookCtx hooks.HookContext,
+	retryConfig *retry.Config,
+) (*http.Response, error) {
+	if retryConfig != nil {
+		return s.executeWithRetry(ctx, req, hookCtx, retryConfig)
+	}
+	return s.executeDirect(ctx, req, hookCtx)
+}
+
+// buildRequest constructs, secures, and decorates the outgoing HTTP request.
+func (s *LivePlayback) buildRequest(ctx context.Context, method, opURL string, body interface{}, o operations.Options, reqContentType string) (*http.Request, error) {
+	var bodyReader interface{} = body
+	_ = bodyReader
+
+	req, err := http.NewRequestWithContext(ctx, method, opURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errCreatingRequest, err)
+	}
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
+	if reqContentType != "" {
+		req.Header.Set(contentType, reqContentType)
+	}
+	for k, v := range o.SetHeaders {
+		req.Header.Set(k, v)
+	}
+	return req, nil
+}
+
 // Create a playbackId
-// Generates a new playback ID for the live stream, allowing viewers to access the stream through this ID. The playback ID can be shared with viewers for direct access to the live broadcast.
+// Generates a new playback ID for the live stream, allowing viewers to access the stream through this ID.
+// The playback ID can be shared with viewers for direct access to the live broadcast.
 //
-//	By calling this endpoint with the `streamId`, FastPix returns a unique `playbackId`, which can be used to stream the live content.
+//	By calling this endpoint with the `streamId`, FastPix returns a unique `playbackId`, which can be used
+//	to stream the live content.
 //
 //	#### Example
 //
-//	A media platform needs to distribute a unique playback ID to users for an exclusive live concert. The platform can also embed the stream on various partner websites.
+//	A media platform needs to distribute a unique playback ID to users for an exclusive live concert.
+//	The platform can also embed the stream on various partner websites.
 func (s *LivePlayback) Create(ctx context.Context, streamID string, body components.PlaybackIDRequest, opts ...operations.Option) (*operations.CreatePlaybackIDOfStreamResponse, error) {
-	request := operations.CreatePlaybackIDOfStreamRequest{
-		StreamID: streamID,
-		Body:     body,
+	request := operations.CreatePlaybackIDOfStreamRequest{StreamID: streamID, Body: body}
+
+	o, err := s.applyOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
-
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
+	baseURL := s.resolveBaseURL(o)
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/live/streams/{streamId}/playback-ids", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "create-playbackId-of-stream",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := s.newHookContext(ctx, baseURL, "create-playbackId-of-stream")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Body", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
+	ctx, cancel := s.applyTimeout(ctx, o)
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", opURL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+		req.Header.Set(contentType, reqContentType)
 	}
-
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
 	}
-
 	for k, v := range o.SetHeaders {
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
+	httpRes, err := s.doRequest(ctx, req, hookCtx, s.resolveRetryConfig(o))
+	if err != nil {
+		return nil, err
 	}
 
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
+	// S3776 fix: response parsing delegated to parseCreateResponse.
+	return s.parseCreateResponse(req, httpRes)
+}
 
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
+// parseCreateResponse handles status-code dispatch for Create.
+// Extracting this keeps Create's own cognitive complexity low.
+func (s *LivePlayback) parseCreateResponse(req *http.Request, httpRes *http.Response) (*operations.CreatePlaybackIDOfStreamResponse, error) {
 	res := &operations.CreatePlaybackIDOfStreamResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
-
 	switch {
 	case httpRes.StatusCode == 201:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.PlaybackIDSuccessResponse
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.PlaybackIDSuccessResponse = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
+			return nil, unknownContentTypeError(httpRes)
 		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out components.PlaybackIDSuccessResponse
+		if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.PlaybackIDSuccessResponse = &out
+
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, consumeAPIError(httpRes)
+
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }
 
 // GetPlaybackIDDetails - Get playbackId details
-// Retrieves details for an existing playback ID. When you provide the playbackId returned from a previous stream or playback creation request, FastPix returns the associated playback information, including the access policy.
+// Retrieves details for an existing playback ID. When you provide the playbackId returned from a previous
+// stream or playback creation request, FastPix returns the associated playback information, including the
+// access policy.
 //
 // #### Example
-// A developer needs to confirm the access policy of the playback ID to ensure whether the stream is public or private for viewers.
+// A developer needs to confirm the access policy of the playback ID to ensure whether the stream is
+// public or private for viewers.
 func (s *LivePlayback) GetPlaybackIDDetails(ctx context.Context, streamID string, playbackID string, opts ...operations.Option) (*operations.GetLiveStreamPlaybackIDResponse, error) {
-	request := operations.GetLiveStreamPlaybackIDRequest{
-		StreamID:   streamID,
-		PlaybackID: playbackID,
+	request := operations.GetLiveStreamPlaybackIDRequest{StreamID: streamID, PlaybackID: playbackID}
+
+	o, err := s.applyOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
-
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
+	baseURL := s.resolveBaseURL(o)
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/live/streams/{streamId}/playback-ids/{playbackId}", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "get-live-stream-playback-id",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := s.newHookContext(ctx, baseURL, "get-live-stream-playback-id")
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
+	ctx, cancel := s.applyTimeout(ctx, o)
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
 	}
-
 	for k, v := range o.SetHeaders {
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
+	httpRes, err := s.doRequest(ctx, req, hookCtx, s.resolveRetryConfig(o))
+	if err != nil {
+		return nil, err
 	}
 
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
+	// S3776 fix: response parsing delegated to parseGetPlaybackIDResponse.
+	return s.parseGetPlaybackIDResponse(req, httpRes)
+}
 
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
+// parseGetPlaybackIDResponse handles status-code dispatch for GetPlaybackIDDetails.
+func (s *LivePlayback) parseGetPlaybackIDResponse(req *http.Request, httpRes *http.Response) (*operations.GetLiveStreamPlaybackIDResponse, error) {
 	res := &operations.GetLiveStreamPlaybackIDResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
-
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.PlaybackIDSuccessResponse
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.PlaybackIDSuccessResponse = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
+			return nil, unknownContentTypeError(httpRes)
 		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out components.PlaybackIDSuccessResponse
+		if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.PlaybackIDSuccessResponse = &out
+
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, consumeAPIError(httpRes)
+
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }
 
 // DeletePlaybackID - Delete a playbackId
-// Deletes a previously created playback ID for a live stream.This prevents new viewers from accessing the stream using the playback ID, while current viewers can continue watching for a short period before the connection ends. FastPix deletes the ID and ensures the new playback request fails.
+// Deletes a previously created playback ID for a live stream. This prevents new viewers from accessing
+// the stream using the playback ID, while current viewers can continue watching for a short period before
+// the connection ends. FastPix deletes the ID and ensures the new playback request fails.
 //
 // #### Example
-// A streaming service wants to prevent new users from joining a live stream that is nearing its end. The host can delete the playback ID to ensure no one can join the stream or replay it once it ends.
+// A streaming service wants to prevent new users from joining a live stream that is nearing its end.
+// The host can delete the playback ID to ensure no one can join the stream or replay it once it ends.
 func (s *LivePlayback) DeletePlaybackID(ctx context.Context, streamID string, playbackID string, opts ...operations.Option) (*operations.DeletePlaybackIDOfStreamResponse, error) {
-	request := operations.DeletePlaybackIDOfStreamRequest{
-		StreamID:   streamID,
-		PlaybackID: playbackID,
+	request := operations.DeletePlaybackIDOfStreamRequest{StreamID: streamID, PlaybackID: playbackID}
+
+	o, err := s.applyOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
+	baseURL := s.resolveBaseURL(o)
+	opURL, err := utils.GenerateURL(ctx, baseURL, "/live/streams/{streamId}/playback-ids", request, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errGeneratingURL, err)
+	}
+
+	hookCtx := s.newHookContext(ctx, baseURL, "delete-playbackId-of-stream")
+
+	ctx, cancel := s.applyTimeout(ctx, o)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", opURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf(errCreatingRequest, err)
+	}
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
+	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
+		return nil, fmt.Errorf("error populating query params: %w", err)
+	}
+	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+		return nil, err
+	}
+	for k, v := range o.SetHeaders {
+		req.Header.Set(k, v)
+	}
+
+	httpRes, err := s.doRequest(ctx, req, hookCtx, s.resolveRetryConfig(o))
+	if err != nil {
+		return nil, err
+	}
+
+	// S3776 fix: response parsing delegated to parseDeletePlaybackIDResponse.
+	return s.parseDeletePlaybackIDResponse(req, httpRes)
+}
+
+// parseDeletePlaybackIDResponse handles status-code dispatch for DeletePlaybackID.
+func (s *LivePlayback) parseDeletePlaybackIDResponse(req *http.Request, httpRes *http.Response) (*operations.DeletePlaybackIDOfStreamResponse, error) {
+	res := &operations.DeletePlaybackIDOfStreamResponse{
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
+	}
+	switch {
+	case httpRes.StatusCode == 200:
+		if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
+			return nil, unknownContentTypeError(httpRes)
+		}
+		rawBody, err := utils.ConsumeRawBody(httpRes)
+		if err != nil {
+			return nil, err
+		}
+		var out components.LiveStreamDeleteResponse
+		if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+			return nil, err
+		}
+		res.LiveStreamDeleteResponse = &out
+
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, consumeAPIError(httpRes)
+
+	default:
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = defaultErr
+	}
+	return res, nil
+}
+
+// --- small shared setup helpers used by all three public methods ---
+
+// applyOptions validates and applies all variadic option funcs.
+func (s *LivePlayback) applyOptions(opts []operations.Option) (operations.Options, error) {
 	o := operations.Options{}
 	supportedOptions := []string{
 		operations.SupportedOptionRetries,
 		operations.SupportedOptionTimeout,
 	}
-
 	for _, opt := range opts {
 		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+			return o, fmt.Errorf(errApplyOptions, err)
 		}
 	}
+	return o, nil
+}
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
+// resolveBaseURL returns the effective base URL for the request.
+func (s *LivePlayback) resolveBaseURL(o operations.Options) string {
+	if o.ServerURL != nil {
+		return *o.ServerURL
 	}
-	opURL, err := utils.GenerateURL(ctx, baseURL, "/live/streams/{streamId}/playback-ids", request, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
-	}
+	return utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
+}
 
-	hookCtx := hooks.HookContext{
+// newHookContext constructs a HookContext for the given operation.
+func (s *LivePlayback) newHookContext(ctx context.Context, baseURL, operationID string) hooks.HookContext {
+	return hooks.HookContext{
 		SDK:              s.rootSDK,
 		SDKConfiguration: s.sdkConfiguration,
 		BaseURL:          baseURL,
 		Context:          ctx,
-		OperationID:      "delete-playbackId-of-stream",
+		OperationID:      operationID,
 		OAuth2Scopes:     nil,
 		SecuritySource:   s.sdkConfiguration.Security,
 	}
-
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "DELETE", opURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-
-	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
-		return nil, fmt.Errorf("error populating query params: %w", err)
-	}
-
-	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
-		return nil, err
-	}
-
-	for k, v := range o.SetHeaders {
-		req.Header.Set(k, v)
-	}
-
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	res := &operations.DeletePlaybackIDOfStreamResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
-	}
-
-	switch {
-	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.LiveStreamDeleteResponse
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.LiveStreamDeleteResponse = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	}
-
-	return res, nil
-
 }

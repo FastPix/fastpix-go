@@ -10,6 +10,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
@@ -17,7 +19,14 @@ import (
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
-	"net/http"
+)
+
+const (
+	aiContentType   = "Content-Type"
+	aiErrUnknownCT  = "unknown content-type received: %s"
+	aiErrAPIError   = "API error occurred"
+	aiErrSendReq    = "error sending request: %w"
+	aiErrNoResponse = "error sending request: no response"
 )
 
 type InVideoAI struct {
@@ -34,82 +43,39 @@ func newInVideoAI(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *
 	}
 }
 
-// GenerateSummary - Generate video summary
-// This endpoint allows you to generate the summary for an existing media.
-//
-// #### How it works
-// 1. Send a `PATCH` request to this endpoint, replacing `<mediaId>` with the ID of the media you want to summarize.
-// 2. Include the `generate` parameter in the request body.
-// 3. Include the `summaryLength` parameter, specify the desired length of the summary in words (for example, 120 words), this determines how concise or detailed the summary will be. If no specific summary length is provided, the default length will be 100 words.
-// 4. The response includes the updated media data and confirmation of the changes applied.
-//
-// You can use the <a href="https://fastpix.com/docs/ai-events/in-video-ai-events#videomediaaisummaryready">video.mediaAI.summary.ready</a> webhook event to track and notify about the summary generation.
-//
-// **Use case**: This is particularly useful when a user uploads a video and later chooses to generate a summary without needing to re-upload the video.
-//
-// Related guide: <a href="https://fastpix.com/docs/video-intelligence/generate-a-video-summary">Video summary</a>
 func (s *InVideoAI) GenerateSummary(ctx context.Context, mediaID string, body operations.UpdateMediaSummaryRequestBody, opts ...operations.Option) (*operations.UpdateMediaSummaryResponse, error) {
 	request := operations.UpdateMediaSummaryRequest{
 		MediaID: mediaID,
 		Body:    body,
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyAIOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
+	baseURL := resolveAIBaseURL(o, s.sdkConfiguration)
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/summary", request, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error generating URL: %w", err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "update-media-summary",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildAIHookContext(s, ctx, baseURL, "update-media-summary")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Body", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	ctx, err = applyAITimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+
+	req, err := buildAIPatchRequest(ctx, opURL, bodyReader, reqContentType, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -120,161 +86,244 @@ func (s *InVideoAI) GenerateSummary(ctx context.Context, mediaID string, body op
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.aiExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.UpdateMediaSummaryResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
+	return s.handleGenerateSummaryResponse(httpRes, res)
+}
+
+func applyAIOptions(opts []operations.Option) (operations.Options, error) {
+	o := operations.Options{}
+	supportedOptions := []string{
+		operations.SupportedOptionRetries,
+		operations.SupportedOptionTimeout,
+	}
+	for _, opt := range opts {
+		if err := opt(&o, supportedOptions...); err != nil {
+			return o, fmt.Errorf("error applying option: %w", err)
+		}
+	}
+	return o, nil
+}
+
+func resolveAIBaseURL(o operations.Options, sdkConfig config.SDKConfiguration) string {
+	if o.ServerURL == nil {
+		return utils.ReplaceParameters(sdkConfig.GetServerDetails())
+	}
+	return *o.ServerURL
+}
+
+func buildAIHookContext(s *InVideoAI, ctx context.Context, baseURL, operationID string) hooks.HookContext {
+	return hooks.HookContext{
+		SDK:              s.rootSDK,
+		SDKConfiguration: s.sdkConfiguration,
+		BaseURL:          baseURL,
+		Context:          ctx,
+		OperationID:      operationID,
+		OAuth2Scopes:     nil,
+		SecuritySource:   s.sdkConfiguration.Security,
+	}
+}
+
+func applyAITimeout(ctx context.Context, o operations.Options, sdkConfig config.SDKConfiguration) (context.Context, error) {
+	timeout := o.Timeout
+	if timeout == nil {
+		timeout = sdkConfig.Timeout
+	}
+	if timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+	return ctx, nil
+}
+
+func buildAIPatchRequest(ctx context.Context, opURL string, bodyReader interface{ Read([]byte) (int, error) }, reqContentType, userAgent string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	if reqContentType != "" {
+		req.Header.Set(aiContentType, reqContentType)
+	}
+	return req, nil
+}
+
+func (s *InVideoAI) aiExecuteRequest(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, o operations.Options) (*http.Response, error) {
+	retryConfig := resolveAIRetryConfig(o, s.sdkConfiguration)
+	if retryConfig != nil {
+		return s.aiExecuteWithRetry(ctx, req, hookCtx, retryConfig)
+	}
+	return s.aiExecuteWithoutRetry(req, hookCtx)
+}
+
+func resolveAIRetryConfig(o operations.Options, sdkConfig config.SDKConfiguration) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return sdkConfig.RetryConfig
+}
+
+func (s *InVideoAI) aiExecuteWithRetry(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.aiRetryAttempt(req, hookCtx)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *InVideoAI) aiRetryAttempt(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	if err := aiRefreshRequestBody(req); err != nil {
+		return nil, err
+	}
+
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, aiClassifyHookError(err)
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		sendErr := aiFormatSendError(err)
+		_, sendErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+		return nil, sendErr
+	}
+
+	return httpRes, nil
+}
+
+func aiRefreshRequestBody(req *http.Request) error {
+	if req.Body == nil || req.Body == http.NoBody || req.GetBody == nil {
+		return nil
+	}
+	copyBody, err := req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.Body = copyBody
+	return nil
+}
+
+func aiClassifyHookError(err error) error {
+	if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
+		return err
+	}
+	return retry.Permanent(err)
+}
+
+func aiFormatSendError(err error) error {
+	if err != nil {
+		return fmt.Errorf(aiErrSendReq, err)
+	}
+	return fmt.Errorf(aiErrNoResponse)
+}
+
+func (s *InVideoAI) aiExecuteWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		return nil, aiBuildSendError(err, hookCtx, s.hooks)
+	}
+
+	return s.aiHandlePostResponse(httpRes, hookCtx)
+}
+
+func aiBuildSendError(err error, hookCtx hooks.HookContext, h *hooks.Hooks) error {
+	sendErr := aiFormatSendError(err)
+	_, sendErr = h.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+	return sendErr
+}
+
+func (s *InVideoAI) aiHandlePostResponse(httpRes *http.Response, hookCtx hooks.HookContext) (*http.Response, error) {
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
+		updatedRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
+		if err != nil {
+			return nil, err
+		}
+		if updatedRes != nil {
+			return updatedRes, nil
+		}
+		return httpRes, nil
+	}
+
+	httpRes, err := s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+	if err != nil {
+		return nil, err
+	}
+	return httpRes, nil
+}
+
+func (s *InVideoAI) handleGenerateSummaryResponse(httpRes *http.Response, res *operations.UpdateMediaSummaryResponse) (*operations.UpdateMediaSummaryResponse, error) {
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.UpdateMediaSummaryResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
+		out, err := parseAIJSONBody[operations.UpdateMediaSummaryResponseBody](httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, aiAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		out, err := parseAIJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = out
 	}
-
 	return res, nil
+}
 
+func parseAIJSONBody[T any](httpRes *http.Response) (*T, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(aiContentType), `application/json`) {
+		return nil, aiUnknownContentTypeError(httpRes)
+	}
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
+	var out T
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func aiAPIError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(aiErrAPIError, httpRes.StatusCode, string(rawBody), httpRes)
+}
+
+func aiUnknownContentTypeError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(
+		fmt.Sprintf(aiErrUnknownCT, httpRes.Header.Get(aiContentType)),
+		httpRes.StatusCode,
+		string(rawBody),
+		httpRes,
+	)
 }

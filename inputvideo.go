@@ -10,6 +10,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
@@ -17,9 +21,9 @@ import (
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
-	"net/http"
-	"net/url"
 )
+
+
 
 type InputVideo struct {
 	rootSDK          *Fastpixgo
@@ -35,99 +39,34 @@ func newInputVideo(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks 
 	}
 }
 
-// Create media from URL
-// This endpoint allows developers or users to create a new video or audio media in FastPix using a publicly accessible URL. FastPix fetches the media from the provided URL, processes it, and stores it on the platform for use.
-//
-// #### Public URL requirement:
-//
-//	The provided URL must be publicly accessible and must point to a video stored in one of the following supported formats: .m4v, .ogv, .mpeg, .mov, .3gp, .f4v, .rm, .ts, .wtv, .avi, .mp4, .wmv, .webm, .mts, .vob, .mxf, asf, m2ts
-//
-// #### Supported storage types:
-//
-// The URL can originate from various cloud storage services or content delivery networks (CDNs) such as:
-//
-// * **Amazon S3:** URLs from Amazon's Simple Storage Service.
-//
-// * **Google Cloud Storage:** URLs from Google Cloud's storage solution.
-//
-// * **Azure Blob Storage:** URLs from Microsoft's Azure storage.
-//
-// * **Public CDNs:** URLs from public content delivery networks that host video files.
-//
-// Upon successful creation, the API returns an `id` that must be retained for future operations related to this media.
-//
-// #### How it works
-//
-// 1. Send a POST request to this endpoint with the media URL (typically a video or audio file) and optional media settings.
-//
-// 2. FastPix uploads the video from the provided URL to its storage.
-//
-// 3. Receive a response containing the unique id for the newly created media item.
-//
-// 4. Use the id in subsequent API calls, such as checking the status of the media with the <a href="https://fastpix.com/docs/video-on-demand-api/manage-videos/get-media">Get Media by ID</a> endpoint to determine when the media is ready for playback.
-//
-// FastPix uses webhooks to tell your application about things that happen in the background, outside of the API regular request flow. For instance, after the media file is created (but not yet processed or encoded), FastPix sends a `POST` request to your specified webhook URL with the event <a href="https://fastpix.com/docs/vod-events/media-events#videomediacreated">video.media.created</a>.
-//
-// After processing completes, monitor the events <a href="https://fastpix.com/docs/vod-events/media-events#videomediaready">video.media.ready</a> and <a href="https://fastpix.com/docs/vod-events/media-events#videomediafailed">video.media.failed</a> to track the status of the media file.
-//
-// Related guide: <a href="https://fastpix.com/docs/upload-videos/upload-videos-from-a-url">Upload videos from URL</a>
 func (s *InputVideo) Create(ctx context.Context, request components.CreateMediaRequest, opts ...operations.Option) (*operations.CreateMediaResponse, error) {
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyInputVideoOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
+	baseURL := resolveInputVideoBaseURL(o, s.sdkConfiguration)
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := url.JoinPath(baseURL, "/on-demand")
 	if err != nil {
 		return nil, fmt.Errorf("error generating URL: %w", err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "create-media",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildInputVideoHookContext(s, ctx, baseURL, "create-media")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Request", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", opURL, bodyReader)
+	ctx, err = applyInputVideoTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+
+	req, err := buildInputVideoPostRequest(ctx, opURL, bodyReader, reqContentType, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -138,248 +77,46 @@ func (s *InputVideo) Create(ctx context.Context, request components.CreateMediaR
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.ivExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.CreateMediaResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
-	switch {
-	case httpRes.StatusCode == 201:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.CreateMediaSuccessResponse
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.CreateMediaSuccessResponse = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	}
-
-	return res, nil
-
+	return s.handleCreateMediaResponse(httpRes, res)
 }
 
-// DirectUploadMedia - Upload media from device
-// This endpoint enables accelerated uploads of large media files directly from your local device to FastPix for processing and storage.
-//
-// > **NOTE**
-// >
-// > This version now supports uploads with no file size limitations and offers faster uploads. The previous endpoint (which had a 500MB size limit) is now deprecated. You can find details in the [changelog](https://fastpix.com/docs/changelog/release-notes).
-//
-// #### How it works
-//
-// 1. Send a POST request to this endpoint with optional media settings.
-//
-// 2. The response includes an `uploadId` and a signed `url` for direct video file upload.
-//
-// 3. Upload your video file to the provided url by making a PUT request. The API accepts the media file from your device and uploads it to the FastPix platform. (Refer to <a href="https://fastpix.com/docs/upload-videos/upload-videos-from-device#step-3-initiate-the-upload">Step 3: Initiate the upload</a> for complete instructions.)
-//
-// 4. Once uploaded, the media undergoes processing and is assigned a unique ID for tracking. Retain this `uploadId` for any future operations related to this upload.
-//
-// After uploading, you can use the <a href="https://fastpix.com/docs/video-on-demand-api/manage-videos/get-media">Get Media by ID</a> endpoint to check the status of the uploaded media asset and see if it has transitioned to a `Ready` status for playback.
-//
-// To notify your application about the status of this API request check for the webhooks for <a href="https://fastpix.com/docs/webhooks/webhook-event-reference#media-related-events">media related events</a>.
-//
-// #### Example
-//
-// A social media platform allows users to upload video content directly from their phones or computers. This endpoint facilitates the upload process. For example, if you are developing a video-sharing app where users can upload short clips from their mobile devices, this endpoint enables them to select a video, upload it to the platform.
-//
-// Related guide: <a href="https://fastpix.com/docs/upload-videos/upload-videos-from-device">Upload videos directly</a>
 func (s *InputVideo) DirectUploadMedia(ctx context.Context, request *operations.DirectUploadVideoMediaRequest, opts ...operations.Option) (*operations.DirectUploadVideoMediaResponse, error) {
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyInputVideoOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
+	baseURL := resolveInputVideoBaseURL(o, s.sdkConfiguration)
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := url.JoinPath(baseURL, "/on-demand/upload")
 	if err != nil {
 		return nil, fmt.Errorf("error generating URL: %w", err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "direct-upload-video-media",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildInputVideoHookContext(s, ctx, baseURL, "direct-upload-video-media")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, true, "Request", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", opURL, bodyReader)
+	ctx, err = applyInputVideoTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+
+	req, err := buildInputVideoPostRequest(ctx, opURL, bodyReader, reqContentType, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -390,161 +127,264 @@ func (s *InputVideo) DirectUploadMedia(ctx context.Context, request *operations.
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.ivExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.DirectUploadVideoMediaResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
+	return s.handleDirectUploadResponse(httpRes, res)
+}
+
+func applyInputVideoOptions(opts []operations.Option) (operations.Options, error) {
+	o := operations.Options{}
+	supportedOptions := []string{
+		operations.SupportedOptionRetries,
+		operations.SupportedOptionTimeout,
+	}
+	for _, opt := range opts {
+		if err := opt(&o, supportedOptions...); err != nil {
+			return o, fmt.Errorf("error applying option: %w", err)
+		}
+	}
+	return o, nil
+}
+
+func resolveInputVideoBaseURL(o operations.Options, sdkConfig config.SDKConfiguration) string {
+	if o.ServerURL == nil {
+		return utils.ReplaceParameters(sdkConfig.GetServerDetails())
+	}
+	return *o.ServerURL
+}
+
+func buildInputVideoHookContext(s *InputVideo, ctx context.Context, baseURL, operationID string) hooks.HookContext {
+	return hooks.HookContext{
+		SDK:              s.rootSDK,
+		SDKConfiguration: s.sdkConfiguration,
+		BaseURL:          baseURL,
+		Context:          ctx,
+		OperationID:      operationID,
+		OAuth2Scopes:     nil,
+		SecuritySource:   s.sdkConfiguration.Security,
+	}
+}
+
+func applyInputVideoTimeout(ctx context.Context, o operations.Options, sdkConfig config.SDKConfiguration) (context.Context, error) {
+	timeout := o.Timeout
+	if timeout == nil {
+		timeout = sdkConfig.Timeout
+	}
+	if timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+	return ctx, nil
+}
+
+func buildInputVideoPostRequest(ctx context.Context, opURL string, bodyReader io.Reader, reqContentType, userAgent string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", opURL, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	if reqContentType != "" {
+		req.Header.Set(contentType, reqContentType)
+	}
+	return req, nil
+}
+
+func (s *InputVideo) ivExecuteRequest(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, o operations.Options) (*http.Response, error) {
+	retryConfig := resolveIVRetryConfig(o, s.sdkConfiguration)
+	if retryConfig != nil {
+		return s.ivExecuteWithRetry(ctx, req, hookCtx, retryConfig)
+	}
+	return s.ivExecuteWithoutRetry(req, hookCtx)
+}
+
+func resolveIVRetryConfig(o operations.Options, sdkConfig config.SDKConfiguration) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return sdkConfig.RetryConfig
+}
+
+func (s *InputVideo) ivExecuteWithRetry(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.ivRetryAttempt(req, hookCtx)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *InputVideo) ivRetryAttempt(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	if err := ivRefreshRequestBody(req); err != nil {
+		return nil, err
+	}
+
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, ivClassifyHookError(err)
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		sendErr := ivFormatSendError(err)
+		_, sendErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+		return nil, sendErr
+	}
+
+	return httpRes, nil
+}
+
+func ivRefreshRequestBody(req *http.Request) error {
+	if req.Body == nil || req.Body == http.NoBody || req.GetBody == nil {
+		return nil
+	}
+	copyBody, err := req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.Body = copyBody
+	return nil
+}
+
+func ivClassifyHookError(err error) error {
+	if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
+		return err
+	}
+	return retry.Permanent(err)
+}
+
+func ivFormatSendError(err error) error {
+	if err != nil {
+		return fmt.Errorf(errSendingRequest, err)
+	}
+	return fmt.Errorf(errNoResponse)
+}
+
+func (s *InputVideo) ivExecuteWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		return nil, ivBuildSendError(err, hookCtx, s.hooks)
+	}
+
+	return s.ivHandlePostResponse(httpRes, hookCtx)
+}
+
+func ivBuildSendError(err error, hookCtx hooks.HookContext, h *hooks.Hooks) error {
+	sendErr := ivFormatSendError(err)
+	_, sendErr = h.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+	return sendErr
+}
+
+func (s *InputVideo) ivHandlePostResponse(httpRes *http.Response, hookCtx hooks.HookContext) (*http.Response, error) {
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
+		updatedRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
+		if err != nil {
+			return nil, err
+		}
+		if updatedRes != nil {
+			return updatedRes, nil
+		}
+		return httpRes, nil
+	}
+
+	httpRes, err := s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+	if err != nil {
+		return nil, err
+	}
+	return httpRes, nil
+}
+
+func (s *InputVideo) handleCreateMediaResponse(httpRes *http.Response, res *operations.CreateMediaResponse) (*operations.CreateMediaResponse, error) {
 	switch {
 	case httpRes.StatusCode == 201:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.DirectUploadVideoMediaResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
+		out, err := parseIVJSONBody[components.CreateMediaSuccessResponse](httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.CreateMediaSuccessResponse = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, ivAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		out, err := parseIVJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = out
 	}
-
 	return res, nil
+}
 
+func (s *InputVideo) handleDirectUploadResponse(httpRes *http.Response, res *operations.DirectUploadVideoMediaResponse) (*operations.DirectUploadVideoMediaResponse, error) {
+	switch {
+	case httpRes.StatusCode == 201:
+		out, err := parseIVJSONBody[operations.DirectUploadVideoMediaResponseBody](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, ivAPIError(httpRes)
+	default:
+		out, err := parseIVJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = out
+	}
+	return res, nil
+}
+
+func parseIVJSONBody[T any](httpRes *http.Response) (*T, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`) {
+		return nil, ivUnknownContentTypeError(httpRes)
+	}
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
+	var out T
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func ivAPIError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
+}
+
+func ivUnknownContentTypeError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(
+		fmt.Sprintf(errUnknownContentType, httpRes.Header.Get(contentType)),
+		httpRes.StatusCode,
+		string(rawBody),
+		httpRes,
+	)
 }

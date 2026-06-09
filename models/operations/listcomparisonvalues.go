@@ -130,123 +130,29 @@ func (e *Dimension) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
-	switch v {
-	case "browser_name":
-		fallthrough
-	case "browser_version":
-		fallthrough
-	case "os_name":
-		fallthrough
-	case "os_version":
-		fallthrough
-	case "device_name":
-		fallthrough
-	case "device_model":
-		fallthrough
-	case "device_type":
-		fallthrough
-	case "device_manufacturer":
-		fallthrough
-	case "player_remote_played":
-		fallthrough
-	case "player_name":
-		fallthrough
-	case "player_version":
-		fallthrough
-	case "player_software_name":
-		fallthrough
-	case "player_software_version":
-		fallthrough
-	case "player_resolution":
-		fallthrough
-	case "fp_sdk":
-		fallthrough
-	case "fp_sdk_version":
-		fallthrough
-	case "player_autoplay_on":
-		fallthrough
-	case "player_preload_on":
-		fallthrough
-	case "video_title":
-		fallthrough
-	case "video_id":
-		fallthrough
-	case "video_series":
-		fallthrough
-	case "fp_playback_id":
-		fallthrough
-	case "fp_live_stream_id":
-		fallthrough
-	case "media_id":
-		fallthrough
-	case "video_source_stream_type":
-		fallthrough
-	case "video_source_type":
-		fallthrough
-	case "video_encoding_variant":
-		fallthrough
-	case "experiment_name":
-		fallthrough
-	case "sub_property_id":
-		fallthrough
-	case "drm_type":
-		fallthrough
-	case "asn_name":
-		fallthrough
-	case "cdn":
-		fallthrough
-	case "video_source_hostname":
-		fallthrough
-	case "connection_type":
-		fallthrough
-	case "view_session_id":
-		fallthrough
-	case "continent":
-		fallthrough
-	case "country":
-		fallthrough
-	case "region":
-		fallthrough
-	case "viewer_id":
-		fallthrough
-	case "error_code":
-		fallthrough
-	case "exit_before_video_start":
-		fallthrough
-	case "view_has_ad":
-		fallthrough
-	case "video_startup_failed":
-		fallthrough
-	case "page_context":
-		fallthrough
-	case "video_content_type":
-		fallthrough
-	case "playback_failed":
-		fallthrough
-	case "custom_1":
-		fallthrough
-	case "custom_2":
-		fallthrough
-	case "custom_3":
-		fallthrough
-	case "custom_4":
-		fallthrough
-	case "custom_5":
-		fallthrough
-	case "custom_6":
-		fallthrough
-	case "custom_7":
-		fallthrough
-	case "custom_8":
-		fallthrough
-	case "custom_9":
-		fallthrough
-	case "custom_10":
-		*e = Dimension(v)
-		return nil
-	default:
-		return fmt.Errorf("invalid value for Dimension: %v", v)
-	}
+	var validDimensions = map[string]struct{}{
+	"browser_name": {}, "browser_version": {}, "os_name": {}, "os_version": {},
+	"device_name": {}, "device_model": {}, "device_type": {}, "device_manufacturer": {},
+	"player_remote_played": {}, "player_name": {}, "player_version": {},
+	"player_software_name": {}, "player_software_version": {}, "player_resolution": {},
+	"fp_sdk": {}, "fp_sdk_version": {}, "player_autoplay_on": {}, "player_preload_on": {},
+	"video_title": {}, "video_id": {}, "video_series": {}, "fp_playback_id": {},
+	"fp_live_stream_id": {}, "media_id": {}, "video_source_stream_type": {},
+	"video_source_type": {}, "video_encoding_variant": {}, "experiment_name": {},
+	"sub_property_id": {}, "drm_type": {}, "asn_name": {}, "cdn": {},
+	"video_source_hostname": {}, "connection_type": {}, "view_session_id": {},
+	"continent": {}, "country": {}, "region": {}, "viewer_id": {}, "error_code": {},
+	"exit_before_video_start": {}, "view_has_ad": {}, "video_startup_failed": {},
+	"page_context": {}, "video_content_type": {}, "playback_failed": {},
+	"custom_1": {}, "custom_2": {}, "custom_3": {}, "custom_4": {}, "custom_5": {},
+	"custom_6": {}, "custom_7": {}, "custom_8": {}, "custom_9": {}, "custom_10": {},
+}
+
+if _, ok := validDimensions[v]; ok {
+	*e = Dimension(v)
+	return nil
+}
+return fmt.Errorf("invalid value for Dimension: %v", v)
 }
 
 type ListComparisonValuesRequest struct {

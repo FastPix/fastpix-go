@@ -50,19 +50,15 @@ func populateQueryParams(queryParams interface{}, globals interface{}, values ur
 	if queryParamsVal.Kind() == reflect.Pointer && queryParamsVal.IsNil() {
 		return nil, nil
 	}
-	queryParamsStructType, queryParamsValType := dereferencePointers(reflect.TypeOf(queryParams), queryParamsVal)
 
+	queryParamsStructType, queryParamsValType := dereferencePointers(reflect.TypeOf(queryParams), queryParamsVal)
 	globalsAlreadyPopulated := []string{}
+
 	for i := 0; i < queryParamsStructType.NumField(); i++ {
 		fieldType := queryParamsStructType.Field(i)
 		valType := queryParamsValType.Field(i)
 
-		if contains(skipFields, fieldType.Name) {
-			continue
-		}
-
-		requestTag := getRequestTag(fieldType)
-		if requestTag != nil {
+		if contains(skipFields, fieldType.Name) || getRequestTag(fieldType) != nil {
 			continue
 		}
 
@@ -71,8 +67,7 @@ func populateQueryParams(queryParams interface{}, globals interface{}, values ur
 			continue
 		}
 
-		constValue := parseConstTag(fieldType)
-		if constValue != nil {
+		if constValue := parseConstTag(fieldType); constValue != nil {
 			values.Add(qpTag.ParamName, *constValue)
 			continue
 		}
@@ -80,53 +75,65 @@ func populateQueryParams(queryParams interface{}, globals interface{}, values ur
 		defaultValue := parseDefaultTag(fieldType)
 
 		if globals != nil {
-			var globalFound bool
-			fieldType, valType, globalFound = populateFromGlobals(fieldType, valType, queryParamTagKey, globals)
-			if globalFound {
-				globalsAlreadyPopulated = append(globalsAlreadyPopulated, fieldType.Name)
-			}
+			fieldType, valType, globalsAlreadyPopulated = applyQueryGlobal(fieldType, valType, globalsAlreadyPopulated, globals)
 		}
 
-		if qpTag.Serialization != "" {
-			vals, err := populateSerializedParams(qpTag, fieldType.Type, valType)
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range vals {
-				values.Add(k, v)
-			}
-		} else {
-			switch qpTag.Style {
-			case "deepObject":
-				vals := populateDeepObjectParams(qpTag, fieldType.Type, valType)
-				for k, v := range vals {
-					for _, vv := range v {
-						values.Add(k, vv)
-					}
-				}
-			case "form":
-				vals := populateFormParams(qpTag, fieldType.Type, valType, ",", defaultValue, allowEmptyValue)
-				for k, v := range vals {
-					for _, vv := range v {
-						values.Add(k, vv)
-					}
-				}
-			case "pipeDelimited":
-				vals := populateFormParams(qpTag, fieldType.Type, valType, "|", defaultValue, allowEmptyValue)
-				for k, v := range vals {
-					for _, vv := range v {
-						values.Add(k, vv)
-					}
-				}
-			default:
-				return nil, fmt.Errorf("unsupported style: %s", qpTag.Style)
-			}
+		if err := applyQueryParam(qpTag, fieldType, valType, defaultValue, allowEmptyValue, values); err != nil {
+			return nil, err
 		}
 	}
 
 	return globalsAlreadyPopulated, nil
 }
 
+func applyQueryGlobal(fieldType reflect.StructField, valType reflect.Value, globalsAlreadyPopulated []string, globals interface{}) (reflect.StructField, reflect.Value, []string) {
+	var globalFound bool
+	fieldType, valType, globalFound = populateFromGlobals(fieldType, valType, queryParamTagKey, globals)
+	if globalFound {
+		globalsAlreadyPopulated = append(globalsAlreadyPopulated, fieldType.Name)
+	}
+	return fieldType, valType, globalsAlreadyPopulated
+}
+
+func applyQueryParam(qpTag *paramTag, fieldType reflect.StructField, valType reflect.Value, defaultValue *string, allowEmptyValue map[string]struct{}, values url.Values) error {
+	if qpTag.Serialization != "" {
+		return applySerializedQueryParam(qpTag, fieldType, valType, values)
+	}
+	return applyStyledQueryParam(qpTag, fieldType, valType, defaultValue, allowEmptyValue, values)
+}
+
+func applySerializedQueryParam(qpTag *paramTag, fieldType reflect.StructField, valType reflect.Value, values url.Values) error {
+	vals, err := populateSerializedParams(qpTag, fieldType.Type, valType)
+	if err != nil {
+		return err
+	}
+	for k, v := range vals {
+		values.Add(k, v)
+	}
+	return nil
+}
+
+func applyStyledQueryParam(qpTag *paramTag, fieldType reflect.StructField, valType reflect.Value, defaultValue *string, allowEmptyValue map[string]struct{}, values url.Values) error {
+	switch qpTag.Style {
+	case "deepObject":
+		addMultiValues(values, populateDeepObjectParams(qpTag, fieldType.Type, valType))
+	case "form":
+		addMultiValues(values, populateFormParams(qpTag, fieldType.Type, valType, ",", defaultValue, allowEmptyValue))
+	case "pipeDelimited":
+		addMultiValues(values, populateFormParams(qpTag, fieldType.Type, valType, "|", defaultValue, allowEmptyValue))
+	default:
+		return fmt.Errorf("unsupported style: %s", qpTag.Style)
+	}
+	return nil
+}
+
+func addMultiValues(values url.Values, vals url.Values) {
+	for k, v := range vals {
+		for _, vv := range v {
+			values.Add(k, vv)
+		}
+	}
+}
 func populateSerializedParams(tag *paramTag, objType reflect.Type, objValue reflect.Value) (map[string]string, error) {
 	if isNil(objType, objValue) {
 		return nil, nil
@@ -265,21 +272,31 @@ func populateDeepObjectParamsStruct(qsValues url.Values, priorScope string, stru
 }
 
 func populateFormParams(tag *paramTag, objType reflect.Type, objValue reflect.Value, delimiter string, defaultValue *string, allowEmptyValue map[string]struct{}) url.Values {
-	return populateForm(tag.ParamName, tag.Explode, objType, objValue, delimiter, defaultValue, allowEmptyValue, func(fieldType reflect.StructField) string {
-		qpTag := parseQueryParamTag(fieldType)
-		if qpTag == nil {
-			return ""
-		}
-
-		// When inline is true, use the parent's param name instead of the field's own name.
-		// This allows union/oneOf wrapper types to serialize their values directly under
-		// the parent's query parameter name.
-		if qpTag.Inline {
-			return tag.ParamName
-		}
-
-		return qpTag.ParamName
-	})
+	cfg := FormPopulateConfig{
+		ParamName:       tag.ParamName,
+		DefaultValue:    defaultValue,
+		AllowEmptyValue: allowEmptyValue,
+		GetFieldName: func(fieldType reflect.StructField) string {
+			qpTag := parseQueryParamTag(fieldType)
+			if qpTag == nil {
+				return ""
+			}
+			// When inline is true, use the parent's param name instead of the field's own name.
+			// This allows union/oneOf wrapper types to serialize their values directly under
+			// the parent's query parameter name.
+			if qpTag.Inline {
+				return tag.ParamName
+			}
+			return qpTag.ParamName
+		},
+	}
+	rctx := reflectContext{
+		objType:   objType,
+		objValue:  objValue,
+		delimiter: delimiter,
+		explode:   tag.Explode,
+	}
+	return populateForm(cfg, rctx)
 }
 
 type paramTag struct {

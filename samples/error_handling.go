@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -14,10 +16,11 @@ import (
 	"github.com/FastPix/fastpix-go/models/operations"
 )
 
+const invalidMediaID = "invalid-media-id"
+
 func main() {
 	ctx := context.Background()
 
-	// Initialize SDK
 	client := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
@@ -26,31 +29,43 @@ func main() {
 		fastpixgo.WithTimeout(30*time.Second),
 	)
 
-	// 1. Basic Error Handling
-	fmt.Println("=== Basic Error Handling ===")
+	testBasicErrorHandling(ctx, client)
+	testSpecificErrorTypeHandling(ctx, client)
+	testAuthErrorHandling(ctx)
+	testTimeoutErrorHandling(ctx)
+	testRetryErrorHandling(ctx)
+	testComprehensiveErrorHandling(ctx, client)
+	testErrorRecoveryStrategies(ctx, client)
+	testErrorLoggingAndMonitoring(ctx, client)
+	testCustomErrorHandling(ctx, client)
 
-	// Try to get a non-existent media
+	fmt.Println("\n=== Error Handling Demo Complete ===")
+}
+
+func testBasicErrorHandling(ctx context.Context, client *fastpixgo.FastPix) {
+	fmt.Println("=== Basic Error Handling ===")
 	fmt.Println("Testing error handling with non-existent media...")
+
 	_, err := client.ManageVideos.GetMedia(ctx, "non-existent-media-id")
 	handleError("GetMedia", err)
+}
 
-	// 2. Specific Error Type Handling
+func testSpecificErrorTypeHandling(ctx context.Context, client *fastpixgo.FastPix) {
 	fmt.Println("\n=== Specific Error Type Handling ===")
-
-	// Test with invalid media creation request
 	fmt.Println("Testing with invalid media creation request...")
+
 	invalidRequest := components.CreateMediaRequest{
-		Inputs:       []components.Input{}, // Empty inputs should cause validation error
+		Inputs:       []components.Input{},
 		AccessPolicy: components.CreateMediaRequestAccessPolicyPublic,
 	}
 
-	_, err = client.InputVideo.CreateMedia(ctx, invalidRequest)
+	_, err := client.InputVideo.CreateMedia(ctx, invalidRequest)
 	handleSpecificErrors("CreateMedia", err)
+}
 
-	// 3. Authentication Error Handling
+func testAuthErrorHandling(ctx context.Context) {
 	fmt.Println("\n=== Authentication Error Handling ===")
 
-	// Create client with invalid credentials
 	invalidClient := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer("invalid-username"),
@@ -60,29 +75,29 @@ func main() {
 	)
 
 	fmt.Println("Testing with invalid credentials...")
-	_, err = invalidClient.ManageVideos.ListMedia(ctx, nil, nil, nil)
+	_, err := invalidClient.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	handleSpecificErrors("ListMedia with invalid auth", err)
+}
 
-	// 4. Network and Timeout Error Handling
+func testTimeoutErrorHandling(ctx context.Context) {
 	fmt.Println("\n=== Network and Timeout Error Handling ===")
 
-	// Create client with very short timeout
 	shortTimeoutClient := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
 			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
 		}),
-		fastpixgo.WithTimeout(1*time.Millisecond), // Very short timeout
+		fastpixgo.WithTimeout(1*time.Millisecond),
 	)
 
 	fmt.Println("Testing with short timeout...")
-	_, err = shortTimeoutClient.ManageVideos.ListMedia(ctx, nil, nil, nil)
+	_, err := shortTimeoutClient.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	handleError("ListMedia with short timeout", err)
+}
 
-	// 5. Retry Configuration and Error Handling
+func testRetryErrorHandling(ctx context.Context) {
 	fmt.Println("\n=== Retry Configuration and Error Handling ===")
 
-	// Create client with retry configuration
 	retryClient := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
@@ -101,13 +116,13 @@ func main() {
 	)
 
 	fmt.Println("Testing with retry configuration...")
-	_, err = retryClient.ManageVideos.ListMedia(ctx, nil, nil, nil)
+	_, err := retryClient.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	handleError("ListMedia with retry", err)
+}
 
-	// 6. Comprehensive Error Handling for Different Operations
+func testComprehensiveErrorHandling(ctx context.Context, client *fastpixgo.FastPix) {
 	fmt.Println("\n=== Comprehensive Error Handling ===")
 
-	// Test various operations with error handling
 	testOperations := []struct {
 		name string
 		fn   func() error
@@ -144,51 +159,40 @@ func main() {
 
 	for _, test := range testOperations {
 		fmt.Printf("\nTesting: %s\n", test.name)
-		err := test.fn()
-		handleSpecificErrors(test.name, err)
+		handleSpecificErrors(test.name, test.fn())
 	}
+}
 
-	// 7. Error Recovery Strategies
+func testErrorRecoveryStrategies(ctx context.Context, client *fastpixgo.FastPix) {
 	fmt.Println("\n=== Error Recovery Strategies ===")
-
-	// Demonstrate fallback strategies
 	fmt.Println("Demonstrating error recovery strategies...")
 
-	// Strategy 1: Retry with exponential backoff
 	fmt.Println("\nStrategy 1: Retry with exponential backoff")
-	err = retryWithBackoff(ctx, client, 3)
-	handleError("Retry with backoff", err)
+	handleError("Retry with backoff", retryWithBackoff(ctx, client, 3))
 
-	// Strategy 2: Fallback to alternative operation
 	fmt.Println("\nStrategy 2: Fallback to alternative operation")
-	err = fallbackOperation(ctx, client)
-	handleError("Fallback operation", err)
+	handleError("Fallback operation", fallbackOperation(ctx, client))
 
-	// Strategy 3: Graceful degradation
 	fmt.Println("\nStrategy 3: Graceful degradation")
-	err = gracefulDegradation(ctx, client)
-	handleError("Graceful degradation", err)
+	handleError("Graceful degradation", gracefulDegradation(ctx, client))
+}
 
-	// 8. Error Logging and Monitoring
+func testErrorLoggingAndMonitoring(ctx context.Context, client *fastpixgo.FastPix) {
 	fmt.Println("\n=== Error Logging and Monitoring ===")
-
-	// Demonstrate proper error logging
 	fmt.Println("Demonstrating error logging...")
 
-	// Log errors with context
-	_, err = client.ManageVideos.GetMedia(ctx, "invalid-media-id")
+	_, err := client.ManageVideos.GetMedia(ctx, invalidMediaID)
 	if err != nil {
 		logError("GetMedia", err, map[string]interface{}{
-			"media_id": "invalid-media-id",
+			"media_id": invalidMediaID,
 			"user_id":  "demo-user",
 			"action":   "get_media",
 		})
 	}
+}
 
-	// 9. Custom Error Handling
+func testCustomErrorHandling(ctx context.Context, client *fastpixgo.FastPix) {
 	fmt.Println("\n=== Custom Error Handling ===")
-
-	// Demonstrate custom error handling wrapper
 	fmt.Println("Demonstrating custom error handling wrapper...")
 
 	result, err := safeExecute(func() (interface{}, error) {
@@ -200,11 +204,8 @@ func main() {
 	} else {
 		fmt.Printf("Custom error handling success: %+v\n", result)
 	}
-
-	fmt.Println("\n=== Error Handling Demo Complete ===")
 }
 
-// handleError demonstrates basic error handling
 func handleError(operation string, err error) {
 	if err != nil {
 		fmt.Printf("❌ %s failed: %v\n", operation, err)
@@ -213,7 +214,6 @@ func handleError(operation string, err error) {
 	}
 }
 
-// handleSpecificErrors demonstrates specific error type handling
 func handleSpecificErrors(operation string, err error) {
 	if err == nil {
 		fmt.Printf("✅ %s succeeded\n", operation)
@@ -222,49 +222,49 @@ func handleSpecificErrors(operation string, err error) {
 
 	fmt.Printf("❌ %s failed: ", operation)
 
-	// Check for specific error types
+	if msg, ok := matchAPIError(err); ok {
+		fmt.Println(msg)
+		return
+	}
+
+	fmt.Printf("Unknown Error: %v\n", err)
+}
+
+func matchAPIError(err error) (string, bool) {
 	var badRequestErr *apierrors.BadRequestError
 	if errors.As(err, &badRequestErr) {
-		fmt.Printf("Bad Request Error (400): %s\n", badRequestErr.Error())
-		return
+		return fmt.Sprintf("Bad Request Error (400): %s", badRequestErr.Error()), true
 	}
 
 	var unauthorizedErr *apierrors.UnauthorizedError
 	if errors.As(err, &unauthorizedErr) {
-		fmt.Printf("Unauthorized Error (401): %s\n", unauthorizedErr.Error())
-		return
+		return fmt.Sprintf("Unauthorized Error (401): %s", unauthorizedErr.Error()), true
 	}
 
 	var forbiddenErr *apierrors.ForbiddenError
 	if errors.As(err, &forbiddenErr) {
-		fmt.Printf("Forbidden Error (403): %s\n", forbiddenErr.Error())
-		return
+		return fmt.Sprintf("Forbidden Error (403): %s", forbiddenErr.Error()), true
 	}
 
 	var notFoundErr *apierrors.NotFoundError
 	if errors.As(err, &notFoundErr) {
-		fmt.Printf("Not Found Error (404): %s\n", notFoundErr.Error())
-		return
+		return fmt.Sprintf("Not Found Error (404): %s", notFoundErr.Error()), true
 	}
 
 	var validationErr *apierrors.ValidationErrorResponse
 	if errors.As(err, &validationErr) {
-		fmt.Printf("Validation Error (422): %s\n", validationErr.Error())
-		return
+		return fmt.Sprintf("Validation Error (422): %s", validationErr.Error()), true
 	}
 
 	var apiErr *apierrors.APIError
 	if errors.As(err, &apiErr) {
-		fmt.Printf("API Error (%d): %s\n", apiErr.StatusCode, apiErr.Error())
-		return
+		return fmt.Sprintf("API Error (%d): %s", apiErr.StatusCode, apiErr.Error()), true
 	}
 
-	// Generic error
-	fmt.Printf("Unknown Error: %v\n", err)
+	return "", false
 }
 
-// retryWithBackoff demonstrates retry with exponential backoff
-func retryWithBackoff(ctx context.Context, client *fastpixgo.Fastpixgo, maxRetries int) error {
+func retryWithBackoff(ctx context.Context, client *fastpixgo.FastPix, maxRetries int) error {
 	var lastErr error
 
 	for i := 0; i < maxRetries; i++ {
@@ -288,10 +288,8 @@ func retryWithBackoff(ctx context.Context, client *fastpixgo.Fastpixgo, maxRetri
 	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
 }
 
-// fallbackOperation demonstrates fallback strategy
-func fallbackOperation(ctx context.Context, client *fastpixgo.Fastpixgo) error {
-	// Try primary operation
-	_, err := client.ManageVideos.GetMedia(ctx, "invalid-media-id")
+func fallbackOperation(ctx context.Context, client *fastpixgo.FastPix) error {
+	_, err := client.ManageVideos.GetMedia(ctx, invalidMediaID)
 	if err == nil {
 		fmt.Println("  ✅ Primary operation succeeded")
 		return nil
@@ -299,7 +297,6 @@ func fallbackOperation(ctx context.Context, client *fastpixgo.Fastpixgo) error {
 
 	fmt.Println("  ⚠️ Primary operation failed, trying fallback...")
 
-	// Try fallback operation
 	_, fallbackErr := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	if fallbackErr == nil {
 		fmt.Println("  ✅ Fallback operation succeeded")
@@ -309,9 +306,7 @@ func fallbackOperation(ctx context.Context, client *fastpixgo.Fastpixgo) error {
 	return fmt.Errorf("both primary and fallback operations failed: primary=%v, fallback=%v", err, fallbackErr)
 }
 
-// gracefulDegradation demonstrates graceful degradation
-func gracefulDegradation(ctx context.Context, client *fastpixgo.Fastpixgo) error {
-	// Try to get detailed information
+func gracefulDegradation(ctx context.Context, client *fastpixgo.FastPix) error {
 	_, err := client.ManageVideos.GetMedia(ctx, "invalid-media-id")
 	if err == nil {
 		fmt.Println("  ✅ Full functionality available")
@@ -320,7 +315,6 @@ func gracefulDegradation(ctx context.Context, client *fastpixgo.Fastpixgo) error
 
 	fmt.Println("  ⚠️ Full functionality unavailable, using degraded mode...")
 
-	// Fall back to basic functionality
 	_, basicErr := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	if basicErr == nil {
 		fmt.Println("  ✅ Degraded mode working")
@@ -330,17 +324,12 @@ func gracefulDegradation(ctx context.Context, client *fastpixgo.Fastpixgo) error
 	return fmt.Errorf("even degraded mode failed: %v", basicErr)
 }
 
-// logError demonstrates proper error logging
 func logError(operation string, err error, context map[string]interface{}) {
 	fmt.Printf("  📝 Logging error for %s\n", operation)
 	fmt.Printf("  Context: %+v\n", context)
 	fmt.Printf("  Error: %v\n", err)
-
-	// In a real application, you would send this to your logging system
-	// log.WithFields(log.Fields(context)).WithError(err).Errorf("Operation %s failed", operation)
 }
 
-// safeExecute demonstrates custom error handling wrapper
 func safeExecute(fn func() (interface{}, error)) (interface{}, error) {
 	defer func() {
 		if r := recover(); r != nil {

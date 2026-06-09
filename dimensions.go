@@ -10,6 +10,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
@@ -17,8 +20,11 @@ import (
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
-	"net/http"
-	"net/url"
+)
+
+const (
+	errContentType               = "unknown content-type received: %s"
+	dimContentType               = "Content-Type"
 )
 
 // Dimensions - Operations involving dimensions
@@ -36,63 +42,30 @@ func newDimensions(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks 
 	}
 }
 
-// List the dimensions
-// Retrieves a list of dimensions that can be used as query parameters across various data endpoints. Each dimension has a unique id that can be used to filter data effectively.
-//
-// The dimensions retrieved from this endpoint can be used in conjunction with the <a href="https://fastpix.com/docs/video-data-api/views/list-video-views">list video views</a> and <a href="https://fastpix.com/docs/video-data-api/views/list-by-top-content">list by top content</a> endpoints to filter results based on specific criteria. For example, you can filter views by `browser_name`, `os_name`, `device_type`, and more.
-//
-// Related guides: <a href="https://fastpix.com/docs/concepts/what-video-data-do-we-capture#/">What Video Data do we capture?</a> ,   <a href="https://fastpix.com/docs/working-with-video-data/pass-custom-metadata-to-metrics">Use passable dimensions</a>
 func (s *Dimensions) List(ctx context.Context, opts ...operations.Option) (*operations.ListDimensionsResponse, error) {
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyDimOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
+	baseURL := resolveDimBaseURL(o, s.sdkConfiguration)
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := url.JoinPath(baseURL, "/data/dimensions")
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "list_dimensions",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildDimHookContext(s, ctx, baseURL, "list_dimensions")
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
+	ctx, err = applyDimTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+
+	req, err := buildDimGetRequest(ctx, opURL, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
 		return nil, err
@@ -102,175 +75,18 @@ func (s *Dimensions) List(ctx context.Context, opts ...operations.Option) (*oper
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.dimExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.ListDimensionsResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
-	switch {
-	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.ListDimensionsResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	}
-
-	return res, nil
-
+	return s.handleListDimensionsResponse(httpRes, res)
 }
 
-// ListFilterValues - List the filter values for a dimension
-// This endpoint returns the filter values associated with a specific dimension, along with the total number of video views for each value. For example, it can list all `browser_name` (dimension) and show how many views occurred for all available browsers like Chrome, Safari (filter values).
-//
-// In order to use the <a href="https://fastpix.com/docs/working-with-video-data/use-custom-dimensions">Custom Dimensions</a>, you must enable them in the dashboard under settings option based on the plan you have opted for.
-//
-// #### Example
-//
-// A developer wants to know how their video content performs across different browsers. By calling this endpoint for the `device_type` dimension, they can retrieve a breakdown of video views by each device (for example, Desktop, Mobile, Tablet). This data helps the developer understand where optimizations or troubleshooting is necessary.
-//
-// Related guide: <a href="https://fastpix.com/docs/working-with-video-data/explore-the-dashboard#filters-and-timeframes">Filters and timespan</a>
 func (s *Dimensions) ListFilterValues(ctx context.Context, dimensionsID operations.DimensionsID, timespan *operations.ListFilterValuesForDimensionTimespan, filterby *string, opts ...operations.Option) (*operations.ListFilterValuesForDimensionResponse, error) {
 	request := operations.ListFilterValuesForDimensionRequest{
 		DimensionsID: dimensionsID,
@@ -278,56 +94,29 @@ func (s *Dimensions) ListFilterValues(ctx context.Context, dimensionsID operatio
 		Filterby:     filterby,
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyDimOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
+	baseURL := resolveDimBaseURL(o, s.sdkConfiguration)
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/data/dimensions/{dimensionsId}", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "list_filter_values_for_dimension",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildDimHookContext(s, ctx, baseURL, "list_filter_values_for_dimension")
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
+	ctx, err = applyDimTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+
+	req, err := buildDimGetRequest(ctx, opURL, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
 		return nil, fmt.Errorf("error populating query params: %w", err)
@@ -341,161 +130,261 @@ func (s *Dimensions) ListFilterValues(ctx context.Context, dimensionsID operatio
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.dimExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.ListFilterValuesForDimensionResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
+	return s.handleListFilterValuesResponse(httpRes, res)
+}
+
+func applyDimOptions(opts []operations.Option) (operations.Options, error) {
+	o := operations.Options{}
+	supportedOptions := []string{
+		operations.SupportedOptionRetries,
+		operations.SupportedOptionTimeout,
+	}
+	for _, opt := range opts {
+		if err := opt(&o, supportedOptions...); err != nil {
+			return o, fmt.Errorf("error applying option: %w", err)
+		}
+	}
+	return o, nil
+}
+
+func resolveDimBaseURL(o operations.Options, sdkConfig config.SDKConfiguration) string {
+	if o.ServerURL == nil {
+		return utils.ReplaceParameters(sdkConfig.GetServerDetails())
+	}
+	return *o.ServerURL
+}
+
+func buildDimHookContext(s *Dimensions, ctx context.Context, baseURL, operationID string) hooks.HookContext {
+	return hooks.HookContext{
+		SDK:              s.rootSDK,
+		SDKConfiguration: s.sdkConfiguration,
+		BaseURL:          baseURL,
+		Context:          ctx,
+		OperationID:      operationID,
+		OAuth2Scopes:     nil,
+		SecuritySource:   s.sdkConfiguration.Security,
+	}
+}
+
+func applyDimTimeout(ctx context.Context, o operations.Options, sdkConfig config.SDKConfiguration) (context.Context, error) {
+	timeout := o.Timeout
+	if timeout == nil {
+		timeout = sdkConfig.Timeout
+	}
+	if timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+	return ctx, nil
+}
+
+func buildDimGetRequest(ctx context.Context, opURL, userAgent string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	return req, nil
+}
+
+func (s *Dimensions) dimExecuteRequest(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, o operations.Options) (*http.Response, error) {
+	retryConfig := resolveDimRetryConfig(o, s.sdkConfiguration)
+	if retryConfig != nil {
+		return s.dimExecuteWithRetry(ctx, req, hookCtx, retryConfig)
+	}
+	return s.dimExecuteWithoutRetry(req, hookCtx)
+}
+
+func resolveDimRetryConfig(o operations.Options, sdkConfig config.SDKConfiguration) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return sdkConfig.RetryConfig
+}
+
+func (s *Dimensions) dimExecuteWithRetry(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.dimRetryAttempt(req, hookCtx)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *Dimensions) dimRetryAttempt(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	if err := dimRefreshRequestBody(req); err != nil {
+		return nil, err
+	}
+
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, dimClassifyHookError(err)
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		sendErr := dimFormatSendError(err)
+		_, sendErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+		return nil, sendErr
+	}
+
+	return httpRes, nil
+}
+
+func dimRefreshRequestBody(req *http.Request) error {
+	if req.Body == nil || req.Body == http.NoBody || req.GetBody == nil {
+		return nil
+	}
+	copyBody, err := req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.Body = copyBody
+	return nil
+}
+
+func dimClassifyHookError(err error) error {
+	if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
+		return err
+	}
+	return retry.Permanent(err)
+}
+
+func dimFormatSendError(err error) error {
+	if err != nil {
+		return fmt.Errorf(errSendingRequest, err)
+	}
+	return fmt.Errorf(errNoResponse)
+}
+
+func (s *Dimensions) dimExecuteWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		return nil, dimBuildSendError(err, hookCtx, s.hooks)
+	}
+
+	return s.dimHandlePostResponse(httpRes, hookCtx)
+}
+
+func dimBuildSendError(err error, hookCtx hooks.HookContext, h *hooks.Hooks) error {
+	sendErr := dimFormatSendError(err)
+	_, sendErr = h.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+	return sendErr
+}
+
+func (s *Dimensions) dimHandlePostResponse(httpRes *http.Response, hookCtx hooks.HookContext) (*http.Response, error) {
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
+		updatedRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
+		if err != nil {
+			return nil, err
+		}
+		if updatedRes != nil {
+			return updatedRes, nil
+		}
+		return httpRes, nil
+	}
+
+	httpRes, err := s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+	if err != nil {
+		return nil, err
+	}
+	return httpRes, nil
+}
+
+func (s *Dimensions) handleListDimensionsResponse(httpRes *http.Response, res *operations.ListDimensionsResponse) (*operations.ListDimensionsResponse, error) {
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.ListFilterValuesForDimensionResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
+		out, err := parseDimJSONBody[operations.ListDimensionsResponseBody](httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, dimAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		out, err := parseDimJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = out
 	}
-
 	return res, nil
+}
 
+func (s *Dimensions) handleListFilterValuesResponse(httpRes *http.Response, res *operations.ListFilterValuesForDimensionResponse) (*operations.ListFilterValuesForDimensionResponse, error) {
+	switch {
+	case httpRes.StatusCode == 200:
+		out, err := parseDimJSONBody[operations.ListFilterValuesForDimensionResponseBody](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, dimAPIError(httpRes)
+	default:
+		out, err := parseDimJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = out
+	}
+	return res, nil
+}
+
+func parseDimJSONBody[T any](httpRes *http.Response) (*T, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(dimContentType), `application/json`) {
+		return nil, dimUnknownContentTypeError(httpRes)
+	}
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
+	var out T
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func dimAPIError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
+}
+
+func dimUnknownContentTypeError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(
+		fmt.Sprintf(errContentType, httpRes.Header.Get(dimContentType)),
+		httpRes.StatusCode,
+		string(rawBody),
+		httpRes,
+	)
 }

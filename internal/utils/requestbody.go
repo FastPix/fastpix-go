@@ -52,11 +52,7 @@ func serializeRequestBody(request interface{}, nullable, optional bool, requestF
 	requestValType := reflect.ValueOf(request)
 
 	if isNil(requestStructType, requestValType) {
-		if !nullable && optional {
-			return nil, "", nil
-		}
-
-		return serializeContentType(requestFieldName, SerializationMethodToContentType[serializationMethod], requestValType, tag)
+		return serializeNilRequestBody(nullable, optional, requestFieldName, serializationMethod, requestValType, tag)
 	}
 
 	if requestStructType.Kind() == reflect.Pointer {
@@ -68,81 +64,131 @@ func serializeRequestBody(request interface{}, nullable, optional bool, requestF
 		return serializeContentType(requestFieldName, SerializationMethodToContentType[serializationMethod], requestValType, tag)
 	}
 
-	requestField, ok := requestStructType.FieldByName(requestFieldName)
+	cfg := requestBodyConfig{
+		nullable:            nullable,
+		optional:            optional,
+		requestFieldName:    requestFieldName,
+		serializationMethod: serializationMethod,
+		tag:                 tag,
+	}
+	rctx := requestReflectContext{
+		requestStructType: requestStructType,
+		requestValType:    requestValType,
+	}
+	return serializeStructRequestBody(request, cfg, rctx)
+}
 
-	if ok {
-		tag := getRequestTag(requestField)
-		if tag != nil {
-			// request object (non-flattened)
-			requestVal := requestValType.FieldByName(requestFieldName)
-			val := reflect.ValueOf(requestVal.Interface())
-			if isNil(requestField.Type, requestVal) {
-				if !nullable && optional {
-					return nil, "", nil
-				}
+func serializeNilRequestBody(nullable, optional bool, requestFieldName, serializationMethod string, requestValType reflect.Value, tag string) (io.Reader, string, error) {
+	if !nullable && optional {
+		return nil, "", nil
+	}
+	return serializeContentType(requestFieldName, SerializationMethodToContentType[serializationMethod], requestValType, tag)
+}
 
-				return serializeContentType(requestFieldName, tag.MediaType, val, string(requestField.Tag))
-			}
+type requestBodyConfig struct {
+	nullable            bool
+	optional            bool
+	requestFieldName    string
+	serializationMethod string
+	tag                 string
+}
 
-			return serializeContentType(requestFieldName, tag.MediaType, val, string(requestField.Tag))
-		}
+type requestReflectContext struct {
+	requestStructType reflect.Type
+	requestValType    reflect.Value
+}
+
+func serializeStructRequestBody(request interface{}, cfg requestBodyConfig, rctx requestReflectContext) (io.Reader, string, error) {
+	requestField, ok := rctx.requestStructType.FieldByName(cfg.requestFieldName)
+	if !ok {
+		return serializeContentType(cfg.requestFieldName, SerializationMethodToContentType[cfg.serializationMethod], reflect.ValueOf(request), cfg.tag)
 	}
 
-	// flattened request object
-	return serializeContentType(requestFieldName, SerializationMethodToContentType[serializationMethod], reflect.ValueOf(request), tag)
+	reqTag := getRequestTag(requestField)
+	if reqTag == nil {
+		return serializeContentType(cfg.requestFieldName, SerializationMethodToContentType[cfg.serializationMethod], reflect.ValueOf(request), cfg.tag)
+	}
+
+	requestVal := rctx.requestValType.FieldByName(cfg.requestFieldName)
+	val := reflect.ValueOf(requestVal.Interface())
+
+	if isNil(requestField.Type, requestVal) && !cfg.nullable && cfg.optional {
+		return nil, "", nil
+	}
+
+	return serializeContentType(cfg.requestFieldName, reqTag.MediaType, val, string(requestField.Tag))
 }
 
 func serializeContentType(fieldName string, mediaType string, val reflect.Value, tag string) (io.Reader, string, error) {
 	buf := &bytes.Buffer{}
 
 	if isNil(val.Type(), val) {
-		// TODO: what does a null mean for other content types? Just returning an empty buffer for now
-		if jsonEncodingRegex.MatchString(mediaType) {
-			if _, err := buf.Write([]byte("null")); err != nil {
-				return nil, "", err
-			}
-		}
-
-		return buf, mediaType, nil
+		return serializeNilContentType(buf, mediaType)
 	}
 
 	switch {
 	case jsonEncodingRegex.MatchString(mediaType):
-		data, err := MarshalJSON(val.Interface(), reflect.StructTag(tag), true)
-		if err != nil {
-			return nil, "", err
-		}
-
-		if _, err := buf.Write(data); err != nil {
-			return nil, "", err
-		}
+		return serializeJSON(buf, val, tag, mediaType)
 	case multipartEncodingRegex.MatchString(mediaType):
-		var err error
-		mediaType, err = encodeMultipartFormData(buf, val.Interface())
-		if err != nil {
-			return nil, "", err
-		}
+		return serializeMultipart(buf, val)
 	case urlEncodedEncodingRegex.MatchString(mediaType):
-		if err := encodeFormData(fieldName, buf, val.Interface()); err != nil {
-			return nil, "", err
-		}
+		return serializeURLEncoded(fieldName, buf, val, mediaType)
 	case val.Type().Implements(reflect.TypeOf((*io.Reader)(nil)).Elem()):
 		return val.Interface().(io.Reader), mediaType, nil
 	default:
-		val = reflect.Indirect(val)
+		return serializeRawValue(buf, val, mediaType)
+	}
+}
 
-		switch {
-		case val.Type().Kind() == reflect.String:
-			if _, err := buf.WriteString(valToString(val.Interface())); err != nil {
-				return nil, "", err
-			}
-		case reflect.TypeOf(val.Interface()) == reflect.TypeOf([]byte(nil)):
-			if _, err := buf.Write(val.Interface().([]byte)); err != nil {
-				return nil, "", err
-			}
-		default:
-			return nil, "", fmt.Errorf("invalid request body type %s for mediaType %s", val.Type(), mediaType)
+func serializeNilContentType(buf *bytes.Buffer, mediaType string) (io.Reader, string, error) {
+	if jsonEncodingRegex.MatchString(mediaType) {
+		if _, err := buf.Write([]byte("null")); err != nil {
+			return nil, "", err
 		}
+	}
+	return buf, mediaType, nil
+}
+
+func serializeJSON(buf *bytes.Buffer, val reflect.Value, tag, mediaType string) (io.Reader, string, error) {
+	data, err := MarshalJSON(val.Interface(), reflect.StructTag(tag), true)
+	if err != nil {
+		return nil, "", err
+	}
+	if _, err := buf.Write(data); err != nil {
+		return nil, "", err
+	}
+	return buf, mediaType, nil
+}
+
+func serializeMultipart(buf *bytes.Buffer, val reflect.Value) (io.Reader, string, error) {
+	mediaType, err := encodeMultipartFormData(buf, val.Interface())
+	if err != nil {
+		return nil, "", err
+	}
+	return buf, mediaType, nil
+}
+
+func serializeURLEncoded(fieldName string, buf *bytes.Buffer, val reflect.Value, mediaType string) (io.Reader, string, error) {
+	if err := encodeFormData(fieldName, buf, val.Interface()); err != nil {
+		return nil, "", err
+	}
+	return buf, mediaType, nil
+}
+
+func serializeRawValue(buf *bytes.Buffer, val reflect.Value, mediaType string) (io.Reader, string, error) {
+	val = reflect.Indirect(val)
+
+	switch {
+	case val.Type().Kind() == reflect.String:
+		if _, err := buf.WriteString(valToString(val.Interface())); err != nil {
+			return nil, "", err
+		}
+	case reflect.TypeOf(val.Interface()) == reflect.TypeOf([]byte(nil)):
+		if _, err := buf.Write(val.Interface().([]byte)); err != nil {
+			return nil, "", err
+		}
+	default:
+		return nil, "", fmt.Errorf("invalid request body type %s for mediaType %s", val.Type(), mediaType)
 	}
 
 	return buf, mediaType, nil
@@ -174,54 +220,9 @@ func encodeMultipartFormData(w io.Writer, data interface{}) (string, error) {
 		}
 
 		tag := parseMultipartFormTag(field)
-		if tag.File {
-			switch fieldType.Kind() {
-			case reflect.Slice, reflect.Array:
-				for i := 0; i < valType.Len(); i++ {
-					arrayVal := valType.Index(i)
-
-					if err := encodeMultipartFormDataFile(writer, tag.Name, arrayVal.Type(), arrayVal); err != nil {
-						writer.Close()
-						return "", err
-					}
-				}
-			default:
-				if err := encodeMultipartFormDataFile(writer, tag.Name, fieldType, valType); err != nil {
-					writer.Close()
-					return "", err
-				}
-			}
-		} else if tag.JSON {
-			jw, err := writer.CreateFormField(tag.Name)
-			if err != nil {
-				writer.Close()
-				return "", err
-			}
-			d, err := MarshalJSON(valType.Interface(), field.Tag, true)
-			if err != nil {
-				writer.Close()
-				return "", err
-			}
-			if _, err := jw.Write(d); err != nil {
-				writer.Close()
-				return "", err
-			}
-		} else {
-			switch fieldType.Kind() {
-			case reflect.Slice, reflect.Array:
-				values := parseDelimitedArray(true, valType, ",")
-				for _, v := range values {
-					if err := writer.WriteField(tag.Name, v); err != nil {
-						writer.Close()
-						return "", err
-					}
-				}
-			default:
-				if err := writer.WriteField(tag.Name, valToString(valType.Interface())); err != nil {
-					writer.Close()
-					return "", err
-				}
-			}
+		if err := encodeMultipartField(writer, tag, field, fieldType, valType); err != nil {
+			writer.Close()
+			return "", err
 		}
 	}
 
@@ -232,11 +233,70 @@ func encodeMultipartFormData(w io.Writer, data interface{}) (string, error) {
 	return writer.FormDataContentType(), nil
 }
 
+func encodeMultipartField(writer *multipart.Writer, tag *multipartFormTag, field reflect.StructField, fieldType reflect.Type, valType reflect.Value) error {
+	switch {
+	case tag.File:
+		return encodeMultipartFileField(writer, tag, fieldType, valType)
+	case tag.JSON:
+		return encodeMultipartJSONField(writer, tag, field, valType)
+	default:
+		return encodeMultipartValueField(writer, tag, fieldType, valType)
+	}
+}
+
+func encodeMultipartFileField(writer *multipart.Writer, tag *multipartFormTag, fieldType reflect.Type, valType reflect.Value) error {
+	if fieldType.Kind() == reflect.Slice || fieldType.Kind() == reflect.Array {
+		for i := 0; i < valType.Len(); i++ {
+			arrayVal := valType.Index(i)
+			if err := encodeMultipartFormDataFile(writer, tag.Name, arrayVal.Type(), arrayVal); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return encodeMultipartFormDataFile(writer, tag.Name, fieldType, valType)
+}
+
+func encodeMultipartJSONField(writer *multipart.Writer, tag *multipartFormTag, field reflect.StructField, valType reflect.Value) error {
+	jw, err := writer.CreateFormField(tag.Name)
+	if err != nil {
+		return err
+	}
+	d, err := MarshalJSON(valType.Interface(), field.Tag, true)
+	if err != nil {
+		return err
+	}
+	_, err = jw.Write(d)
+	return err
+}
+
+func encodeMultipartValueField(writer *multipart.Writer, tag *multipartFormTag, fieldType reflect.Type, valType reflect.Value) error {
+	if fieldType.Kind() == reflect.Slice || fieldType.Kind() == reflect.Array {
+		for _, v := range parseDelimitedArray(true, valType, ",") {
+			if err := writer.WriteField(tag.Name, v); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return writer.WriteField(tag.Name, valToString(valType.Interface()))
+}
+
 func encodeMultipartFormDataFile(w *multipart.Writer, fieldName string, fieldType reflect.Type, valType reflect.Value) error {
 	if fieldType.Kind() != reflect.Struct {
 		return fmt.Errorf("invalid type %s for multipart/form-data file", valType.Type())
 	}
 
+	fileName, reader := extractFileFields(fieldType, valType)
+
+	if fileName == "" || reader == nil {
+		return fmt.Errorf("invalid multipart/form-data file")
+	}
+
+	return writeMultipartFilePart(w, fieldName, fileName, reader)
+}
+
+func extractFileFields(fieldType reflect.Type, valType reflect.Value) (string, io.Reader) {
 	var fileName string
 	var reader io.Reader
 
@@ -250,27 +310,31 @@ func encodeMultipartFormDataFile(w *multipart.Writer, fieldName string, fieldTyp
 		}
 
 		if tag.Content && val.CanInterface() {
-			if reflect.TypeOf(val.Interface()) == reflect.TypeOf([]byte(nil)) {
-				reader = bytes.NewReader(val.Interface().([]byte))
-			} else if reflect.TypeOf(val.Interface()).Implements(reflect.TypeOf((*io.Reader)(nil)).Elem()) {
-				reader = val.Interface().(io.Reader)
-			}
+			reader = extractReaderFromValue(val)
 		} else {
 			fileName = val.String()
 		}
 	}
 
-	if fileName == "" || reader == nil {
-		return fmt.Errorf("invalid multipart/form-data file")
-	}
+	return fileName, reader
+}
 
-	// Detect content type based on file extension
+func extractReaderFromValue(val reflect.Value) io.Reader {
+	if reflect.TypeOf(val.Interface()) == reflect.TypeOf([]byte(nil)) {
+		return bytes.NewReader(val.Interface().([]byte))
+	}
+	if reflect.TypeOf(val.Interface()).Implements(reflect.TypeOf((*io.Reader)(nil)).Elem()) {
+		return val.Interface().(io.Reader)
+	}
+	return nil
+}
+
+func writeMultipartFilePart(w *multipart.Writer, fieldName, fileName string, reader io.Reader) error {
 	contentType := mime.TypeByExtension(filepath.Ext(fileName))
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 
-	// Create multipart header with proper content type
 	h := make(textproto.MIMEHeader)
 	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, fileName))
 	h.Set("Content-Type", contentType)
@@ -279,11 +343,11 @@ func encodeMultipartFormDataFile(w *multipart.Writer, fieldName string, fieldTyp
 	if err != nil {
 		return err
 	}
+
 	if _, err := io.Copy(fw, reader); err != nil {
 		return err
 	}
 
-	// Reset seek position to 0 if the reader supports seeking
 	if seeker, ok := reader.(io.Seeker); ok {
 		_, _ = seeker.Seek(0, io.SeekStart)
 	}
@@ -302,77 +366,149 @@ func encodeFormData(fieldName string, w io.Writer, data interface{}) error {
 
 	dataValues := url.Values{}
 
-	switch requestType.Kind() {
-	case reflect.Struct:
-		for i := 0; i < requestType.NumField(); i++ {
-			field := requestType.Field(i)
-			fieldType := field.Type
-			valType := requestValType.Field(i)
-
-			if isNil(fieldType, valType) {
-				continue
-			}
-
-			if fieldType.Kind() == reflect.Pointer {
-				fieldType = fieldType.Elem()
-				valType = valType.Elem()
-			}
-
-			tag := parseFormTag(field)
-			if tag.JSON {
-				data, err := MarshalJSON(valType.Interface(), field.Tag, true)
-				if err != nil {
-					return err
-				}
-				dataValues.Set(tag.Name, string(data))
-			} else {
-				switch tag.Style {
-				// TODO: support other styles
-				case "form":
-					values := populateForm(tag.Name, tag.Explode, fieldType, valType, ",", nil, nil, func(sf reflect.StructField) string {
-						tag := parseFormTag(field)
-						if tag == nil {
-							return ""
-						}
-
-						return tag.Name
-					})
-					for k, v := range values {
-						for _, vv := range v {
-							dataValues.Add(k, vv)
-						}
-					}
-				}
-			}
-		}
-	case reflect.Map:
-		// check if optionalnullable.OptionalNullable[T]
-		if nullableValue, ok := optionalnullable.AsOptionalNullable(requestValType); ok {
-			// Handle optionalnullable.OptionalNullable[T] using GetUntyped method
-			if value, isSet := nullableValue.GetUntyped(); isSet && value != nil {
-				dataValues.Set(fieldName, valToString(value))
-			}
-			// If not set or explicitly null, skip adding to form
-			break
-		}
-
-		// Handle regular map
-		for _, k := range requestValType.MapKeys() {
-			v := requestValType.MapIndex(k)
-			dataValues.Set(fmt.Sprintf("%v", k.Interface()), valToString(v.Interface()))
-		}
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < requestValType.Len(); i++ {
-			v := requestValType.Index(i)
-			dataValues.Set(fieldName, valToString(v.Interface()))
-		}
-	}
-
-	if _, err := w.Write([]byte(dataValues.Encode())); err != nil {
+	if err := populateFormDataValues(fieldName, requestType, requestValType, dataValues); err != nil {
 		return err
 	}
 
+	_, err := w.Write([]byte(dataValues.Encode()))
+	return err
+}
+
+func populateFormDataValues(fieldName string, requestType reflect.Type, requestValType reflect.Value, dataValues url.Values) error {
+	switch requestType.Kind() {
+	case reflect.Struct:
+		return populateFormDataStruct(requestType, requestValType, dataValues)
+	case reflect.Map:
+		return populateFormDataMap(fieldName, requestValType, dataValues)
+	case reflect.Slice, reflect.Array:
+		populateFormDataSlice(fieldName, requestValType, dataValues)
+	}
 	return nil
+}
+
+func populateFormDataStruct(requestType reflect.Type, requestValType reflect.Value, dataValues url.Values) error {
+	for i := 0; i < requestType.NumField(); i++ {
+		field := requestType.Field(i)
+		fieldType := field.Type
+		valType := requestValType.Field(i)
+
+		if isNil(fieldType, valType) {
+			continue
+		}
+
+		if fieldType.Kind() == reflect.Pointer {
+			fieldType = fieldType.Elem()
+			valType = valType.Elem()
+		}
+
+		tag := parseFormTag(field)
+		if err := populateFormDataField(tag, field, fieldType, valType, dataValues); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func populateFormDataField(tag *formTag, field reflect.StructField, fieldType reflect.Type, valType reflect.Value, dataValues url.Values) error {
+	if tag.JSON {
+		data, err := MarshalJSON(valType.Interface(), field.Tag, true)
+		if err != nil {
+			return err
+		}
+		dataValues.Set(tag.Name, string(data))
+		return nil
+	}
+
+	return populateFormDataFieldByStyle(tag, field, fieldType, valType, dataValues)
+}
+
+func populateFormDataFieldByStyle(tag *formTag, field reflect.StructField, fieldType reflect.Type, valType reflect.Value, dataValues url.Values) error {
+	switch tag.Style {
+	case "form":
+		return populateFormStyleField(tag, field, fieldType, valType, dataValues)
+	case "spaceDelimited":
+		return populateDelimitedStyleField(tag, fieldType, valType, dataValues, " ")
+	case "pipeDelimited":
+		return populateDelimitedStyleField(tag, fieldType, valType, dataValues, "|")
+	case "deepObject":
+		return populateDeepObjectStyleField(tag, fieldType, valType, dataValues)
+	default:
+		return fmt.Errorf("unsupported form style: %s", tag.Style)
+	}
+}
+
+func populateFormStyleField(tag *formTag, field reflect.StructField, fieldType reflect.Type, valType reflect.Value, dataValues url.Values) error {
+	cfg := FormPopulateConfig{
+		ParamName: tag.Name,
+		GetFieldName: func(sf reflect.StructField) string {
+			t := parseFormTag(field)
+			if t == nil {
+				return ""
+			}
+			return t.Name
+		},
+	}
+	rctx := reflectContext{
+		objType:   fieldType,
+		objValue:  valType,
+		delimiter: ",",
+		explode:   tag.Explode,
+	}
+	values := populateForm(cfg, rctx)
+	for k, v := range values {
+		for _, vv := range v {
+			dataValues.Add(k, vv)
+		}
+	}
+	return nil
+}
+
+func populateDelimitedStyleField(tag *formTag, fieldType reflect.Type, valType reflect.Value, dataValues url.Values, delimiter string) error {
+	if fieldType.Kind() != reflect.Slice && fieldType.Kind() != reflect.Array {
+		dataValues.Set(tag.Name, valToString(valType.Interface()))
+		return nil
+	}
+
+	values := parseDelimitedArray(false, valType, delimiter)
+	for _, v := range values {
+		dataValues.Add(tag.Name, v)
+	}
+	return nil
+}
+
+func populateDeepObjectStyleField(tag *formTag, fieldType reflect.Type, valType reflect.Value, dataValues url.Values) error {
+	if fieldType.Kind() != reflect.Struct && fieldType.Kind() != reflect.Map {
+		return fmt.Errorf("deepObject style requires a struct or map, got %s", fieldType.Kind())
+	}
+
+	for k, vals := range populateDeepObjectParams(&paramTag{ParamName: tag.Name, Explode: tag.Explode}, fieldType, valType) {
+		for _, v := range vals {
+			dataValues.Add(k, v)
+		}
+	}
+	return nil
+}
+
+func populateFormDataMap(fieldName string, requestValType reflect.Value, dataValues url.Values) error {
+	if nullableValue, ok := optionalnullable.AsOptionalNullable(requestValType); ok {
+		if value, isSet := nullableValue.GetUntyped(); isSet && value != nil {
+			dataValues.Set(fieldName, valToString(value))
+		}
+		return nil
+	}
+
+	for _, k := range requestValType.MapKeys() {
+		v := requestValType.MapIndex(k)
+		dataValues.Set(fmt.Sprintf("%v", k.Interface()), valToString(v.Interface()))
+	}
+
+	return nil
+}
+
+func populateFormDataSlice(fieldName string, requestValType reflect.Value, dataValues url.Values) {
+	for i := 0; i < requestValType.Len(); i++ {
+		dataValues.Set(fieldName, valToString(requestValType.Index(i).Interface()))
+	}
 }
 
 type requestTag struct {
@@ -380,7 +516,6 @@ type requestTag struct {
 }
 
 func getRequestTag(field reflect.StructField) *requestTag {
-	// example `request:"mediaType=multipart/form-data"`
 	values := parseStructTag(requestTagKey, field)
 	if values == nil {
 		return nil
@@ -408,7 +543,6 @@ type multipartFormTag struct {
 }
 
 func parseMultipartFormTag(field reflect.StructField) *multipartFormTag {
-	// example `multipartForm:"name=file"`
 	values := parseStructTag(multipartFormTagKey, field)
 
 	tag := &multipartFormTag{}
@@ -437,7 +571,6 @@ type formTag struct {
 }
 
 func parseFormTag(field reflect.StructField) *formTag {
-	// example `form:"name=propName,style=spaceDelimited,explode"`
 	values := parseStructTag(formTagKey, field)
 
 	tag := &formTag{

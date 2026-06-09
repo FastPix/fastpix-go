@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -12,10 +14,11 @@ import (
 	"github.com/FastPix/fastpix-go/models/operations"
 )
 
+const responseFormat = "Response: %+v\n"
+
 func main() {
 	ctx := context.Background()
 
-	// Initialize SDK
 	client := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
@@ -24,7 +27,6 @@ func main() {
 		fastpixgo.WithTimeout(30*time.Second),
 	)
 
-	// Get media for AI operations
 	mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
 	if err != nil {
 		log.Printf("Error listing media: %v", err)
@@ -39,169 +41,172 @@ func main() {
 	mediaID := mediaResponse.Object.Data[0].ID
 	fmt.Printf("Working with media: %s\n", *mediaID)
 
-	// 1. Generate Video Summary
-	fmt.Println("\n=== Generating Video Summary ===")
-	summaryRequest := operations.UpdateMediaSummaryRequestBody{
-		Generate:      true,
-		SummaryLength: fastpixgo.Int64(200), // Summary length in words
-	}
+	runAIFeatures(ctx, client, *mediaID)
+	runAdvancedAIFeatures(ctx, client, *mediaID)
+	runBatchAIProcessing(ctx, client, mediaResponse)
+	checkAIFeaturesStatus(ctx, client, *mediaID)
+	runAIErrorHandling(ctx, client)
 
-	summaryResponse, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, *mediaID, summaryRequest)
+	fmt.Println("\n=== AI Features Demo Complete ===")
+	fmt.Println("Note: AI features are processed asynchronously.")
+	fmt.Println("Check the media details after some time to see the generated content.")
+}
+
+func runAIFeatures(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
+	generateSummary(ctx, client, mediaID, 200)
+	generateChapters(ctx, client, mediaID)
+	generateNamedEntities(ctx, client, mediaID)
+	enableModeration(ctx, client, mediaID)
+}
+
+func generateSummary(ctx context.Context, client *fastpixgo.FastPix, mediaID string, length int64) {
+	fmt.Println("\n=== Generating Video Summary ===")
+	req := operations.UpdateMediaSummaryRequestBody{
+		Generate:      true,
+		SummaryLength: fastpixgo.Int64(length),
+	}
+	resp, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, mediaID, req)
 	if err != nil {
 		log.Printf("Error generating video summary: %v", err)
-	} else {
-		fmt.Println("Video summary generation initiated successfully!")
-		fmt.Printf("Response: %+v\n", summaryResponse)
+		return
 	}
+	fmt.Println("Video summary generation initiated successfully!")
+	fmt.Printf(responseFormat, resp)
+}
 
-	// 2. Generate Video Chapters
+func generateChapters(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
 	fmt.Println("\n=== Generating Video Chapters ===")
-	chaptersRequest := operations.UpdateMediaChaptersRequestBody{
+	req := operations.UpdateMediaChaptersRequestBody{
 		Chapters: true,
 	}
-
-	chaptersResponse, err := client.InVideoAIFeatures.UpdateMediaChapters(ctx, *mediaID, chaptersRequest)
+	resp, err := client.InVideoAIFeatures.UpdateMediaChapters(ctx, mediaID, req)
 	if err != nil {
 		log.Printf("Error generating video chapters: %v", err)
-	} else {
-		fmt.Println("Video chapters generation initiated successfully!")
-		fmt.Printf("Response: %+v\n", chaptersResponse)
+		return
 	}
+	fmt.Println("Video chapters generation initiated successfully!")
+	fmt.Printf(responseFormat, resp)
+}
 
-	// 3. Generate Named Entities
+func generateNamedEntities(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
 	fmt.Println("\n=== Generating Named Entities ===")
-	entitiesRequest := operations.UpdateMediaNamedEntitiesRequestBody{
+	req := operations.UpdateMediaNamedEntitiesRequestBody{
 		NamedEntities: true,
 	}
-
-	entitiesResponse, err := client.InVideoAIFeatures.UpdateMediaNamedEntities(ctx, *mediaID, entitiesRequest)
+	resp, err := client.InVideoAIFeatures.UpdateMediaNamedEntities(ctx, mediaID, req)
 	if err != nil {
 		log.Printf("Error generating named entities: %v", err)
-	} else {
-		fmt.Println("Named entities generation initiated successfully!")
-		fmt.Printf("Response: %+v\n", entitiesResponse)
+		return
 	}
+	fmt.Println("Named entities generation initiated successfully!")
+	fmt.Printf(responseFormat, resp)
+}
 
-	// 4. Enable Video Moderation
+func enableModeration(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
 	fmt.Println("\n=== Enabling Video Moderation ===")
-	moderationRequest := operations.UpdateMediaModerationRequestBody{
+	req := operations.UpdateMediaModerationRequestBody{
 		Moderation: &operations.UpdateMediaModerationModeration{
 			Type: components.MediaTypeVideo.ToPointer(),
 		},
 	}
-
-	moderationResponse, err := client.InVideoAIFeatures.UpdateMediaModeration(ctx, *mediaID, moderationRequest)
+	resp, err := client.InVideoAIFeatures.UpdateMediaModeration(ctx, mediaID, req)
 	if err != nil {
 		log.Printf("Error enabling video moderation: %v", err)
-	} else {
-		fmt.Println("Video moderation enabled successfully!")
-		fmt.Printf("Response: %+v\n", moderationResponse)
+		return
 	}
+	fmt.Println("Video moderation enabled successfully!")
+	fmt.Printf(responseFormat, resp)
+}
 
-	// 5. Advanced AI Features with Custom Parameters
+func runAdvancedAIFeatures(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
 	fmt.Println("\n=== Advanced AI Features ===")
 
-	// Generate detailed summary with specific parameters
-	detailedSummaryRequest := operations.UpdateMediaSummaryRequestBody{
+	_, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, mediaID, operations.UpdateMediaSummaryRequestBody{
 		Generate:      true,
-		SummaryLength: fastpixgo.Int64(500), // Longer summary
-	}
-
-	detailedSummaryResponse, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, *mediaID, detailedSummaryRequest)
+		SummaryLength: fastpixgo.Int64(500),
+	})
 	if err != nil {
 		log.Printf("Error generating detailed summary: %v", err)
 	} else {
 		fmt.Println("Detailed summary generation initiated successfully!")
 	}
 
-	// Generate chapters with specific settings
-	detailedChaptersRequest := operations.UpdateMediaChaptersRequestBody{
+	_, err = client.InVideoAIFeatures.UpdateMediaChapters(ctx, mediaID, operations.UpdateMediaChaptersRequestBody{
 		Chapters: true,
-	}
-
-	detailedChaptersResponse, err := client.InVideoAIFeatures.UpdateMediaChapters(ctx, *mediaID, detailedChaptersRequest)
+	})
 	if err != nil {
 		log.Printf("Error generating detailed chapters: %v", err)
 	} else {
 		fmt.Println("Detailed chapters generation initiated successfully!")
 	}
+}
 
-	// 6. Batch AI Processing
+func runBatchAIProcessing(ctx context.Context, client *fastpixgo.FastPix, mediaResponse *operations.ListMediaResponse) {
 	fmt.Println("\n=== Batch AI Processing ===")
 
-	// Process multiple media items with AI features
-	if len(mediaResponse.Object.Data) > 1 {
-		for i, media := range mediaResponse.Object.Data[1:3] { // Process up to 2 more media items
-			fmt.Printf("\nProcessing media %d: %s\n", i+2, *media.ID)
-
-			// Generate summary for each media
-			batchSummaryRequest := operations.UpdateMediaSummaryRequestBody{
-				Generate:      true,
-				SummaryLength: fastpixgo.Int64(100),
-			}
-
-			_, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, *media.ID, batchSummaryRequest)
-			if err != nil {
-				log.Printf("Error generating summary for media %s: %v", *media.ID, err)
-			} else {
-				fmt.Printf("Summary generation initiated for media %s\n", *media.ID)
-			}
-
-			// Generate chapters for each media
-			batchChaptersRequest := operations.UpdateMediaChaptersRequestBody{
-				Chapters: true,
-			}
-
-			_, err = client.InVideoAIFeatures.UpdateMediaChapters(ctx, *media.ID, batchChaptersRequest)
-			if err != nil {
-				log.Printf("Error generating chapters for media %s: %v", *media.ID, err)
-			} else {
-				fmt.Printf("Chapters generation initiated for media %s\n", *media.ID)
-			}
-		}
+	if len(mediaResponse.Object.Data) <= 1 {
+		return
 	}
 
-	// 7. AI Features Status Check
-	fmt.Println("\n=== Checking AI Features Status ===")
-
-	// Get media details to check AI features status
-	mediaDetailsResponse, err := client.ManageVideos.GetMedia(ctx, *mediaID)
-	if err != nil {
-		log.Printf("Error getting media details: %v", err)
-	} else {
-		media := mediaDetailsResponse.Object.Data
-		fmt.Printf("Media Title: %s\n", getStringValue(media.Title))
-		fmt.Printf("Media Duration: %d seconds\n", getInt64Value(media.Duration))
-		fmt.Printf("Media Status: %s\n", getStringValue(media.Status))
-
-		// Check if AI features are available in metadata
-		if media.Metadata != nil {
-			fmt.Println("Media Metadata:")
-			for key, value := range media.Metadata {
-				fmt.Printf("  %s: %s\n", key, value)
-			}
-		}
+	for i, media := range mediaResponse.Object.Data[1:3] {
+		fmt.Printf("\nProcessing media %d: %s\n", i+2, *media.ID)
+		processBatchMediaItem(ctx, client, *media.ID)
 	}
+}
 
-	// 8. Error Handling for AI Features
-	fmt.Println("\n=== AI Features Error Handling ===")
-
-	// Try to process a non-existent media ID to demonstrate error handling
-	fakeMediaID := "non-existent-media-id"
-
-	fakeSummaryRequest := operations.UpdateMediaSummaryRequestBody{
+func processBatchMediaItem(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
+	_, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, mediaID, operations.UpdateMediaSummaryRequestBody{
 		Generate:      true,
 		SummaryLength: fastpixgo.Int64(100),
+	})
+	if err != nil {
+		log.Printf("Error generating summary for media %s: %v", mediaID, err)
+	} else {
+		fmt.Printf("Summary generation initiated for media %s\n", mediaID)
 	}
 
-	_, err = client.InVideoAIFeatures.UpdateMediaSummary(ctx, fakeMediaID, fakeSummaryRequest)
+	_, err = client.InVideoAIFeatures.UpdateMediaChapters(ctx, mediaID, operations.UpdateMediaChaptersRequestBody{
+		Chapters: true,
+	})
+	if err != nil {
+		log.Printf("Error generating chapters for media %s: %v", mediaID, err)
+	} else {
+		fmt.Printf("Chapters generation initiated for media %s\n", mediaID)
+	}
+}
+
+func checkAIFeaturesStatus(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
+	fmt.Println("\n=== Checking AI Features Status ===")
+
+	mediaDetailsResponse, err := client.ManageVideos.GetMedia(ctx, mediaID)
+	if err != nil {
+		log.Printf("Error getting media details: %v", err)
+		return
+	}
+
+	media := mediaDetailsResponse.Object.Data
+	fmt.Printf("Media Title: %s\n", getStringValue(media.Title))
+	fmt.Printf("Media Duration: %d seconds\n", getInt64Value(media.Duration))
+	fmt.Printf("Media Status: %s\n", getStringValue(media.Status))
+
+	if media.Metadata != nil {
+		fmt.Println("Media Metadata:")
+		for key, value := range media.Metadata {
+			fmt.Printf("  %s: %s\n", key, value)
+		}
+	}
+}
+
+func runAIErrorHandling(ctx context.Context, client *fastpixgo.FastPix) {
+	fmt.Println("\n=== AI Features Error Handling ===")
+
+	_, err := client.InVideoAIFeatures.UpdateMediaSummary(ctx, "non-existent-media-id", operations.UpdateMediaSummaryRequestBody{
+		Generate:      true,
+		SummaryLength: fastpixgo.Int64(100),
+	})
 	if err != nil {
 		fmt.Printf("Expected error for non-existent media: %v\n", err)
 	} else {
 		fmt.Println("Unexpected success for non-existent media")
 	}
-
-	fmt.Println("\n=== AI Features Demo Complete ===")
-	fmt.Println("Note: AI features are processed asynchronously.")
-	fmt.Println("Check the media details after some time to see the generated content.")
 }

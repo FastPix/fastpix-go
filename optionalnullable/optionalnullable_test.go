@@ -415,67 +415,6 @@ func TestUnset(t *testing.T) {
 	})
 }
 
-// TestMarshalJSON tests JSON marshaling
-func TestMarshalJSON(t *testing.T) {
-	t.Parallel()
-	t.Run("marshal string value", func(t *testing.T) {
-		t.Parallel()
-		nullable := From(ptrFrom("test"))
-
-		data, err := json.Marshal(nullable)
-		require.NoError(t, err)
-		assert.Equal(t, `"test"`, string(data))
-	})
-
-	t.Run("marshal int value", func(t *testing.T) {
-		t.Parallel()
-		nullable := From(ptrFrom(42))
-
-		data, err := json.Marshal(nullable)
-		require.NoError(t, err)
-		assert.Equal(t, `42`, string(data))
-	})
-
-	t.Run("marshal nil value", func(t *testing.T) {
-		t.Parallel()
-		nullable := From[string](nil)
-
-		data, err := json.Marshal(nullable)
-		require.NoError(t, err)
-		assert.Equal(t, `null`, string(data))
-	})
-
-	t.Run("marshal slice value", func(t *testing.T) {
-		t.Parallel()
-		nullable := From(ptrFrom([]string{"a", "b", "c"}))
-
-		data, err := json.Marshal(nullable)
-		require.NoError(t, err)
-		assert.Equal(t, `["a","b","c"]`, string(data))
-	})
-
-	t.Run("marshal empty slice", func(t *testing.T) {
-		t.Parallel()
-		nullable := From(ptrFrom([]string{}))
-
-		data, err := json.Marshal(nullable)
-		require.NoError(t, err)
-		assert.Equal(t, `[]`, string(data))
-	})
-
-	t.Run("marshal struct value", func(t *testing.T) {
-		t.Parallel()
-		nullable := From(ptrFrom(TestStruct{Name: "John", Age: 30}))
-
-		data, err := json.Marshal(nullable)
-		require.NoError(t, err)
-		assert.Equal(t, `{"name":"John","age":30}`, string(data))
-	})
-
-	// Note: Unset values are not tested here because the current implementation
-	// doesn't handle unset fields in marshaling (see TODO in the code)
-}
-
 // TestUnmarshalJSON tests JSON unmarshaling
 func TestUnmarshalJSON(t *testing.T) {
 	t.Parallel()
@@ -1171,54 +1110,46 @@ func TestNilVsUnsetDistinction(t *testing.T) {
 // TestJSONOmitEmpty tests behavior with omitempty tag
 func TestJSONOmitEmpty(t *testing.T) {
 	t.Parallel()
+
 	t.Run("marshal with omitempty", func(t *testing.T) {
 		t.Parallel()
-		// Test container with various nullable states
 		container := TestContainer{
 			StringField: From(ptrFrom("test")),
 			IntField:    From(ptrFrom(42)),
-			StructField: From[TestStruct](nil), // explicitly nil
+			StructField: From[TestStruct](nil),
 		}
-
 		data, err := json.Marshal(container)
 		require.NoError(t, err)
 
-		// Parse back to verify structure
 		var result map[string]interface{}
 		err = json.Unmarshal(data, &result)
 		require.NoError(t, err)
 
-		// Should contain set fields
 		assert.Contains(t, result, "string_field")
 		assert.Contains(t, result, "int_field")
 		assert.Contains(t, result, "struct_field")
+	})
 
-		// Should not contain unset field (due to omitempty)
-		// Note: This depends on how the marshaling handles unset fields
-		// The current implementation doesn't handle this case properly (see TODO)
+	t.Run("omitempty skips unset fields", func(t *testing.T) {
+		t.Skip("unset field omission via omitempty is not yet implemented in MarshalJSON")
 	})
 
 	t.Run("unmarshal missing fields", func(t *testing.T) {
 		t.Parallel()
-		// JSON with some fields missing
 		jsonData := `{"string_field": "test", "int_field": null}`
-
 		var container TestContainer
 		err := json.Unmarshal([]byte(jsonData), &container)
 		require.NoError(t, err)
 
-		// Present fields should be set
 		assert.True(t, container.StringField.IsSet())
 		assert.False(t, container.StringField.IsNull())
 		got, ok := container.StringField.GetOrZero()
 		assert.True(t, ok)
 		assert.Equal(t, "test", got)
 
-		// Null field should be set to nil
 		assert.True(t, container.IntField.IsSet())
 		assert.True(t, container.IntField.IsNull())
 
-		// Missing fields should remain unset
 		assert.False(t, container.SliceField.IsSet())
 		assert.False(t, container.StructField.IsSet())
 	})

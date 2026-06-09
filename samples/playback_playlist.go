@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -15,7 +17,6 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Initialize SDK
 	client := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
@@ -24,7 +25,6 @@ func main() {
 		fastpixgo.WithTimeout(30*time.Second),
 	)
 
-	// 1. Create Playlist
 	fmt.Println("=== Creating Playlist ===")
 	createPlaylistRequest := components.CreatePlaylistRequest{
 		Name:        "My Test Playlist",
@@ -41,15 +41,9 @@ func main() {
 	if err != nil {
 		log.Printf("Error creating playlist: %v", err)
 	} else {
-		if playlistResponse.PlaylistCreatedResponse != nil && playlistResponse.PlaylistCreatedResponse.Data != nil && playlistResponse.PlaylistCreatedResponse.Data.ID != nil {
-			playlistID := playlistResponse.PlaylistCreatedResponse.Data.ID
-			fmt.Printf("Playlist created successfully! ID: %s\n", *playlistID)
-		} else {
-			fmt.Println("Playlist created but no ID returned")
-		}
+		printCreatePlaylistResult(playlistResponse)
 	}
 
-	// 2. List All Playlists
 	fmt.Println("\n=== Listing All Playlists ===")
 	limit := int64(10)
 	offset := int64(0)
@@ -58,190 +52,259 @@ func main() {
 	if err != nil {
 		log.Printf("Error listing playlists: %v", err)
 	} else {
-		fmt.Printf("Found %d playlists:\n", len(playlistsResponse.GetAllPlaylistsResponse.Data))
-		for i, playlist := range playlistsResponse.GetAllPlaylistsResponse.Data {
-			fmt.Printf("  %d. ID: %s, Name: %s, Type: %s\n",
-				i+1, *playlist.ID, getStringValue(playlist.Name), getStringValue(playlist.Type))
-		}
+		printPlaylistList(playlistsResponse)
 	}
 
-	// 3. Get Specific Playlist
 	if playlistsResponse.GetAllPlaylistsResponse != nil && len(playlistsResponse.GetAllPlaylistsResponse.Data) > 0 {
-		playlistID := playlistsResponse.GetAllPlaylistsResponse.Data[0].ID
-		fmt.Printf("\n=== Getting Playlist Details for ID: %s ===\n", *playlistID)
-
-		playlistDetailsResponse, err := client.Playlist.GetPlaylistByID(ctx, *playlistID)
-		if err != nil {
-			log.Printf("Error getting playlist details: %v", err)
-		} else {
-			playlist := playlistDetailsResponse.PlaylistByIDResponse.Data
-			fmt.Printf("Name: %s\n", getStringValue(playlist.Name))
-			fmt.Printf("Description: %s\n", getStringValue(playlist.Description))
-			fmt.Printf("Type: %s\n", getStringValue(playlist.Type))
-			fmt.Printf("Media Count: %d\n", getInt64Value(playlist.MediaCount))
-		}
-
-		// 4. Update Playlist
-		fmt.Printf("\n=== Updating Playlist: %s ===\n", *playlistID)
-		updatePlaylistRequest := components.UpdatePlaylistRequest{
-			Name:        "Updated Test Playlist",
-			Description: "Updated description for testing",
-			Metadata: map[string]string{
-				"category": "updated-demo",
-				"public":   "true",
-				"updated":  "true",
-			},
-		}
-
-		updatePlaylistResponse, err := client.Playlist.UpdateAPlaylist(ctx, *playlistID, updatePlaylistRequest)
-		if err != nil {
-			log.Printf("Error updating playlist: %v", err)
-		} else {
-			fmt.Println("Playlist updated successfully!")
-		}
-
-		// 5. Add Media to Playlist
-		fmt.Printf("\n=== Adding Media to Playlist: %s ===\n", *playlistID)
-
-		// First, get some media to add to the playlist
-		mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
-		if err != nil {
-			log.Printf("Error listing media: %v", err)
-		} else if mediaResponse.Object != nil && len(mediaResponse.Object.Data) > 0 {
-			mediaID := mediaResponse.Object.Data[0].ID
-			fmt.Printf("Adding media %s to playlist\n", *mediaID)
-
-			addMediaRequest := components.MediaIdsRequest{
-				MediaIds: []string{*mediaID},
-			}
-
-			addMediaResponse, err := client.Playlist.AddMediaToPlaylist(ctx, *playlistID, addMediaRequest)
-			if err != nil {
-				log.Printf("Error adding media to playlist: %v", err)
-			} else {
-				fmt.Println("Media added to playlist successfully!")
-				fmt.Printf("Response: %+v\n", addMediaResponse)
-			}
-
-			// 6. Change Media Order in Playlist
-			fmt.Printf("\n=== Changing Media Order in Playlist: %s ===\n", *playlistID)
-			changeOrderRequest := components.ChangeMediaOrderRequest{
-				MediaIds: []string{*mediaID},
-			}
-
-			changeOrderResponse, err := client.Playlist.ChangeMediaOrderInPlaylist(ctx, *playlistID, changeOrderRequest)
-			if err != nil {
-				log.Printf("Error changing media order: %v", err)
-			} else {
-				fmt.Println("Media order changed successfully!")
-			}
-
-			// 7. Delete Media from Playlist
-			fmt.Printf("\n=== Deleting Media from Playlist: %s ===\n", *playlistID)
-			deleteMediaRequest := components.MediaIdsRequest{
-				MediaIds: []string{*mediaID},
-			}
-
-			deleteMediaResponse, err := client.Playlist.DeleteMediaFromPlaylist(ctx, *playlistID, deleteMediaRequest)
-			if err != nil {
-				log.Printf("Error deleting media from playlist: %v", err)
-			} else {
-				fmt.Println("Media deleted from playlist successfully!")
-			}
-		} else {
-			fmt.Println("No media available to add to playlist")
-		}
-
-		// 8. Delete Playlist
-		fmt.Printf("\n=== Deleting Playlist: %s ===\n", *playlistID)
-		deletePlaylistResponse, err := client.Playlist.DeleteAPlaylist(ctx, *playlistID)
-		if err != nil {
-			log.Printf("Error deleting playlist: %v", err)
-		} else {
-			fmt.Println("Playlist deleted successfully!")
-		}
+		managePlaylist(ctx, client, *playlistsResponse.GetAllPlaylistsResponse.Data[0].ID)
 	}
 
-	// 9. Media Playback Management
-	fmt.Println("\n=== Media Playback Management ===")
+	manageMediaPlayback(ctx, client)
+	manageDRMConfigurations(ctx, client)
+}
 
-	// Get media for playback operations
-	mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
-	if err != nil {
-		log.Printf("Error listing media: %v", err)
-	} else if mediaResponse.Object != nil && len(mediaResponse.Object.Data) > 0 {
-		mediaID := mediaResponse.Object.Data[0].ID
-		fmt.Printf("Working with media: %s\n", *mediaID)
-
-		// Create Playback ID for Media
-		fmt.Printf("\n=== Creating Playback ID for Media: %s ===\n", *mediaID)
-		createPlaybackRequest := operations.CreateMediaPlaybackIDRequestBody{
-			AccessPolicy: components.AccessPolicyPublic,
-		}
-
-		playbackResponse, err := client.Playback.CreateMediaPlaybackID(ctx, *mediaID, &createPlaybackRequest)
-		if err != nil {
-			log.Printf("Error creating playback ID: %v", err)
-		} else {
-			playbackID := playbackResponse.Object.Data.PlaybackIds[0].ID
-			fmt.Printf("Playback ID created successfully! ID: %s\n", *playbackID)
-
-			// Get Playback ID Details
-			fmt.Printf("\n=== Getting Playback ID Details: %s ===\n", *playbackID)
-			playbackDetailsResponse, err := client.Playback.GetPlaybackID(ctx, *mediaID, *playbackID)
-			if err != nil {
-				log.Printf("Error getting playback ID details: %v", err)
-			} else {
-				fmt.Printf("Playback ID details retrieved successfully!\n")
-				fmt.Printf("Access Policy: %s\n", getStringValue(playbackDetailsResponse.Object.Data.AccessPolicy))
-				fmt.Printf("Created: %s\n", getStringValue(playbackDetailsResponse.Object.Data.CreatedAt))
-			}
-
-			// Delete Playback ID
-			fmt.Printf("\n=== Deleting Playback ID: %s ===\n", *playbackID)
-			deletePlaybackResponse, err := client.Playback.DeleteMediaPlaybackID(ctx, *mediaID, *playbackID)
-			if err != nil {
-				log.Printf("Error deleting playback ID: %v", err)
-			} else {
-				fmt.Println("Playback ID deleted successfully!")
-			}
-		}
-	} else {
-		fmt.Println("No media available for playback operations")
+func printCreatePlaylistResult(playlistResponse *operations.CreateAPlaylistResponse) {
+	if playlistResponse.PlaylistCreatedResponse != nil &&
+		playlistResponse.PlaylistCreatedResponse.Data != nil &&
+		playlistResponse.PlaylistCreatedResponse.Data.ID != nil {
+		fmt.Printf("Playlist created successfully! ID: %s\n", *playlistResponse.PlaylistCreatedResponse.Data.ID)
+		return
 	}
+	fmt.Println("Playlist created but no ID returned")
+}
 
-	// 10. DRM Configuration
-	fmt.Println("\n=== DRM Configuration ===")
-
-	// List DRM Configurations
-	fmt.Println("Listing DRM Configurations...")
-	drmResponse, err := client.DRMConfigurations.GetDrmConfiguration(ctx)
-	if err != nil {
-		log.Printf("Error listing DRM configurations: %v", err)
-	} else {
-		fmt.Printf("Found %d DRM configurations\n", len(drmResponse.Object.Data))
-		for i, config := range drmResponse.Object.Data {
-			fmt.Printf("  %d. ID: %s, Name: %s\n", i+1, *config.ID, getStringValue(config.Name))
-		}
-	}
-
-	// Get Specific DRM Configuration
-	if drmResponse.Object != nil && len(drmResponse.Object.Data) > 0 {
-		drmConfigID := drmResponse.Object.Data[0].ID
-		fmt.Printf("\n=== Getting DRM Configuration Details: %s ===\n", *drmConfigID)
-
-		drmDetailsResponse, err := client.DRMConfigurations.GetDrmConfigurationByID(ctx, *drmConfigID)
-		if err != nil {
-			log.Printf("Error getting DRM configuration details: %v", err)
-		} else {
-			fmt.Printf("DRM configuration details retrieved successfully!\n")
-			fmt.Printf("Name: %s\n", getStringValue(drmDetailsResponse.Object.Data.Name))
-			fmt.Printf("Type: %s\n", getStringValue(drmDetailsResponse.Object.Data.Type))
-		}
+func printPlaylistList(playlistsResponse *operations.GetAllPlaylistsResponse) {
+	fmt.Printf("Found %d playlists:\n", len(playlistsResponse.GetAllPlaylistsResponse.Data))
+	for i, playlist := range playlistsResponse.GetAllPlaylistsResponse.Data {
+		fmt.Printf("  %d. ID: %s, Name: %s, Type: %s\n",
+			i+1, *playlist.ID, getStringValue(playlist.Name), getStringValue(playlist.Type))
 	}
 }
 
-// Helper functions to safely get values from pointers
+func managePlaylist(ctx context.Context, client *fastpixgo.FastPix, playlistID string) {
+	getPlaylistDetails(ctx, client, playlistID)
+	updatePlaylist(ctx, client, playlistID)
+	managePlaylistMedia(ctx, client, playlistID)
+	deletePlaylist(ctx, client, playlistID)
+}
+
+func getPlaylistDetails(ctx context.Context, client *fastpixgo.FastPix, playlistID string) {
+	fmt.Printf("\n=== Getting Playlist Details for ID: %s ===\n", playlistID)
+
+	playlistDetailsResponse, err := client.Playlist.GetPlaylistByID(ctx, playlistID)
+	if err != nil {
+		log.Printf("Error getting playlist details: %v", err)
+		return
+	}
+
+	playlist := playlistDetailsResponse.PlaylistByIDResponse.Data
+	fmt.Printf("Name: %s\n", getStringValue(playlist.Name))
+	fmt.Printf("Description: %s\n", getStringValue(playlist.Description))
+	fmt.Printf("Type: %s\n", getStringValue(playlist.Type))
+	fmt.Printf("Media Count: %d\n", getInt64Value(playlist.MediaCount))
+}
+
+func updatePlaylist(ctx context.Context, client *fastpixgo.FastPix, playlistID string) {
+	fmt.Printf("\n=== Updating Playlist: %s ===\n", playlistID)
+
+	updatePlaylistRequest := components.UpdatePlaylistRequest{
+		Name:        "Updated Test Playlist",
+		Description: "Updated description for testing",
+		Metadata: map[string]string{
+			"category": "updated-demo",
+			"public":   "true",
+			"updated":  "true",
+		},
+	}
+
+	_, err := client.Playlist.UpdateAPlaylist(ctx, playlistID, updatePlaylistRequest)
+	if err != nil {
+		log.Printf("Error updating playlist: %v", err)
+		return
+	}
+
+	fmt.Println("Playlist updated successfully!")
+}
+
+func managePlaylistMedia(ctx context.Context, client *fastpixgo.FastPix, playlistID string) {
+	fmt.Printf("\n=== Adding Media to Playlist: %s ===\n", playlistID)
+
+	mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
+	if err != nil {
+		log.Printf("Error listing media: %v", err)
+		return
+	}
+
+	if mediaResponse.Object == nil || len(mediaResponse.Object.Data) == 0 {
+		fmt.Println("No media available to add to playlist")
+		return
+	}
+
+	mediaID := *mediaResponse.Object.Data[0].ID
+	fmt.Printf("Adding media %s to playlist\n", mediaID)
+
+	addMediaToPlaylist(ctx, client, playlistID, mediaID)
+	changeMediaOrderInPlaylist(ctx, client, playlistID, mediaID)
+	deleteMediaFromPlaylist(ctx, client, playlistID, mediaID)
+}
+
+func addMediaToPlaylist(ctx context.Context, client *fastpixgo.FastPix, playlistID, mediaID string) {
+	addMediaRequest := components.MediaIdsRequest{
+		MediaIds: []string{mediaID},
+	}
+
+	addMediaResponse, err := client.Playlist.AddMediaToPlaylist(ctx, playlistID, addMediaRequest)
+	if err != nil {
+		log.Printf("Error adding media to playlist: %v", err)
+		return
+	}
+
+	fmt.Println("Media added to playlist successfully!")
+	fmt.Printf("Response: %+v\n", addMediaResponse)
+}
+
+func changeMediaOrderInPlaylist(ctx context.Context, client *fastpixgo.FastPix, playlistID, mediaID string) {
+	fmt.Printf("\n=== Changing Media Order in Playlist: %s ===\n", playlistID)
+
+	_, err := client.Playlist.ChangeMediaOrderInPlaylist(ctx, playlistID, components.ChangeMediaOrderRequest{
+		MediaIds: []string{mediaID},
+	})
+	if err != nil {
+		log.Printf("Error changing media order: %v", err)
+		return
+	}
+
+	fmt.Println("Media order changed successfully!")
+}
+
+func deleteMediaFromPlaylist(ctx context.Context, client *fastpixgo.FastPix, playlistID, mediaID string) {
+	fmt.Printf("\n=== Deleting Media from Playlist: %s ===\n", playlistID)
+
+	_, err := client.Playlist.DeleteMediaFromPlaylist(ctx, playlistID, components.MediaIdsRequest{
+		MediaIds: []string{mediaID},
+	})
+	if err != nil {
+		log.Printf("Error deleting media from playlist: %v", err)
+		return
+	}
+
+	fmt.Println("Media deleted from playlist successfully!")
+}
+
+func deletePlaylist(ctx context.Context, client *fastpixgo.FastPix, playlistID string) {
+	fmt.Printf("\n=== Deleting Playlist: %s ===\n", playlistID)
+
+	_, err := client.Playlist.DeleteAPlaylist(ctx, playlistID)
+	if err != nil {
+		log.Printf("Error deleting playlist: %v", err)
+		return
+	}
+
+	fmt.Println("Playlist deleted successfully!")
+}
+
+func manageMediaPlayback(ctx context.Context, client *fastpixgo.FastPix) {
+	fmt.Println("\n=== Media Playback Management ===")
+
+	mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
+	if err != nil {
+		log.Printf("Error listing media: %v", err)
+		return
+	}
+
+	if mediaResponse.Object == nil || len(mediaResponse.Object.Data) == 0 {
+		fmt.Println("No media available for playback operations")
+		return
+	}
+
+	mediaID := *mediaResponse.Object.Data[0].ID
+	fmt.Printf("Working with media: %s\n", mediaID)
+	managePlaybackID(ctx, client, mediaID)
+}
+
+func managePlaybackID(ctx context.Context, client *fastpixgo.FastPix, mediaID string) {
+	fmt.Printf("\n=== Creating Playback ID for Media: %s ===\n", mediaID)
+
+	createPlaybackRequest := operations.CreateMediaPlaybackIDRequestBody{
+		AccessPolicy: components.AccessPolicyPublic,
+	}
+
+	playbackResponse, err := client.Playback.CreateMediaPlaybackID(ctx, mediaID, &createPlaybackRequest)
+	if err != nil {
+		log.Printf("Error creating playback ID: %v", err)
+		return
+	}
+
+	playbackID := *playbackResponse.Object.Data.PlaybackIds[0].ID
+	fmt.Printf("Playback ID created successfully! ID: %s\n", playbackID)
+
+	getPlaybackIDDetails(ctx, client, mediaID, playbackID)
+	deleteMediaPlaybackID(ctx, client, mediaID, playbackID)
+}
+
+func getPlaybackIDDetails(ctx context.Context, client *fastpixgo.FastPix, mediaID, playbackID string) {
+	fmt.Printf("\n=== Getting Playback ID Details: %s ===\n", playbackID)
+
+	playbackDetailsResponse, err := client.Playback.GetPlaybackID(ctx, mediaID, playbackID)
+	if err != nil {
+		log.Printf("Error getting playback ID details: %v", err)
+		return
+	}
+
+	fmt.Printf("Playback ID details retrieved successfully!\n")
+	fmt.Printf("Access Policy: %s\n", getStringValue(playbackDetailsResponse.Object.Data.AccessPolicy))
+	fmt.Printf("Created: %s\n", getStringValue(playbackDetailsResponse.Object.Data.CreatedAt))
+}
+
+func deleteMediaPlaybackID(ctx context.Context, client *fastpixgo.FastPix, mediaID, playbackID string) {
+	fmt.Printf("\n=== Deleting Playback ID: %s ===\n", playbackID)
+
+	_, err := client.Playback.DeleteMediaPlaybackID(ctx, mediaID, playbackID)
+	if err != nil {
+		log.Printf("Error deleting playback ID: %v", err)
+		return
+	}
+
+	fmt.Println("Playback ID deleted successfully!")
+}
+
+func manageDRMConfigurations(ctx context.Context, client *fastpixgo.FastPix) {
+	fmt.Println("\n=== DRM Configuration ===")
+	fmt.Println("Listing DRM Configurations...")
+
+	drmResponse, err := client.DRMConfigurations.GetDrmConfiguration(ctx)
+	if err != nil {
+		log.Printf("Error listing DRM configurations: %v", err)
+		return
+	}
+
+	if drmResponse.Object == nil || len(drmResponse.Object.Data) == 0 {
+		fmt.Println("No DRM configurations found")
+		return
+	}
+
+	fmt.Printf("Found %d DRM configurations\n", len(drmResponse.Object.Data))
+	for i, config := range drmResponse.Object.Data {
+		fmt.Printf("  %d. ID: %s, Name: %s\n", i+1, *config.ID, getStringValue(config.Name))
+	}
+
+	getDrmConfigurationByID(ctx, client, *drmResponse.Object.Data[0].ID)
+}
+
+func getDrmConfigurationByID(ctx context.Context, client *fastpixgo.FastPix, drmConfigID string) {
+	fmt.Printf("\n=== Getting DRM Configuration Details: %s ===\n", drmConfigID)
+
+	drmDetailsResponse, err := client.DRMConfigurations.GetDrmConfigurationByID(ctx, drmConfigID)
+	if err != nil {
+		log.Printf("Error getting DRM configuration details: %v", err)
+		return
+	}
+
+	fmt.Printf("DRM configuration details retrieved successfully!\n")
+	fmt.Printf("Name: %s\n", getStringValue(drmDetailsResponse.Object.Data.Name))
+	fmt.Printf("Type: %s\n", getStringValue(drmDetailsResponse.Object.Data.Type))
+}
+
 func getStringValue(ptr *string) string {
 	if ptr == nil {
 		return ""

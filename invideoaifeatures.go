@@ -10,6 +10,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
@@ -17,7 +20,12 @@ import (
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
-	"net/http"
+)
+
+const (
+	errApplyingOption    = "error applying option: %w"
+	userAgent            = "User-Agent"
+	applicationJSON      = "application/json"
 )
 
 type InVideoAIFeatures struct {
@@ -34,81 +42,36 @@ func newInVideoAIFeatures(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration,
 	}
 }
 
-// UpdateChapters - Generate video chapters
-// This endpoint enables you to generate chapters for an existing media file.
-//
-// #### How it works
-// 1. Make a `PATCH` request to this endpoint, replacing `<mediaId>` with the ID of the media for which you want to generate chapters.
-// 2. Include the `chapters` parameter in the request body to enable.
-// 3. The response contains the updated media data, confirming the changes made.
-//
-// You can use the <a href="https://fastpix.com/docs/ai-events/in-video-ai-events#videomediaaichaptersready">video.mediaAI.chapters.ready</a> webhook event to track and notify about the chapters generation.
-//
-// **Use case:** This is particularly useful when a user uploads a video and later decides to enable chapters without re-uploading the entire video.
-//
-// Related guide: <a href="https://fastpix.com/docs/video-intelligence/generate-video-chapters">Video chapters</a>
 func (s *InVideoAIFeatures) UpdateChapters(ctx context.Context, mediaID string, body operations.UpdateMediaChaptersRequestBody, opts ...operations.Option) (*operations.UpdateMediaChaptersResponse, error) {
-	request := operations.UpdateMediaChaptersRequest{
-		MediaID: mediaID,
-		Body:    body,
+	request := operations.UpdateMediaChaptersRequest{MediaID: mediaID, Body: body}
+
+	o, err := applyFeatOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
+	baseURL := resolveFeatBaseURL(o, s.sdkConfiguration)
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/chapters", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "update-media-chapters",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildFeatHookContext(s, ctx, baseURL, "update-media-chapters")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Body", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	ctx, err = applyFeatTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+
+	req, err := buildFeatPatchRequest(ctx, opURL, bodyReader, reqContentType, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -119,245 +82,48 @@ func (s *InVideoAIFeatures) UpdateChapters(ctx context.Context, mediaID string, 
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.featExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.UpdateMediaChaptersResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
-	switch {
-	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.UpdateMediaChaptersResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	}
-
-	return res, nil
-
+	return s.handleUpdateChaptersResponse(httpRes, res)
 }
 
-// UpdateMediaNamedEntities - Generate named entities
-// This endpoint allows you to extract named entities from an existing media.
-// Named Entity Recognition (NER) is a fundamental natural language processing (NLP) technique that identifies and classifies key information (entities) in text into predefined categories. For instance:
-//
-//   - Organizations (for example, "Microsoft", "United Nations")
-//   - Locations (for example, "Paris", "Mount Everest")
-//   - Product names (for example, "iPhone", "Coca-Cola")
-//
-// #### How it works
-// 1. Make a PATCH request to this endpoint, replacing `<mediaId>` with the ID of the media you want to extract named-entities.
-// 2. Include the `namedEntities` parameter in the request body to enable.
-// 3. Receive a response containing the updated media data, confirming the changes made.
-//
-// You can use the <a href="https://fastpix.com/docs/ai-events/in-video-ai-events#videomediaainamedentitiesready">video.mediaAI.named-entities.ready</a> webhook event to track and notify about the named entities extraction.
-//
-// **Use case:** If a user uploads a video and later decides to enable named entity extraction without re-uploading the entire video.
-//
-// Related guide: <a href="https://fastpix.com/docs/video-intelligence/extract-named-entities-from-a-video">Named entities</a>
 func (s *InVideoAIFeatures) UpdateMediaNamedEntities(ctx context.Context, mediaID string, body operations.UpdateMediaNamedEntitiesRequestBody, opts ...operations.Option) (*operations.UpdateMediaNamedEntitiesResponse, error) {
-	request := operations.UpdateMediaNamedEntitiesRequest{
-		MediaID: mediaID,
-		Body:    body,
+	request := operations.UpdateMediaNamedEntitiesRequest{MediaID: mediaID, Body: body}
+
+	o, err := applyFeatOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
+	baseURL := resolveFeatBaseURL(o, s.sdkConfiguration)
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/named-entities", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "update-media-named-entities",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildFeatHookContext(s, ctx, baseURL, "update-media-named-entities")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Body", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	ctx, err = applyFeatTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+
+	req, err := buildFeatPatchRequest(ctx, opURL, bodyReader, reqContentType, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -368,240 +134,48 @@ func (s *InVideoAIFeatures) UpdateMediaNamedEntities(ctx context.Context, mediaI
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.featExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.UpdateMediaNamedEntitiesResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
-	switch {
-	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.UpdateMediaNamedEntitiesResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	}
-
-	return res, nil
-
+	return s.handleUpdateNamedEntitiesResponse(httpRes, res)
 }
 
-// UpdateModeration - Enable video moderation
-// This endpoint enables moderation features, such as NSFW and profanity filtering, to detect inappropriate content in existing media.
-//
-// #### How it works
-// 1. Make a `PATCH` request to this endpoint, replacing `<mediaId>` with the ID of the media you want to update.
-// 2. Include the `moderation` object and provide the requried `type` parameter in the request body to specify the media type (for example, video/audio/av).
-// 4. The response contains the updated media data, confirming the changes made.
-//
-// You can use the <a href="https://fastpix.com/docs/ai-events/in-video-ai-events#videomediaaimoderationready">video.mediaAI.moderation.ready</a> webhook event to track and notify about the detected moderation results.
-//
-// **Use case:** This is particularly useful when a user uploads a video and later decides to enable moderation detection without the need to re-upload it.
-//
-// Related guide: <a href="https://fastpix.com/docs/video-intelligence/detect-nsfw-content-and-profanity">Moderate NSFW & Profanity</a>
 func (s *InVideoAIFeatures) UpdateModeration(ctx context.Context, mediaID string, body operations.UpdateMediaModerationRequestBody, opts ...operations.Option) (*operations.UpdateMediaModerationResponse, error) {
-	request := operations.UpdateMediaModerationRequest{
-		MediaID: mediaID,
-		Body:    body,
+	request := operations.UpdateMediaModerationRequest{MediaID: mediaID, Body: body}
+
+	o, err := applyFeatOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
-	}
+	baseURL := resolveFeatBaseURL(o, s.sdkConfiguration)
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := utils.GenerateURL(ctx, baseURL, "/on-demand/{mediaId}/moderation", request, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "update-media-moderation",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
-	}
+	hookCtx := buildFeatHookContext(s, ctx, baseURL, "update-media-moderation")
+
 	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Body", "json", `request:"mediaType=application/json"`)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	ctx, err = applyFeatTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+
+	req, err := buildFeatPatchRequest(ctx, opURL, bodyReader, reqContentType, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
@@ -612,161 +186,284 @@ func (s *InVideoAIFeatures) UpdateModeration(ctx context.Context, mediaID string
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.featExecuteRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.UpdateMediaModerationResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
 	}
 
+	return s.handleUpdateModerationResponse(httpRes, res)
+}
+
+func applyFeatOptions(opts []operations.Option) (operations.Options, error) {
+	o := operations.Options{}
+	supportedOptions := []string{
+		operations.SupportedOptionRetries,
+		operations.SupportedOptionTimeout,
+	}
+	for _, opt := range opts {
+		if err := opt(&o, supportedOptions...); err != nil {
+			return o, fmt.Errorf(errApplyingOption, err)
+		}
+	}
+	return o, nil
+}
+
+func resolveFeatBaseURL(o operations.Options, sdkConfig config.SDKConfiguration) string {
+	if o.ServerURL == nil {
+		return utils.ReplaceParameters(sdkConfig.GetServerDetails())
+	}
+	return *o.ServerURL
+}
+
+func buildFeatHookContext(s *InVideoAIFeatures, ctx context.Context, baseURL, operationID string) hooks.HookContext {
+	return hooks.HookContext{
+		SDK:              s.rootSDK,
+		SDKConfiguration: s.sdkConfiguration,
+		BaseURL:          baseURL,
+		Context:          ctx,
+		OperationID:      operationID,
+		OAuth2Scopes:     nil,
+		SecuritySource:   s.sdkConfiguration.Security,
+	}
+}
+
+func applyFeatTimeout(ctx context.Context, o operations.Options, sdkConfig config.SDKConfiguration) (context.Context, error) {
+	timeout := o.Timeout
+	if timeout == nil {
+		timeout = sdkConfig.Timeout
+	}
+	if timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+	return ctx, nil
+}
+
+func buildFeatPatchRequest(ctx context.Context, opURL string, bodyReader io.Reader, reqContentType, ua string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf(errCreatingRequest, err)
+	}
+	req.Header.Set("Accept", applicationJSON)
+	req.Header.Set(userAgent, ua)
+	if reqContentType != "" {
+		req.Header.Set(contentType, reqContentType)
+	}
+	return req, nil
+}
+
+func (s *InVideoAIFeatures) featExecuteRequest(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, o operations.Options) (*http.Response, error) {
+	retryConfig := resolveFeatRetryConfig(o, s.sdkConfiguration)
+	if retryConfig != nil {
+		return s.featExecuteWithRetry(ctx, req, hookCtx, retryConfig)
+	}
+	return s.featExecuteWithoutRetry(req, hookCtx)
+}
+
+func resolveFeatRetryConfig(o operations.Options, sdkConfig config.SDKConfiguration) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return sdkConfig.RetryConfig
+}
+
+func (s *InVideoAIFeatures) featExecuteWithRetry(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.featRetryAttempt(req, hookCtx)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *InVideoAIFeatures) featRetryAttempt(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	if err := featRefreshRequestBody(req); err != nil {
+		return nil, err
+	}
+
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, featClassifyHookError(err)
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		sendErr := featFormatSendError(err)
+		_, sendErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+		return nil, sendErr
+	}
+
+	return httpRes, nil
+}
+
+func featRefreshRequestBody(req *http.Request) error {
+	if req.Body == nil || req.Body == http.NoBody || req.GetBody == nil {
+		return nil
+	}
+	copyBody, err := req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.Body = copyBody
+	return nil
+}
+
+func featClassifyHookError(err error) error {
+	if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
+		return err
+	}
+	return retry.Permanent(err)
+}
+
+func featFormatSendError(err error) error {
+	if err != nil {
+		return fmt.Errorf(errSendingRequest, err)
+	}
+	return fmt.Errorf(errNoResponse)
+}
+
+func (s *InVideoAIFeatures) featExecuteWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		return nil, featBuildSendError(err, hookCtx, s.hooks)
+	}
+
+	return s.featHandlePostResponse(httpRes, hookCtx)
+}
+
+func featBuildSendError(err error, hookCtx hooks.HookContext, h *hooks.Hooks) error {
+	sendErr := featFormatSendError(err)
+	_, sendErr = h.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+	return sendErr
+}
+
+func (s *InVideoAIFeatures) featHandlePostResponse(httpRes *http.Response, hookCtx hooks.HookContext) (*http.Response, error) {
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
+		updatedRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
+		if err != nil {
+			return nil, err
+		}
+		if updatedRes != nil {
+			return updatedRes, nil
+		}
+		return httpRes, nil
+	}
+
+	httpRes, err := s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+	if err != nil {
+		return nil, err
+	}
+	return httpRes, nil
+}
+
+func (s *InVideoAIFeatures) handleUpdateChaptersResponse(httpRes *http.Response, res *operations.UpdateMediaChaptersResponse) (*operations.UpdateMediaChaptersResponse, error) {
 	switch {
 	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out operations.UpdateMediaModerationResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
+		out, err := parseFeatJSONBody[operations.UpdateMediaChaptersResponseBody](httpRes)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, featAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		out, err := parseFeatJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = out
 	}
-
 	return res, nil
+}
 
+func (s *InVideoAIFeatures) handleUpdateNamedEntitiesResponse(httpRes *http.Response, res *operations.UpdateMediaNamedEntitiesResponse) (*operations.UpdateMediaNamedEntitiesResponse, error) {
+	switch {
+	case httpRes.StatusCode == 200:
+		out, err := parseFeatJSONBody[operations.UpdateMediaNamedEntitiesResponseBody](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, featAPIError(httpRes)
+	default:
+		out, err := parseFeatJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = out
+	}
+	return res, nil
+}
+
+func (s *InVideoAIFeatures) handleUpdateModerationResponse(httpRes *http.Response, res *operations.UpdateMediaModerationResponse) (*operations.UpdateMediaModerationResponse, error) {
+	switch {
+	case httpRes.StatusCode == 200:
+		out, err := parseFeatJSONBody[operations.UpdateMediaModerationResponseBody](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.Object = out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, featAPIError(httpRes)
+	default:
+		out, err := parseFeatJSONBody[components.DefaultError](httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = out
+	}
+	return res, nil
+}
+
+func parseFeatJSONBody[T any](httpRes *http.Response) (*T, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`) {
+		return nil, featUnknownContentTypeError(httpRes)
+	}
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
+	var out T
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func featAPIError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
+}
+
+func featUnknownContentTypeError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(
+		fmt.Sprintf(errUnknownContentType, httpRes.Header.Get(contentType)),
+		httpRes.StatusCode,
+		string(rawBody),
+		httpRes,
+	)
 }

@@ -16,8 +16,19 @@ import (
 )
 
 const (
-	securityTagKey = "security"
+	securityTagKey  = "security"
+	errNotSupported = "not supported"
 )
+
+var validSecurityTypes = map[string]struct{}{
+	"apiKey": {}, "http": {}, "oauth2": {}, "openIdConnect": {},
+}
+
+var validSecuritySubTypes = map[string]struct{}{
+	"bearer": {}, "basic": {}, "custom": {},
+	"header": {}, "query": {}, "cookie": {},
+	"client_credentials": {},
+}
 
 type securityTag struct {
 	Option  bool
@@ -26,6 +37,24 @@ type securityTag struct {
 	Type    string
 	SubType string
 	Env     string
+}
+
+func (t *securityTag) validate() error {
+	if !t.Scheme {
+		return nil
+	}
+	if t.Type == "" {
+		return fmt.Errorf("security tag missing required 'type' on scheme field")
+	}
+	if _, ok := validSecurityTypes[t.Type]; !ok {
+		return fmt.Errorf("security tag has unknown type %q", t.Type)
+	}
+	if t.SubType != "" {
+		if _, ok := validSecuritySubTypes[t.SubType]; !ok {
+			return fmt.Errorf("security tag has unknown subtype %q", t.SubType)
+		}
+	}
+	return nil
 }
 
 func PopulateSecurity(ctx context.Context, req *http.Request, securitySource func(context.Context) (interface{}, error)) error {
@@ -38,6 +67,16 @@ func PopulateSecurity(ctx context.Context, req *http.Request, securitySource fun
 		return err
 	}
 
+	headers, queryParams, err := buildSecurityParams(security)
+	if err != nil {
+		return err
+	}
+
+	applySecurityToRequest(req, headers, queryParams)
+	return nil
+}
+
+func buildSecurityParams(security interface{}) (map[string]string, map[string]string, error) {
 	headers := make(map[string]string)
 	queryParams := make(map[string]string)
 
@@ -45,7 +84,7 @@ func PopulateSecurity(ctx context.Context, req *http.Request, securitySource fun
 	securityStructType := securityValType.Type()
 
 	if isNil(securityStructType, securityValType) {
-		return nil
+		return headers, queryParams, nil
 	}
 
 	if securityStructType.Kind() == reflect.Ptr {
@@ -57,31 +96,56 @@ func PopulateSecurity(ctx context.Context, req *http.Request, securitySource fun
 		fieldType := securityStructType.Field(i)
 		valType := securityValType.Field(i)
 
-		kind := valType.Kind()
-
 		if isNil(fieldType.Type, valType) {
 			continue
 		}
 
-		if fieldType.Type.Kind() == reflect.Pointer {
-			kind = valType.Elem().Kind()
-		}
-
-		secTag := parseSecurityTag(fieldType)
-		if secTag != nil {
-			if secTag.Option {
-				handleSecurityOption(headers, queryParams, valType.Interface())
-			} else if secTag.Scheme {
-				// Special case for basic auth which could be a flattened struct
-				if secTag.SubType == "basic" && kind != reflect.Struct {
-					parseSecurityScheme(headers, queryParams, secTag, security)
-				} else {
-					parseSecurityScheme(headers, queryParams, secTag, valType.Interface())
-				}
-			}
+		if err := applySecurityField(headers, queryParams, fieldType, valType, security); err != nil {
+			return nil, nil, err
 		}
 	}
 
+	return headers, queryParams, nil
+}
+
+func applySecurityField(headers, queryParams map[string]string, fieldType reflect.StructField, valType reflect.Value, security interface{}) error {
+	secTag, err := parseSecurityTag(fieldType)
+	if err != nil {
+		return fmt.Errorf("field %q: %w", fieldType.Name, err)
+	}
+	if secTag == nil {
+		return nil
+	}
+
+	kind := resolveFieldKind(fieldType, valType)
+
+	if secTag.Option {
+		return handleSecurityOption(headers, queryParams, valType.Interface())
+	}
+
+	if secTag.Scheme {
+		applySecurityScheme(headers, queryParams, secTag, fieldType, valType, kind, security)
+	}
+
+	return nil
+}
+
+func resolveFieldKind(fieldType reflect.StructField, valType reflect.Value) reflect.Kind {
+	if fieldType.Type.Kind() == reflect.Pointer {
+		return valType.Elem().Kind()
+	}
+	return valType.Kind()
+}
+
+func applySecurityScheme(headers, queryParams map[string]string, secTag *securityTag, fieldType reflect.StructField, valType reflect.Value, kind reflect.Kind, security interface{}) {
+	if secTag.SubType == "basic" && kind != reflect.Struct {
+		parseSecurityScheme(headers, queryParams, secTag, security)
+	} else {
+		parseSecurityScheme(headers, queryParams, secTag, valType.Interface())
+	}
+}
+
+func applySecurityToRequest(req *http.Request, headers, queryParams map[string]string) {
 	for key, value := range headers {
 		req.Header.Add(key, value)
 	}
@@ -91,8 +155,6 @@ func PopulateSecurity(ctx context.Context, req *http.Request, securitySource fun
 		query.Add(key, value)
 	}
 	req.URL.RawQuery = query.Encode()
-
-	return nil
 }
 
 func PopulateSecurityFromEnv(security interface{}) bool {
@@ -109,59 +171,84 @@ func PopulateSecurityFromEnv(security interface{}) bool {
 
 func populateStructFromEnv(structType reflect.Type, structVal reflect.Value) bool {
 	fieldPopulated := false
+
 	for i := 0; i < structType.NumField(); i++ {
 		fieldType := structType.Field(i)
-		secTag := parseSecurityTag(fieldType)
-		if fieldType.Type.Kind() == reflect.Struct ||
-			(fieldType.Type.Kind() == reflect.Ptr && fieldType.Type.Elem().Kind() == reflect.Struct) {
-			if fieldType.Type.Kind() == reflect.Ptr {
-				if hasEnvVarsForSecurityStruct(fieldType.Type.Elem(), secTag != nil && secTag.Option) {
-					fieldVal := reflect.New(fieldType.Type.Elem())
-					if populateStructFromEnv(fieldType.Type.Elem(), fieldVal.Elem()) {
-						structVal.Field(i).Set(fieldVal)
-						fieldPopulated = true
-					}
-				}
-			} else {
-				fieldVal := structVal.Field(i)
-				if populateStructFromEnv(fieldType.Type.Elem(), fieldVal.Elem()) {
-					fieldPopulated = true
-				}
-			}
-			continue
-		}
 
-		if secTag == nil || secTag.Env == "" {
-			continue
-		}
-
-		envValue := getCaseInsensitiveEnvVar(secTag.Env)
-		if envValue == "" {
-			continue
-		}
-
-		if fieldType.Type.Kind() == reflect.Ptr {
-			fieldVal := reflect.New(fieldType.Type.Elem())
-			if setFieldValue(fieldVal.Elem(), envValue) {
-				structVal.Field(i).Set(fieldVal)
+		if isStructOrPtrToStruct(fieldType.Type) {
+			if populateStructFieldFromEnv(structType, structVal, fieldType, i) {
 				fieldPopulated = true
 			}
-		} else {
-			fieldVal := structVal.Field(i)
-			if setFieldValue(fieldVal, envValue) {
-				fieldPopulated = true
-			}
+			continue
+		}
+
+		if populateScalarFieldFromEnv(structVal, fieldType, i) {
+			fieldPopulated = true
 		}
 	}
 
 	return fieldPopulated
 }
 
+func isStructOrPtrToStruct(t reflect.Type) bool {
+	return t.Kind() == reflect.Struct ||
+		(t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Struct)
+}
+
+func populateStructFieldFromEnv(structType reflect.Type, structVal reflect.Value, fieldType reflect.StructField, i int) bool {
+	secTag, _ := parseSecurityTag(fieldType)
+	isOption := secTag != nil && secTag.Option
+
+	if fieldType.Type.Kind() == reflect.Ptr {
+		return populatePtrStructFieldFromEnv(structVal, fieldType, i, isOption)
+	}
+
+	fieldVal := structVal.Field(i)
+	return populateStructFromEnv(fieldType.Type.Elem(), fieldVal.Elem())
+}
+
+func populatePtrStructFieldFromEnv(structVal reflect.Value, fieldType reflect.StructField, i int, isOption bool) bool {
+	if !hasEnvVarsForSecurityStruct(fieldType.Type.Elem(), isOption) {
+		return false
+	}
+
+	fieldVal := reflect.New(fieldType.Type.Elem())
+	if populateStructFromEnv(fieldType.Type.Elem(), fieldVal.Elem()) {
+		structVal.Field(i).Set(fieldVal)
+		return true
+	}
+
+	return false
+}
+
+func populateScalarFieldFromEnv(structVal reflect.Value, fieldType reflect.StructField, i int) bool {
+	secTag, _ := parseSecurityTag(fieldType)
+	if secTag == nil || secTag.Env == "" {
+		return false
+	}
+
+	envValue := getCaseInsensitiveEnvVar(secTag.Env)
+	if envValue == "" {
+		return false
+	}
+
+	if fieldType.Type.Kind() == reflect.Ptr {
+		fieldVal := reflect.New(fieldType.Type.Elem())
+		if setFieldValue(fieldVal.Elem(), envValue) {
+			structVal.Field(i).Set(fieldVal)
+			return true
+		}
+		return false
+	}
+
+	return setFieldValue(structVal.Field(i), envValue)
+}
+
 func hasEnvVarsForSecurityStruct(structType reflect.Type, isSecurityOption bool) bool {
 	valid := false
 	for i := 0; i < structType.NumField(); i++ {
 		fieldType := structType.Field(i)
-		secTag := parseSecurityTag(fieldType)
+		secTag, _ := parseSecurityTag(fieldType)
 		if secTag == nil {
 			continue
 		}
@@ -172,8 +259,7 @@ func hasEnvVarsForSecurityStruct(structType reflect.Type, isSecurityOption bool)
 			return false
 		}
 
-		if fieldType.Type.Kind() == reflect.Struct ||
-			(fieldType.Type.Kind() == reflect.Ptr && fieldType.Type.Elem().Kind() == reflect.Struct) {
+		if isStructOrPtrToStruct(fieldType.Type) {
 			if hasEnvVarsForSecurityStruct(fieldType.Type, secTag.Option) {
 				valid = true
 			} else if isSecurityOption {
@@ -185,23 +271,28 @@ func hasEnvVarsForSecurityStruct(structType reflect.Type, isSecurityOption bool)
 	return valid
 }
 
-func handleSecurityOption(headers, queryParams map[string]string, option interface{}) {
+func handleSecurityOption(headers, queryParams map[string]string, option interface{}) error {
 	optionValType := trueReflectValue(reflect.ValueOf(option))
 	optionStructType := optionValType.Type()
 
 	if isNil(optionStructType, optionValType) {
-		return
+		return nil
 	}
 
 	for i := 0; i < optionStructType.NumField(); i++ {
 		fieldType := optionStructType.Field(i)
 		valType := optionValType.Field(i)
 
-		secTag := parseSecurityTag(fieldType)
+		secTag, err := parseSecurityTag(fieldType)
+		if err != nil {
+			return fmt.Errorf("field %q: %w", fieldType.Name, err)
+		}
 		if secTag != nil && secTag.Scheme {
 			parseSecurityScheme(headers, queryParams, secTag, valType.Interface())
 		}
 	}
+
+	return nil
 }
 
 func parseSecurityScheme(headers, queryParams map[string]string, schemeTag *securityTag, scheme interface{}) {
@@ -212,70 +303,88 @@ func parseSecurityScheme(headers, queryParams map[string]string, schemeTag *secu
 		return
 	}
 
-	if schemeType.Kind() == reflect.Struct {
-		if schemeTag.Type == "http" {
-			switch schemeTag.SubType {
-			case "basic":
-				handleBasicAuthScheme(headers, schemeVal.Interface())
-				return
-			case "custom":
-				return
-			}
-		}
-
-		for i := 0; i < schemeType.NumField(); i++ {
-			fieldType := schemeType.Field(i)
-			valType := schemeVal.Field(i)
-
-			if isNil(fieldType.Type, valType) {
-				continue
-			}
-
-			if fieldType.Type.Kind() == reflect.Ptr {
-				valType = valType.Elem()
-			}
-
-			secTag := parseSecurityTag(fieldType)
-			if secTag == nil || secTag.Name == "" {
-				return
-			}
-
-			parseSecuritySchemeValue(headers, queryParams, schemeTag, secTag, valType.Interface())
-		}
-	} else {
+	if schemeType.Kind() != reflect.Struct {
 		parseSecuritySchemeValue(headers, queryParams, schemeTag, schemeTag, schemeVal.Interface())
+		return
 	}
+
+	parseStructSecurityScheme(headers, queryParams, schemeTag, schemeType, schemeVal)
+}
+
+func parseStructSecurityScheme(headers, queryParams map[string]string, schemeTag *securityTag, schemeType reflect.Type, schemeVal reflect.Value) {
+	if schemeTag.Type == "http" && isEarlyReturnHTTPSubType(schemeTag.SubType) {
+		if schemeTag.SubType == "basic" {
+			handleBasicAuthScheme(headers, schemeVal.Interface())
+		}
+		return
+	}
+
+	for i := 0; i < schemeType.NumField(); i++ {
+		fieldType := schemeType.Field(i)
+		valType := schemeVal.Field(i)
+
+		if isNil(fieldType.Type, valType) {
+			continue
+		}
+
+		if fieldType.Type.Kind() == reflect.Ptr {
+			valType = valType.Elem()
+		}
+
+		secTag, _ := parseSecurityTag(fieldType)
+		if secTag == nil || secTag.Name == "" {
+			return
+		}
+
+		parseSecuritySchemeValue(headers, queryParams, schemeTag, secTag, valType.Interface())
+	}
+}
+
+func isEarlyReturnHTTPSubType(subType string) bool {
+	return subType == "basic" || subType == "custom"
 }
 
 func parseSecuritySchemeValue(headers, queryParams map[string]string, schemeTag *securityTag, secTag *securityTag, val interface{}) {
 	switch schemeTag.Type {
 	case "apiKey":
-		switch schemeTag.SubType {
-		case "header":
-			headers[secTag.Name] = valToString(val)
-		case "query":
-			queryParams[secTag.Name] = valToString(val)
-		case "cookie":
-			headers["Cookie"] = fmt.Sprintf("%s=%s", secTag.Name, valToString(val))
-		default:
-			panic("not supported")
-		}
+		applyAPIKeyScheme(headers, queryParams, secTag, val)
 	case "openIdConnect":
 		headers[secTag.Name] = prefixBearer(valToString(val))
 	case "oauth2":
-		if schemeTag.SubType != "client_credentials" {
-			headers[secTag.Name] = prefixBearer(valToString(val))
-		}
+		applyOAuth2Scheme(headers, schemeTag, secTag, val)
 	case "http":
-		switch schemeTag.SubType {
-		case "bearer":
-			headers[secTag.Name] = prefixBearer(valToString(val))
-		case "custom":
-		default:
-			panic("not supported")
-		}
+		applyHTTPScheme(headers, schemeTag, secTag, val)
 	default:
-		panic("not supported")
+		panic(errNotSupported)
+	}
+}
+
+func applyAPIKeyScheme(headers, queryParams map[string]string, secTag *securityTag, val interface{}) {
+	switch secTag.SubType {
+	case "header":
+		headers[secTag.Name] = valToString(val)
+	case "query":
+		queryParams[secTag.Name] = valToString(val)
+	case "cookie":
+		headers["Cookie"] = fmt.Sprintf("%s=%s", secTag.Name, valToString(val))
+	default:
+		panic(errNotSupported)
+	}
+}
+
+func applyOAuth2Scheme(headers map[string]string, schemeTag *securityTag, secTag *securityTag, val interface{}) {
+	if schemeTag.SubType != "client_credentials" {
+		headers[secTag.Name] = prefixBearer(valToString(val))
+	}
+}
+
+func applyHTTPScheme(headers map[string]string, schemeTag *securityTag, secTag *securityTag, val interface{}) {
+	switch schemeTag.SubType {
+	case "bearer":
+		headers[secTag.Name] = prefixBearer(valToString(val))
+	case "custom":
+	default:
+		panic(errNotSupported)
 	}
 }
 
@@ -283,7 +392,6 @@ func prefixBearer(authHeaderValue string) string {
 	if strings.HasPrefix(strings.ToLower(authHeaderValue), "bearer ") {
 		return authHeaderValue
 	}
-
 	return fmt.Sprintf("Bearer %s", authHeaderValue)
 }
 
@@ -301,7 +409,7 @@ func handleBasicAuthScheme(headers map[string]string, scheme interface{}) {
 			valType = valType.Elem()
 		}
 
-		secTag := parseSecurityTag(fieldType)
+		secTag, _ := parseSecurityTag(fieldType)
 		if secTag == nil || secTag.Name == "" {
 			continue
 		}
@@ -317,10 +425,10 @@ func handleBasicAuthScheme(headers map[string]string, scheme interface{}) {
 	headers["Authorization"] = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password))))
 }
 
-func parseSecurityTag(field reflect.StructField) *securityTag {
+func parseSecurityTag(field reflect.StructField) (*securityTag, error) {
 	tag := field.Tag.Get(securityTagKey)
 	if tag == "" {
-		return nil
+		return nil, nil
 	}
 
 	option := false
@@ -330,8 +438,7 @@ func parseSecurityTag(field reflect.StructField) *securityTag {
 	securitySubType := ""
 	env := ""
 
-	options := strings.Split(tag, ",")
-	for _, optionConf := range options {
+	for _, optionConf := range strings.Split(tag, ",") {
 		parts := strings.Split(optionConf, "=")
 		if len(parts) < 1 || len(parts) > 2 {
 			continue
@@ -353,9 +460,7 @@ func parseSecurityTag(field reflect.StructField) *securityTag {
 		}
 	}
 
-	// TODO: validate tag?
-
-	return &securityTag{
+	t := &securityTag{
 		Option:  option,
 		Scheme:  scheme,
 		Name:    name,
@@ -363,6 +468,12 @@ func parseSecurityTag(field reflect.StructField) *securityTag {
 		SubType: securitySubType,
 		Env:     env,
 	}
+
+	if err := t.validate(); err != nil {
+		return nil, err
+	}
+
+	return t, nil
 }
 
 func trueReflectValue(val reflect.Value) reflect.Value {

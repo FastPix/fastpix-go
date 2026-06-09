@@ -7,13 +7,11 @@
 package fastpixgo
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
-	"github.com/FastPix/fastpix-go/models/apierrors"
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
@@ -35,246 +33,168 @@ func newStartLiveStream(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, h
 	}
 }
 
-// Create a new stream
-// Creates a new <a href="https://fastpix.com/docs/broadcast/live-stream-with-rtmps">RTMPS</a> or <a href="https://fastpix.com/docs/broadcast/live-stream-with-srt">SRT</a> live stream in FastPix. When you create a stream, FastPix generates a unique `streamKey` and `srtSecret` that you can use with broadcasting software such as OBS to connect to FastPix RTMPS or SRT servers. Use SRT for live streaming in unstable network conditions, as it provides error correction and encryption for a more reliable and secure broadcast.
-//
-// Leverage SRT for live streaming in environments with unstable networks, taking advantage of its error correction and encryption features for a resilient and secure broadcast.
-//
-// <h4>How it works</h4>
-//
-// 1. Send a `POST` request to this endpoint. You can configure the stream settings, including `metadata` (such as stream name and description), `reconnectWindow` (in case of disconnection), and privacy options (`public` or `private`).
-//
-// 2. FastPix returns the stream details for both RTMPS and SRT configurations. These keys and IDs from the stream details are essential for connecting the broadcasting software to FastPix’s servers and transmitting the live stream to viewers.
-//
-// 3. After the live stream is created, FastPix sends a `POST` request to your specified webhook endpoint with the event <a href="https://fastpix.com/docs/live-stream-events/live-events#videolive_streamcreated">video.live_stream.created</a>.
-//
-// **Example:**
-//
-//	Imagine a gaming platform that allows users to live stream gameplay directly from their dashboard. The API creates a new stream, provides the necessary stream key, and sets it to "private" so that only specific viewers can access it.
-//
-// Related guide: <a href="https://fastpix.com/docs/get-started/live-quickstart">How to live stream</a>
-func (s *StartLiveStream) Create(ctx context.Context, request components.CreateLiveStreamRequest, opts ...operations.Option) (*operations.CreateNewStreamResponse, error) {
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+func (s *StartLiveStream) resolveBaseURLStartLiveStream(o operations.Options) string {
+	if o.ServerURL != nil {
+		return *o.ServerURL
 	}
+	return utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
+}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
+func (s *StartLiveStream) resolveRetryConfigStartLiveStream(o operations.Options) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return s.sdkConfiguration.RetryConfig
+}
+
+func (s *StartLiveStream) prepareRequestStartLiveStream(ctx context.Context, req *http.Request, o operations.Options) error {
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
+	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+		return err
+	}
+	for k, v := range o.SetHeaders {
+		req.Header.Set(k, v)
+	}
+	return nil
+}
+
+func (s *StartLiveStream) retryAttemptStartLiveStream(hookCtx hooks.HookContext, req *http.Request) (*http.Response, error) {
+	if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
+		copyBody, err := req.GetBody()
+		if err != nil {
+			return nil, err
 		}
+		req.Body = copyBody
 	}
-
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
-	opURL, err := url.JoinPath(baseURL, "/live/streams")
+	var err error
+	req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
 	if err != nil {
-		return nil, fmt.Errorf("error generating URL: %w", err)
+		return nil, classifyHookError(err)
 	}
+	res, doErr := s.sdkConfiguration.Client.Do(req)
+	return s.handleDoErrorStartLiveStream(hookCtx, res, doErr)
+}
 
-	hookCtx := hooks.HookContext{
-		SDK:              s.rootSDK,
-		SDKConfiguration: s.sdkConfiguration,
-		BaseURL:          baseURL,
-		Context:          ctx,
-		OperationID:      "create-new-stream",
-		OAuth2Scopes:     nil,
-		SecuritySource:   s.sdkConfiguration.Security,
+func (s *StartLiveStream) handleDoErrorStartLiveStream(hookCtx hooks.HookContext, res *http.Response, doErr error) (*http.Response, error) {
+	if doErr != nil {
+		doErr = fmt.Errorf(errSendingRequest, doErr)
+		_, doErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, doErr)
+		return nil, doErr
 	}
-	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Request", "json", `request:"mediaType=application/json"`)
+	if res == nil {
+		noRes := fmt.Errorf(errNoResponse)
+		_, noRes = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, noRes)
+		return nil, noRes
+	}
+	return res, nil
+}
+
+func (s *StartLiveStream) executeWithRetryStartLiveStream(ctx context.Context, hookCtx hooks.HookContext, req *http.Request, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.retryAttemptStartLiveStream(hookCtx, req)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *StartLiveStream) executeWithoutRetryStartLiveStream(hookCtx hooks.HookContext, req *http.Request) (*http.Response, error) {
+	var err error
+	req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+	res, doErr := s.sdkConfiguration.Client.Do(req)
+	if doErr != nil || res == nil {
+		return s.handleDoErrorStartLiveStream(hookCtx, res, doErr)
+	}
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, res.StatusCode) {
+		altRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, res, nil)
+		if err != nil {
+			return nil, err
+		}
+		if altRes != nil {
+			return altRes, nil
+		}
+		return res, nil
+	}
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, res)
+}
+
+func (s *StartLiveStream) executeRequestStartLiveStream(ctx context.Context, hookCtx hooks.HookContext, req *http.Request, retryConfig *retry.Config) (*http.Response, error) {
+	if retryConfig != nil {
+		return s.executeWithRetryStartLiveStream(ctx, hookCtx, req, retryConfig)
+	}
+	return s.executeWithoutRetryStartLiveStream(hookCtx, req)
+}
+
+// Create - Create a new stream
+func (s *StartLiveStream) Create(ctx context.Context, request components.CreateLiveStreamRequest, opts ...operations.Option) (*operations.CreateNewStreamResponse, error) {
+	o, err := applyOptions(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
+	baseURL := s.resolveBaseURLStartLiveStream(o)
+	opURL, err := url.JoinPath(baseURL, "/live/streams")
+	if err != nil {
+		return nil, fmt.Errorf(errGeneratingURL, err)
 	}
 
-	if timeout != nil {
+	hookCtx := hooks.HookContext{
+		SDK: s.rootSDK, SDKConfiguration: s.sdkConfiguration,
+		BaseURL: baseURL, Context: ctx, OperationID: "create-new-stream",
+		OAuth2Scopes: nil, SecuritySource: s.sdkConfiguration.Security,
+	}
+
+	bodyReader, mediaType, err := utils.SerializeRequestBody(ctx, request, false, false, "Request", "json", `request:"mediaType=application/json"`)
+	if err != nil {
+		return nil, err
+	}
+
+	if t := firstNonNilDuration(o.Timeout, s.sdkConfiguration.Timeout); t != nil {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		ctx, cancel = context.WithTimeout(ctx, *t)
 		defer cancel()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", opURL, bodyReader)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf(errCreatingRequest, err)
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
-	if reqContentType != "" {
-		req.Header.Set("Content-Type", reqContentType)
+	if mediaType != "" {
+		req.Header.Set(contentType, mediaType)
 	}
-
-	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+	if err := s.prepareRequestStartLiveStream(ctx, req, o); err != nil {
 		return nil, err
 	}
 
-	for k, v := range o.SetHeaders {
-		req.Header.Set(k, v)
+	httpRes, err := s.executeRequestStartLiveStream(ctx, hookCtx, req, s.resolveRetryConfigStartLiveStream(o))
+	if err != nil {
+		return nil, err
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	res := &operations.CreateNewStreamResponse{
-		HTTPMeta: components.HTTPMetadata{
-			Request:  req,
-			Response: httpRes,
-		},
-	}
-
+	res := &operations.CreateNewStreamResponse{HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes}}
 	switch {
 	case httpRes.StatusCode == 201:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.LiveStreamResponseDTO
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.LiveStreamResponseDTO = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
+		var out components.LiveStreamResponseDTO
+		if err := parseJSONBody(httpRes, &out); err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
-		if err != nil {
-			return nil, err
-		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
+		res.LiveStreamResponseDTO = &out
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, handleAPIError(httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
 		}
+		res.DefaultError = defaultErr
 	}
-
 	return res, nil
-
 }

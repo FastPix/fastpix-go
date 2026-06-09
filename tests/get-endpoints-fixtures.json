@@ -121,7 +121,7 @@
     },
     "get_video_view_details": {
       "pathParams": {
-        "viewId": "b4d6cf48-f23d-4c85-9e70-2877fb662f0b"
+        "viewId": "dcf0ae08-16a7-4a8c-805d-993f309dbf96"
       }
     },
     "list_by_top_content": {

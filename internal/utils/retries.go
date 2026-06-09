@@ -43,118 +43,143 @@ var (
 		http.MethodPut,
 	}
 )
-
 func Retry(ctx context.Context, r Retries, operation func() (*http.Response, error)) (*http.Response, error) {
-	switch r.Config.Strategy {
-	case "backoff":
-		if r.Config.Backoff == nil {
-			return operation()
-		}
-
-		var resp *http.Response
-
-		err := retryWithBackoff(ctx, r.Config.Backoff, func() error {
-			if resp != nil {
-				resp.Body.Close()
-			}
-
-			select {
-			case <-ctx.Done():
-				return retry.Permanent(ctx.Err())
-			default:
-			}
-
-			res, err := operation()
-			if err != nil {
-				if !r.Config.RetryConnectionErrors {
-					return retry.Permanent(err)
-				}
-
-				var httpMethod string
-
-				// Use http.Request method if available
-				if res != nil && res.Request != nil {
-					httpMethod = res.Request.Method
-				}
-
-				isIdempotentHTTPMethod := slices.Contains(idempotentHTTPMethods, httpMethod)
-				urlError := new(url.Error)
-
-				if errors.As(err, &urlError) {
-					if urlError.Temporary() || urlError.Timeout() {
-						return err
-					}
-
-					// In certain error cases, the http.Request may not have
-					// been populated, so use url.Error.Op which only has its
-					// first character capitalized from the original request
-					// HTTP method.
-					if httpMethod == "" {
-						httpMethod = strings.ToUpper(urlError.Op)
-					}
-
-					isIdempotentHTTPMethod = slices.Contains(idempotentHTTPMethods, httpMethod)
-
-					// Connection closed
-					if errors.Is(urlError.Err, io.EOF) && isIdempotentHTTPMethod {
-						return err
-					}
-				}
-
-				// syscall detection is not available on every platform, so
-				// fallback to best effort string detection.
-				isBrokenPipeError := strings.Contains(err.Error(), "broken pipe")
-				isConnectionResetError := strings.Contains(err.Error(), "connection reset")
-
-				if (isBrokenPipeError || isConnectionResetError) && isIdempotentHTTPMethod {
-					return err
-				}
-
-				return retry.Permanent(err)
-			}
-			resp = res
-			if res == nil {
-				return fmt.Errorf("no response")
-			}
-
-			for _, code := range r.StatusCodes {
-				if strings.Contains(strings.ToUpper(code), "X") {
-					codeRange, err := strconv.Atoi(code[:1])
-					if err != nil {
-						continue
-					}
-
-					s := res.StatusCode / 100
-
-					if s >= codeRange && s < codeRange+1 {
-						return retry.TemporaryFromResponse("request failed", res)
-					}
-				} else {
-					parsedCode, err := strconv.Atoi(code)
-					if err != nil {
-						continue
-					}
-
-					if res.StatusCode == parsedCode {
-						return retry.TemporaryFromResponse("request failed", res)
-					}
-				}
-			}
-
-			resp = res
-
-			return nil
-		})
-
-		var tempErr *retry.TemporaryError
-		if err != nil && !errors.As(err, &tempErr) {
-			return nil, err
-		}
-
-		return resp, nil
-	default:
+	if r.Config.Strategy != "backoff" {
 		return operation()
 	}
+
+	if r.Config.Backoff == nil {
+		return operation()
+	}
+
+	return retryWithBackoffStrategy(ctx, r, operation)
+}
+
+func retryWithBackoffStrategy(ctx context.Context, r Retries, operation func() (*http.Response, error)) (*http.Response, error) {
+	var resp *http.Response
+
+	err := retryWithBackoff(ctx, r.Config.Backoff, func() error {
+		closeResponseBody(resp)
+
+		if err := ctx.Err(); err != nil {
+			return retry.Permanent(err)
+		}
+
+		res, err := operation()
+		if err != nil {
+			return classifyOperationError(err, res, r.Config.RetryConnectionErrors)
+		}
+
+		resp = res
+		if res == nil {
+			return fmt.Errorf("no response")
+		}
+
+		return matchStatusCode(res, r.StatusCodes)
+	})
+
+	var tempErr *retry.TemporaryError
+	if err != nil && !errors.As(err, &tempErr) {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func closeResponseBody(resp *http.Response) {
+	if resp != nil {
+		resp.Body.Close()
+	}
+}
+
+func classifyOperationError(err error, res *http.Response, retryConnectionErrors bool) error {
+	if !retryConnectionErrors {
+		return retry.Permanent(err)
+	}
+
+	httpMethod := resolveHTTPMethod(res, err)
+	isIdempotent := slices.Contains(idempotentHTTPMethods, httpMethod)
+
+	if retryable := classifyURLError(err, httpMethod, isIdempotent); retryable != nil {
+		return retryable
+	}
+
+	if isRetryablePipeOrResetError(err, isIdempotent) {
+		return err
+	}
+
+	return retry.Permanent(err)
+}
+
+func resolveHTTPMethod(res *http.Response, err error) string {
+	if res != nil && res.Request != nil {
+		return res.Request.Method
+	}
+
+	var urlError *url.Error
+	if errors.As(err, &urlError) {
+		return strings.ToUpper(urlError.Op)
+	}
+
+	return ""
+}
+
+func classifyURLError(err error, httpMethod string, isIdempotent bool) error {
+	var urlError *url.Error
+	if !errors.As(err, &urlError) {
+		return nil
+	}
+
+	if urlError.Temporary() || urlError.Timeout() {
+		return err
+	}
+
+	if errors.Is(urlError.Err, io.EOF) && isIdempotent {
+		return err
+	}
+
+	return nil
+}
+
+func isRetryablePipeOrResetError(err error, isIdempotent bool) bool {
+	if !isIdempotent {
+		return false
+	}
+
+	msg := err.Error()
+	return strings.Contains(msg, "broken pipe") || strings.Contains(msg, "connection reset")
+}
+
+func matchStatusCode(res *http.Response, statusCodes []string) error {
+	for _, code := range statusCodes {
+		if strings.Contains(strings.ToUpper(code), "X") {
+			if matched := matchWildcardStatusCode(res.StatusCode, code); matched {
+				return retry.TemporaryFromResponse("request failed", res)
+			}
+		} else {
+			if matched := matchExactStatusCode(res.StatusCode, code); matched {
+				return retry.TemporaryFromResponse("request failed", res)
+			}
+		}
+	}
+	return nil
+}
+
+func matchWildcardStatusCode(statusCode int, code string) bool {
+	codeRange, err := strconv.Atoi(code[:1])
+	if err != nil {
+		return false
+	}
+	s := statusCode / 100
+	return s >= codeRange && s < codeRange+1
+}
+
+func matchExactStatusCode(statusCode int, code string) bool {
+	parsedCode, err := strconv.Atoi(code)
+	if err != nil {
+		return false
+	}
+	return statusCode == parsedCode
 }
 
 func retryWithBackoff(ctx context.Context, s *retry.BackoffStrategy, operation func() error) error {

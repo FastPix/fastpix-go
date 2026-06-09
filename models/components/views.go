@@ -123,15 +123,15 @@ func (u *PlayerHeight) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-
+    const errNotSupported ="could not unmarshal `%s` into any supported union types for PlayerHeight"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for PlayerHeight", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for PlayerHeight", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -145,7 +145,7 @@ func (u *PlayerHeight) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for PlayerHeight", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u PlayerHeight) MarshalJSON() ([]byte, error) {
@@ -213,15 +213,15 @@ func (u *PlayerViewCount) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-
+    const errNotSupported ="could not unmarshal `%s` into any supported union types for PlayerViewCount"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for PlayerViewCount", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for PlayerViewCount", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -235,7 +235,7 @@ func (u *PlayerViewCount) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for PlayerViewCount", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u PlayerViewCount) MarshalJSON() ([]byte, error) {
@@ -304,14 +304,15 @@ func (u *PropertyID) UnmarshalJSON(data []byte) error {
 		})
 	}
 
+    const errNotSupported ="could not unmarshal `%s` into any supported union types for PropertyID"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for PropertyID", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for PropertyID", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -325,7 +326,7 @@ func (u *PropertyID) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for PropertyID", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u PropertyID) MarshalJSON() ([]byte, error) {
@@ -393,15 +394,15 @@ func (u *ViewerTime) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-
+    const errNotSupported ="could not unmarshal `%s` into any supported union types for ViewerTime"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for ViewerTime", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for ViewerTime", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -415,7 +416,7 @@ func (u *ViewerTime) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for ViewerTime", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u ViewerTime) MarshalJSON() ([]byte, error) {
@@ -483,15 +484,15 @@ func (u *EventTime) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-
+    const errNotSupported ="could not unmarshal `%s` into any supported union types for EventTime"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for EventTime", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for EventTime", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -505,7 +506,7 @@ func (u *EventTime) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for EventTime", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u EventTime) MarshalJSON() ([]byte, error) {

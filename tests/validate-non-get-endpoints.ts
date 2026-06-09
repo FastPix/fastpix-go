@@ -110,8 +110,21 @@ function safeFileSlug(input: string): string {
   return input.replace(/[^a-zA-Z0-9_.-]+/g, "_");
 }
 
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {} as Record<string, unknown>);
+  }
+  return value;
+}
+
 function toPrettyJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(sortKeysDeep(value), null, 2);
 }
 
 function preview(text: string): string {
@@ -157,6 +170,31 @@ async function waitForMediaReady(
 // Go SDK invocation (via the tests/sdkharness subprocess)
 // ---------------------------------------------------------------------------
 
+
+// Resolve the absolute path to the go binary from fixed, known locations.
+// Using an absolute path in spawnSync avoids PATH-based executable lookup entirely,
+// fully resolving Sonar S4036.
+function resolveAbsoluteGoBinary(): string {
+  const candidates = process.platform === "win32"
+    ? [
+        String.raw`C:\Go\bin\go.exe`,
+        String.raw`C:\Program Files\Go\bin\go.exe`,
+      ]
+    : [
+        "/opt/homebrew/bin/go",        // Homebrew on Apple Silicon Mac
+        "/usr/local/go/bin/go",        // Standard Go install on Linux/macOS
+        "/usr/bin/go",
+        "/usr/local/bin/go",
+        "/home/linuxbrew/.linuxbrew/bin/go", // Homebrew on Linux
+      ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return "/opt/homebrew/bin/go";
+}
+
+const GO_BINARY = resolveAbsoluteGoBinary();
+
 // Path to the Go harness package, relative to the SDK repo root (parent of tests/).
 const GO_HARNESS_PKG = "./tests/sdkharness";
 
@@ -172,12 +210,21 @@ function invokeGoSDK(
   password: string,
 ): GoSDKResult {
   const repoRoot = join(__dirname, "..");
+  mkdirSync(join(repoRoot, ".gotmp"), { recursive: true });
 
-  const child = spawnSync("go", ["run", GO_HARNESS_PKG], {
+  const child = spawnSync(GO_BINARY, ["run", GO_HARNESS_PKG], {
     input: JSON.stringify({ operationId, request, baseUrl, username, password }),
     encoding: "utf-8",
     cwd: repoRoot,
     maxBuffer: 10 * 1024 * 1024,
+    env: {
+      HOME: process.env.HOME ?? "",
+      GOPATH: process.env.GOPATH ?? "",
+      GOROOT: process.env.GOROOT ?? "",
+      GOCACHE: process.env.GOCACHE ?? "",
+      GOTMPDIR: join(repoRoot, ".gotmp"),
+      USERPROFILE: process.env.USERPROFILE ?? "",
+    },
   });
 
   if (child.error) {
@@ -227,7 +274,7 @@ async function waitForTrackReady(
       const track = (body?.data?.tracks ?? []).find((t: any) => t?.id === trackId);
       if (track) {
         last = track.status ?? "present";
-        if (last === "Ready" || last === "present") return last;
+        if (last === "Ready" || last === "present" || last === "available") return last;
       }
     } catch {
       /* transient; keep polling */
@@ -290,10 +337,9 @@ function makeOpenAPIResponseValidator(spec: any, endpoint: EndpointInfo) {
   const definitions = convertRefsToDefinitions(spec.components?.schemas || {});
   const responses: any = {};
   for (const [status, def] of Object.entries(endpoint.responses || {})) {
-    const d = def as any;
-    const schema = d?.content?.["application/json"]?.schema;
+    const schema = def?.content?.["application/json"]?.schema;
     if (!schema) continue;
-    responses[status] = { description: d.description || "", schema: convertRefsToDefinitions(schema) };
+    responses[status] = { description: def.description || "", schema: convertRefsToDefinitions(schema) };
   }
   if (Object.keys(responses).length === 0) return null;
   return new OpenAPIResponseValidator({ responses, definitions });
@@ -302,6 +348,21 @@ function makeOpenAPIResponseValidator(spec: any, endpoint: EndpointInfo) {
 // ---------------------------------------------------------------------------
 // JSON diff helpers (shared with the GET validator)
 // ---------------------------------------------------------------------------
+
+function shouldSkipValue(v: any, includeEmptyArrays: boolean): boolean {
+  if (includeEmptyArrays) return false;
+  if (Array.isArray(v) && v.length === 0) return true;
+  if (v === null || v === undefined) return true;
+  return typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0;
+}
+
+function collectJsonPathsFromArray(arr: any[], prefix: string, opts: { includeEmptyArrays?: boolean }, out: Set<string>): void {
+  const includeEmptyArrays = opts.includeEmptyArrays ?? true;
+  if (!includeEmptyArrays && arr.length === 0) return;
+  const arrayPrefix = prefix ? `${prefix}[]` : "[]";
+  out.add(arrayPrefix);
+  for (const item of arr) for (const p of collectJsonPaths(item, arrayPrefix, opts)) out.add(p);
+}
 
 function collectJsonPaths(value: any, prefix = "", opts: { includeEmptyArrays?: boolean } = {}): Set<string> {
   const out = new Set<string>();
@@ -312,16 +373,11 @@ function collectJsonPaths(value: any, prefix = "", opts: { includeEmptyArrays?: 
     return out;
   }
   if (Array.isArray(value)) {
-    if (!includeEmptyArrays && value.length === 0) return out;
-    const arrayPrefix = prefix ? `${prefix}[]` : "[]";
-    out.add(arrayPrefix);
-    for (const item of value) for (const p of collectJsonPaths(item, arrayPrefix, opts)) out.add(p);
+    collectJsonPathsFromArray(value, prefix, opts, out);
     return out;
   }
   for (const [k, v] of Object.entries(value)) {
-    if (!includeEmptyArrays && Array.isArray(v) && v.length === 0) continue;
-    if (!includeEmptyArrays && (v === null || v === undefined)) continue;
-    if (!includeEmptyArrays && typeof v === "object" && v !== null && !Array.isArray(v) && Object.keys(v).length === 0) continue;
+    if (shouldSkipValue(v, includeEmptyArrays)) continue;
     const p = prefix ? `${prefix}.${k}` : k;
     out.add(p);
     for (const child of collectJsonPaths(v, p, opts)) out.add(child);
@@ -350,7 +406,7 @@ function sortUnique(arr: string[]) {
 }
 
 function jsonRoundTrip(value: any): any {
-  return JSON.parse(JSON.stringify(value));
+  return structuredClone(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -418,6 +474,58 @@ function writeArtifacts(operationId: string, rawBody: any, sdkValue: any) {
   writeFileSync(join(dir, `${slug}.sdk.json`), toPrettyJson(sdkValue ?? null));
 }
 
+function pushStepDetail(lines: string[], r: StepResult): void {
+  lines.push(
+    `### ${r.operationId} (\`${r.method} ${r.path}\`)`,
+    `- **Phase**: ${r.phase}`,
+    `- **Status**: ${r.status}`,
+  );
+  if (r.httpStatus !== null) lines.push(`- **HTTP status**: ${r.httpStatus}`);
+  if (r.capturedId) lines.push(`- **Captured id**: \`${r.capturedId}\``);
+  if (r.note) lines.push(`- **Note**: ${r.note}`);
+  if (r.sdkError) lines.push(`- **SDK error**: ${preview(r.sdkError)}`);
+  if (r.openapiErrors.length) {
+    lines.push("- **OpenAPI errors**:");
+    for (const e of r.openapiErrors.slice(0, 20)) lines.push(`  - \`${e.path ?? ""}\` ${e.message ?? JSON.stringify(e)}`);
+  }
+  if (r.missingInSDK.length) {
+    lines.push("- **Missing in SDK (present in API)**:");
+    for (const p of r.missingInSDK) lines.push(`  - \`${p}\``);
+  }
+  if (r.missingInAPI.length) {
+    lines.push("- **Missing in API (present in SDK)**:");
+    for (const p of r.missingInAPI) lines.push(`  - \`${p}\``);
+  }
+  lines.push("");
+}
+
+function formatOpenAPICol(openapiValid: boolean | null): string {
+  if (openapiValid === null) return "—";
+  return openapiValid ? "✅" : "❌";
+}
+
+function formatSDKCol(status: StepResult["status"], sdkOk: boolean): string {
+  if (status === "SKIP") return "—";
+  return sdkOk ? "✅" : "❌";
+}
+
+function formatStatus(status: StepResult["status"]): string {
+  if (status === "PASS") return "✅ PASS";
+  if (status === "SKIP") return "⤳ SKIP";
+  return "❌ FAIL";
+}
+
+function formatPaths(paths: string[]): string {
+  return paths.length ? paths.join(", ") : "None";
+}
+
+function buildTableRow(r: StepResult): string {
+  const ov = formatOpenAPICol(r.openapiValid);
+  const sdk = formatSDKCol(r.status, r.sdkOk);
+  const st = formatStatus(r.status);
+  return `| ${r.phase} | ${r.method} | \`${r.operationId}\` | ${r.httpStatus ?? "—"} | ${ov} | ${sdk} | ${formatPaths(r.missingInSDK)} | ${formatPaths(r.missingInAPI)} | ${st} |`;
+}
+
 function writeReport(results: StepResult[], ctx: Ctx) {
   const total = results.length;
   const pass = results.filter((r) => r.status === "PASS").length;
@@ -425,49 +533,32 @@ function writeReport(results: StepResult[], ctx: Ctx) {
   const skip = results.filter((r) => r.status === "SKIP").length;
 
   const lines: string[] = [];
-  lines.push("# Non-GET endpoints validation report\n");
-  lines.push(`Generated: ${new Date().toISOString()}\n`);
-  lines.push("## Summary\n");
-  lines.push(`- **Total**: ${total}`);
-  lines.push(`- **PASS**: ${pass}`);
-  lines.push(`- **FAIL**: ${fail}`);
-  lines.push(`- **SKIP**: ${skip}\n`);
-
-  lines.push("## Captured resources\n");
+  lines.push(
+    "# Non-GET endpoints validation report\n",
+    `Generated: ${new Date().toISOString()}\n`,
+    "## Summary\n",
+    `- **Total**: ${total}`,
+    `- **PASS**: ${pass}`,
+    `- **FAIL**: ${fail}`,
+    `- **SKIP**: ${skip}\n`,
+    "## Captured resources\n",
+  );
   for (const [k, v] of Object.entries(ctx)) lines.push(`- \`${k}\`: ${v ?? "(not created)"}`);
-  lines.push("");
-
-  lines.push("## Consolidated report\n");
-  lines.push("| Phase | Method | OperationId | HTTP | OpenAPI valid | SDK | Missing in SDK | Missing in API | Status |");
-  lines.push("|---|---|---|---:|:--:|:--:|---|---|:--:|");
+  lines.push(
+    "",
+    "## Consolidated report\n",
+    "| Phase | Method | OperationId | HTTP | OpenAPI valid | SDK | Missing in SDK | Missing in API | Status |",
+    "|---|---|---|---:|:--:|:--:|---|---|:--:|",
+  );
   const phaseOrder: Phase[] = ["CREATE", "UPDATE", "DELETE"];
   for (const phase of phaseOrder) {
     for (const r of results.filter((x) => x.phase === phase)) {
-      const ov = r.openapiValid === null ? "—" : r.openapiValid ? "✅" : "❌";
-      const sdk = r.status === "SKIP" ? "—" : r.sdkOk ? "✅" : "❌";
-      const mis = (a: string[]) => (a.length ? a.join(", ") : "None");
-      const st = r.status === "PASS" ? "✅ PASS" : r.status === "SKIP" ? "⤳ SKIP" : "❌ FAIL";
-      lines.push(`| ${r.phase} | ${r.method} | \`${r.operationId}\` | ${r.httpStatus ?? "—"} | ${ov} | ${sdk} | ${mis(r.missingInSDK)} | ${mis(r.missingInAPI)} | ${st} |`);
+      lines.push(buildTableRow(r));
     }
   }
-  lines.push("");
-
-  lines.push("## Per-operation details\n");
+  lines.push("", "## Per-operation details\n");
   for (const r of results) {
-    lines.push(`### ${r.operationId} (\`${r.method} ${r.path}\`)`);
-    lines.push(`- **Phase**: ${r.phase}`);
-    lines.push(`- **Status**: ${r.status}`);
-    if (r.httpStatus !== null) lines.push(`- **HTTP status**: ${r.httpStatus}`);
-    if (r.capturedId) lines.push(`- **Captured id**: \`${r.capturedId}\``);
-    if (r.note) lines.push(`- **Note**: ${r.note}`);
-    if (r.sdkError) lines.push(`- **SDK error**: ${preview(r.sdkError)}`);
-    if (r.openapiErrors.length) {
-      lines.push(`- **OpenAPI errors**:`);
-      for (const e of r.openapiErrors.slice(0, 20)) lines.push(`  - \`${e.path ?? ""}\` ${e.message ?? JSON.stringify(e)}`);
-    }
-    if (r.missingInSDK.length) { lines.push(`- **Missing in SDK (present in API)**:`); for (const p of r.missingInSDK) lines.push(`  - \`${p}\``); }
-    if (r.missingInAPI.length) { lines.push(`- **Missing in API (present in SDK)**:`); for (const p of r.missingInAPI) lines.push(`  - \`${p}\``); }
-    lines.push("");
+    pushStepDetail(lines, r);
   }
 
   const reportPath = join(__dirname, REPORT_MD);
@@ -478,6 +569,151 @@ function writeReport(results: StepResult[], ctx: Ctx) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+
+type RunStepDeps = { spec: any; baseUrl: string; username: string; password: string };
+
+async function waitIfNeeded(step: Step, ctx: Ctx, baseUrl: string, username: string, password: string): Promise<boolean> {
+  if (step.operationId === "Generate-subtitle-track" && ctx.mediaId && ctx.trackId) {
+    process.stdout.write(`  ⏳ waiting for track ${ctx.trackId} to be ready...`);
+    const tstatus = await waitForTrackReady(baseUrl, username, password, ctx.mediaId, ctx.trackId);
+    console.log(` ${tstatus}`);
+    if (tstatus !== "Ready" && tstatus !== "present" && tstatus !== "available") {
+      console.log(`  ⤳ SKIP — track not ready after timeout (status: ${tstatus})`);
+      return false;
+    }
+  }
+  return true;
+}
+
+async function retryLoop(
+  step: Step,
+  request: Record<string, any>,
+  baseUrl: string,
+  username: string,
+  password: string,
+): Promise<GoSDKResult> {
+  let sdkRes = invokeGoSDK(step.operationId, request, baseUrl, username, password);
+  if (!step.retryOn) return sdkRes;
+  let attempt = 0;
+  const maxAttempts = 24;
+  while (!sdkRes.ok && attempt < maxAttempts && JSON.stringify(sdkRes.error ?? {}).includes(step.retryOn)) {
+    attempt++;
+    if (attempt === 1) process.stdout.write(`  ⏳ resource not ready, retrying`);
+    else process.stdout.write(".");
+    await sleep(5000);
+    sdkRes = invokeGoSDK(step.operationId, request, baseUrl, username, password);
+  }
+  if (attempt > 0) console.log("");
+  return sdkRes;
+}
+
+async function waitForMediaIfNeeded(step: Step, ctx: Ctx, baseUrl: string, username: string, password: string): Promise<void> {
+  if (step.operationId === "create-media" && ctx.mediaId) {
+    process.stdout.write(`  ⏳ waiting for media ${ctx.mediaId} to be Ready...`);
+    const status = await waitForMediaReady(baseUrl, username, password, ctx.mediaId);
+    console.log(` ${status}`);
+  }
+}
+
+function getCapturedId(operationId: string, ctx: Ctx): string | undefined {
+  const captureMap: Record<string, string | undefined> = {
+    "create_signing_key": ctx.signingKeyId,
+    "create-a-playlist": ctx.playlistId,
+    "create-new-stream": ctx.streamId,
+    "create-media": ctx.mediaId,
+    "create-media-playback-id": ctx.createdPlaybackId,
+    "Add-media-track": ctx.trackId,
+    "create-playbackId-of-stream": ctx.streamPlaybackId,
+    "create-simulcast-of-stream": ctx.simulcastId,
+    "direct-upload-video-media": ctx.uploadId,
+  };
+  return captureMap[operationId];
+}
+
+function validateStepResponse(
+  spec: any,
+  ep: EndpointInfo,
+  sdkRes: Extract<GoSDKResult, { ok: true }>,
+): { openapiValid: boolean | null; openapiErrors: any[] } {
+  const validator = makeOpenAPIResponseValidator(spec, ep);
+  if (!validator || !sdkRes.statusCode) return { openapiValid: null, openapiErrors: [] };
+  const err = validator.validateResponse(String(sdkRes.statusCode), sdkRes.rawBody);
+  return { openapiValid: !err, openapiErrors: err?.errors ?? [] };
+}
+
+function computeStepDiff(sdkRes: Extract<GoSDKResult, { ok: true }>): { missingInSDK: string[]; missingInAPI: string[] } {
+  const apiNorm = normalizeJsonForComparison(sdkRes.rawBody);
+  const sdkNorm = sdkRes.value && typeof sdkRes.value === "object"
+    ? normalizeJsonForComparison(jsonRoundTrip(sdkRes.value))
+    : null;
+  const apiPaths = collectJsonPaths(apiNorm, "", { includeEmptyArrays: false });
+  const sdkPaths = sdkNorm ? collectJsonPaths(sdkNorm, "", { includeEmptyArrays: false }) : new Set<string>();
+  return {
+    missingInSDK: sdkPaths.size ? sortUnique([...apiPaths].filter((p) => !sdkPaths.has(p))) : [],
+    missingInAPI: sdkPaths.size ? sortUnique([...sdkPaths].filter((p) => !apiPaths.has(p))) : [],
+  };
+}
+
+async function runStep(
+  step: Step,
+  ep: EndpointInfo | undefined,
+  ctx: Ctx,
+  deps: RunStepDeps,
+): Promise<StepResult> {
+  const { spec, baseUrl, username, password } = deps;
+  const base = {
+    operationId: step.operationId,
+    method: ep?.method ?? "?",
+    path: ep?.path ?? "?",
+    phase: step.phase,
+    openapiErrors: [] as any[],
+    missingInSDK: [] as string[],
+    missingInAPI: [] as string[],
+  };
+
+  if (!ep) {
+    return { ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: "operationId not found in spec" };
+  }
+
+  const missingDeps = (step.needs ?? []).filter((k) => !ctx[k]);
+  if (missingDeps.length) {
+    console.log(`  ⤳ SKIP (missing: ${missingDeps.join(", ")})`);
+    return { ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: `missing dependency: ${missingDeps.join(", ")}` };
+  }
+
+  const trackReady = await waitIfNeeded(step, ctx, baseUrl, username, password);
+  if (!trackReady) {
+    return { ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: "track not ready after timeout" };
+  }
+
+  const request = step.request(ctx);
+  const sdkRes = await retryLoop(step, request, baseUrl, username, password);
+
+  if (!sdkRes.ok) {
+    const msg = `${sdkRes.error?.name ?? "Error"}: ${sdkRes.error?.message ?? "SDK call failed"}`;
+    console.log(`  ❌ FAIL — ${msg.split("\n")[0].slice(0, 120)}`);
+    writeArtifacts(step.operationId, sdkRes.error?.bodyJson ?? null, sdkRes.error ?? null);
+    return { ...base, status: "FAIL", httpStatus: sdkRes.error?.statusCode ?? null, openapiValid: null, sdkOk: false, sdkError: msg };
+  }
+
+  if (step.capture) step.capture(sdkRes.value, ctx);
+  await waitForMediaIfNeeded(step, ctx, baseUrl, username, password);
+
+  const capturedId = getCapturedId(step.operationId, ctx);
+  const { openapiValid, openapiErrors } = validateStepResponse(spec, ep, sdkRes);
+  const { missingInSDK, missingInAPI } = computeStepDiff(sdkRes);
+
+  writeArtifacts(step.operationId, sdkRes.rawBody, sdkRes.value);
+
+  const status: StepResult["status"] =
+    openapiValid !== false && missingInSDK.length === 0 && missingInAPI.length === 0 ? "PASS" : "FAIL";
+
+  const idSuffix = capturedId ? ` id=${capturedId}` : "";
+  const statusLabel = status === "PASS" ? "✅ PASS" : "❌ FAIL";
+  console.log(`  ${statusLabel} (HTTP ${sdkRes.statusCode ?? "?"})${idSuffix}`);
+
+  return { ...base, status, httpStatus: sdkRes.statusCode, openapiValid, openapiErrors, sdkOk: true, missingInSDK, missingInAPI, capturedId };
+}
 
 async function main(): Promise<void> {
   const spec = loadOpenAPISpec();
@@ -500,127 +736,12 @@ async function main(): Promise<void> {
   for (let i = 0; i < STEPS.length; i++) {
     const step = STEPS[i];
     const ep = endpoints.get(step.operationId);
-    const base = {
-      operationId: step.operationId,
-      method: ep?.method ?? "?",
-      path: ep?.path ?? "?",
-      phase: step.phase,
-      openapiErrors: [] as any[],
-      missingInSDK: [] as string[],
-      missingInAPI: [] as string[],
-    };
-
     console.log(`[${i + 1}/${STEPS.length}] (${step.phase}) ${step.operationId}`);
-
-    if (!ep) {
-      results.push({ ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: "operationId not found in spec" });
-      continue;
+    const result = await runStep(step, ep, ctx, { spec, baseUrl, username, password });
+    if (result.capturedId) {
+      // capturedId surfaced for logging; ctx already updated by capture()
     }
-
-    const missingDeps = (step.needs ?? []).filter((k) => !ctx[k]);
-    if (missingDeps.length) {
-      console.log(`  ⤳ SKIP (missing: ${missingDeps.join(", ")})`);
-      results.push({ ...base, status: "SKIP", httpStatus: null, openapiValid: null, sdkOk: false, note: `missing dependency: ${missingDeps.join(", ")}` });
-      continue;
-    }
-
-    // generating subtitles needs the just-added track to be fetched/ready first
-    if (step.operationId === "Generate-subtitle-track" && ctx.mediaId && ctx.trackId) {
-      process.stdout.write(`  ⏳ waiting for track ${ctx.trackId} to be ready...`);
-      const tstatus = await waitForTrackReady(baseUrl, username, password, ctx.mediaId, ctx.trackId);
-      console.log(` ${tstatus}`);
-    }
-
-    const request = step.request(ctx);
-    let sdkRes = invokeGoSDK(step.operationId, request, baseUrl, username, password);
-
-    // wait for an async-provisioning resource (e.g. a playback id transitioning
-    // from "preparing" to "available") by retrying while the error still matches.
-    if (step.retryOn) {
-      let attempt = 0;
-      const maxAttempts = 24; // ~2 min at 5s
-      while (!sdkRes.ok && attempt < maxAttempts && JSON.stringify(sdkRes.error ?? {}).includes(step.retryOn)) {
-        attempt++;
-        if (attempt === 1) process.stdout.write(`  ⏳ resource not ready, retrying`);
-        else process.stdout.write(".");
-        await sleep(5000);
-        sdkRes = invokeGoSDK(step.operationId, request, baseUrl, username, password);
-      }
-      if (attempt > 0) console.log("");
-    }
-
-    if (!sdkRes.ok) {
-      const msg = `${sdkRes.error?.name ?? "Error"}: ${sdkRes.error?.message ?? "SDK call failed"}`;
-      console.log(`  ❌ FAIL — ${msg.split("\n")[0].slice(0, 120)}`);
-      writeArtifacts(step.operationId, sdkRes.error?.bodyJson ?? null, sdkRes.error ?? null);
-      results.push({ ...base, status: "FAIL", httpStatus: sdkRes.error?.statusCode ?? null, openapiValid: null, sdkOk: false, sdkError: msg });
-      continue;
-    }
-
-    // capture created ids for downstream steps
-    let capturedId: string | undefined;
-    if (step.capture) {
-      step.capture(sdkRes.value, ctx);
-    }
-
-    // a just-created media must reach "Ready" before playback-ids / tracks can
-    // be added, otherwise those create steps 400 and cascade into SKIPs.
-    if (step.operationId === "create-media" && ctx.mediaId) {
-      process.stdout.write(`  ⏳ waiting for media ${ctx.mediaId} to be Ready...`);
-      const status = await waitForMediaReady(baseUrl, username, password, ctx.mediaId);
-      console.log(` ${status}`);
-    }
-    // best-effort: surface whatever id this step just stored
-    capturedId =
-      ctx.signingKeyId && step.operationId === "create_signing_key" ? ctx.signingKeyId :
-      ctx.playlistId && step.operationId === "create-a-playlist" ? ctx.playlistId :
-      ctx.streamId && step.operationId === "create-new-stream" ? ctx.streamId :
-      ctx.mediaId && step.operationId === "create-media" ? ctx.mediaId :
-      ctx.createdPlaybackId && step.operationId === "create-media-playback-id" ? ctx.createdPlaybackId :
-      ctx.trackId && step.operationId === "Add-media-track" ? ctx.trackId :
-      ctx.streamPlaybackId && step.operationId === "create-playbackId-of-stream" ? ctx.streamPlaybackId :
-      ctx.simulcastId && step.operationId === "create-simulcast-of-stream" ? ctx.simulcastId :
-      ctx.uploadId && step.operationId === "direct-upload-video-media" ? ctx.uploadId :
-      undefined;
-
-    // OpenAPI response-schema validation against the raw wire body
-    const validator = makeOpenAPIResponseValidator(spec, ep);
-    let openapiValid: boolean | null = null;
-    let openapiErrors: any[] = [];
-    if (validator && sdkRes.statusCode) {
-      const err = validator.validateResponse(String(sdkRes.statusCode), sdkRes.rawBody);
-      openapiValid = !err;
-      openapiErrors = err?.errors ?? [];
-    }
-
-    // path diff between raw API body and SDK value
-    const apiNorm = normalizeJsonForComparison(sdkRes.rawBody);
-    const sdkNorm = sdkRes.value && typeof sdkRes.value === "object" ? normalizeJsonForComparison(jsonRoundTrip(sdkRes.value)) : null;
-    const apiPaths = collectJsonPaths(apiNorm, "", { includeEmptyArrays: false });
-    const sdkPaths = sdkNorm ? collectJsonPaths(sdkNorm, "", { includeEmptyArrays: false }) : new Set<string>();
-    const missingInSDK = sdkPaths.size ? sortUnique([...apiPaths].filter((p) => !sdkPaths.has(p))) : [];
-    const missingInAPI = sdkPaths.size ? sortUnique([...sdkPaths].filter((p) => !apiPaths.has(p))) : [];
-
-    writeArtifacts(step.operationId, sdkRes.rawBody, sdkRes.value);
-
-    const status: StepResult["status"] =
-      sdkRes.ok && (openapiValid === null || openapiValid) && missingInSDK.length === 0 && missingInAPI.length === 0
-        ? "PASS"
-        : "FAIL";
-
-    console.log(`  ${status === "PASS" ? "✅ PASS" : "❌ FAIL"} (HTTP ${sdkRes.statusCode ?? "?"})${capturedId ? ` id=${capturedId}` : ""}`);
-
-    results.push({
-      ...base,
-      status,
-      httpStatus: sdkRes.statusCode,
-      openapiValid,
-      openapiErrors,
-      sdkOk: true,
-      missingInSDK,
-      missingInAPI,
-      capturedId,
-    });
+    results.push(result);
   }
 
   writeReport(results, ctx);

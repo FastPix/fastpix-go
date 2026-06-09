@@ -36,8 +36,19 @@ func GenerateURL(_ context.Context, serverURL, path string, pathParams interface
 		}
 	}
 
-	// TODO should we handle the case where there are no matching path params?
-	return ReplaceParameters(uri, parsedParameters), nil
+	result := ReplaceParameters(uri, parsedParameters)
+	if err := validateNoUnreplacedParams(result); err != nil {
+		return "", err
+	}
+
+	return result, nil
+}
+
+func validateNoUnreplacedParams(uri string) error {
+	if strings.Contains(uri, "{") || strings.Contains(uri, "}") {
+		return fmt.Errorf("unresolved path parameters in URL: %s", uri)
+	}
+	return nil
 }
 
 func populateParsedParameters(pathParams interface{}, globals interface{}, parsedParameters map[string]string, skipFields []string) ([]string, error) {
@@ -49,12 +60,7 @@ func populateParsedParameters(pathParams interface{}, globals interface{}, parse
 		fieldType := pathParamsStructType.Field(i)
 		valType := pathParamsValType.Field(i)
 
-		if contains(skipFields, fieldType.Name) {
-			continue
-		}
-
-		requestTag := getRequestTag(fieldType)
-		if requestTag != nil {
+		if contains(skipFields, fieldType.Name) || getRequestTag(fieldType) != nil {
 			continue
 		}
 
@@ -64,39 +70,65 @@ func populateParsedParameters(pathParams interface{}, globals interface{}, parse
 		}
 
 		if globals != nil {
-			var globalFound bool
-			fieldType, valType, globalFound = populateFromGlobals(fieldType, valType, pathParamTagKey, globals)
-			if globalFound {
-				globalsAlreadyPopulated = append(globalsAlreadyPopulated, fieldType.Name)
-			}
+			fieldType, valType, globalsAlreadyPopulated = applyPathGlobal(fieldType, valType, globalsAlreadyPopulated, globals)
 		}
 
-		if ppTag.Serialization != "" {
-			vals, err := populateSerializedParams(ppTag, fieldType.Type, valType)
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range vals {
-				parsedParameters[k] = url.PathEscape(v)
-			}
-		} else {
-			// TODO: support other styles
-			switch ppTag.Style {
-			case "simple":
-				simpleParams := getSimplePathParams(ppTag.ParamName, fieldType.Type, valType, ppTag.Explode)
-				for k, v := range simpleParams {
-					parsedParameters[k] = v
-				}
-			}
+		if err := applyParsedParam(ppTag, fieldType, valType, parsedParameters); err != nil {
+			return nil, err
 		}
 	}
 
 	return globalsAlreadyPopulated, nil
 }
 
-func getSimplePathParams(parentName string, objType reflect.Type, objValue reflect.Value, explode bool) map[string]string {
-	pathParams := make(map[string]string)
+func applyPathGlobal(fieldType reflect.StructField, valType reflect.Value, globalsAlreadyPopulated []string, globals interface{}) (reflect.StructField, reflect.Value, []string) {
+	var globalFound bool
+	fieldType, valType, globalFound = populateFromGlobals(fieldType, valType, pathParamTagKey, globals)
+	if globalFound {
+		globalsAlreadyPopulated = append(globalsAlreadyPopulated, fieldType.Name)
+	}
+	return fieldType, valType, globalsAlreadyPopulated
+}
 
+func applyParsedParam(ppTag *paramTag, fieldType reflect.StructField, valType reflect.Value, parsedParameters map[string]string) error {
+	if ppTag.Serialization != "" {
+		return applySerializedPathParam(ppTag, fieldType, valType, parsedParameters)
+	}
+	return applyStyledPathParam(ppTag, fieldType, valType, parsedParameters)
+}
+
+func applySerializedPathParam(ppTag *paramTag, fieldType reflect.StructField, valType reflect.Value, parsedParameters map[string]string) error {
+	vals, err := populateSerializedParams(ppTag, fieldType.Type, valType)
+	if err != nil {
+		return err
+	}
+	for k, v := range vals {
+		parsedParameters[k] = url.PathEscape(v)
+	}
+	return nil
+}
+
+func applyStyledPathParam(ppTag *paramTag, fieldType reflect.StructField, valType reflect.Value, parsedParameters map[string]string) error {
+	switch ppTag.Style {
+	case "simple":
+		for k, v := range getSimplePathParams(ppTag.ParamName, fieldType.Type, valType, ppTag.Explode) {
+			parsedParameters[k] = v
+		}
+	case "label":
+		for k, v := range getLabelPathParams(ppTag.ParamName, fieldType.Type, valType, ppTag.Explode) {
+			parsedParameters[k] = v
+		}
+	case "matrix":
+		for k, v := range getMatrixPathParams(ppTag.ParamName, fieldType.Type, valType, ppTag.Explode) {
+			parsedParameters[k] = v
+		}
+	default:
+		return fmt.Errorf("unsupported path param style: %s", ppTag.Style)
+	}
+	return nil
+}
+
+func getSimplePathParams(parentName string, objType reflect.Type, objValue reflect.Value, explode bool) map[string]string {
 	if isNil(objType, objValue) {
 		return nil
 	}
@@ -108,76 +140,188 @@ func getSimplePathParams(parentName string, objType reflect.Type, objValue refle
 
 	switch objType.Kind() {
 	case reflect.Array, reflect.Slice:
+		return simpleSlicePathParams(parentName, objValue)
+	case reflect.Map:
+		return simpleMapPathParams(parentName, objValue, explode)
+	case reflect.Struct:
+		return simpleStructPathParams(parentName, objType, objValue, explode)
+	default:
+		return map[string]string{parentName: valToString(objValue.Interface())}
+	}
+}
+
+func simpleSlicePathParams(parentName string, objValue reflect.Value) map[string]string {
+	if objValue.Len() == 0 {
+		return nil
+	}
+
+	ppVals := make([]string, 0, objValue.Len())
+	for i := 0; i < objValue.Len(); i++ {
+		ppVals = append(ppVals, valToString(objValue.Index(i).Interface()))
+	}
+
+	return map[string]string{parentName: strings.Join(ppVals, ",")}
+}
+
+func simpleMapPathParams(parentName string, objValue reflect.Value, explode bool) map[string]string {
+	if nullableValue, ok := optionalnullable.AsOptionalNullable(objValue); ok {
+		result := make(map[string]string)
+		if value, isSet := nullableValue.GetUntyped(); isSet && value != nil {
+			result[parentName] = valToString(value)
+		}
+		return result
+	}
+
+	if objValue.Len() == 0 {
+		return nil
+	}
+
+	var ppVals []string
+	objMap := objValue.MapRange()
+	for objMap.Next() {
+		ppVals = append(ppVals, formatKeyValue(objMap.Key().String(), valToString(objMap.Value().Interface()), explode))
+	}
+
+	return map[string]string{parentName: strings.Join(ppVals, ",")}
+}
+
+func simpleStructPathParams(parentName string, objType reflect.Type, objValue reflect.Value, explode bool) map[string]string {
+	switch objValue.Interface().(type) {
+	case time.Time, types.Date, big.Int:
+		return map[string]string{parentName: valToString(objValue.Interface())}
+	}
+
+	return simpleStructFieldPathParams(parentName, objType, objValue, explode)
+}
+
+func simpleStructFieldPathParams(parentName string, objType reflect.Type, objValue reflect.Value, explode bool) map[string]string {
+	var ppVals []string
+
+	for i := 0; i < objType.NumField(); i++ {
+		fieldType := objType.Field(i)
+		valType := objValue.Field(i)
+
+		ppTag := parseParamTag(pathParamTagKey, fieldType, "simple", explode)
+		if ppTag == nil || isNil(fieldType.Type, valType) {
+			continue
+		}
+
+		if fieldType.Type.Kind() == reflect.Pointer {
+			valType = valType.Elem()
+		}
+
+		ppVals = append(ppVals, formatKeyValue(ppTag.ParamName, valToString(valType.Interface()), explode))
+	}
+
+	return map[string]string{parentName: strings.Join(ppVals, ",")}
+}
+
+func getLabelPathParams(parentName string, objType reflect.Type, objValue reflect.Value, explode bool) map[string]string {
+	if isNil(objType, objValue) {
+		return nil
+	}
+
+	if objType.Kind() == reflect.Ptr {
+		objType = objType.Elem()
+		objValue = objValue.Elem()
+	}
+
+	sep := "."
+
+	switch objType.Kind() {
+	case reflect.Array, reflect.Slice:
 		if objValue.Len() == 0 {
 			return nil
 		}
-		var ppVals []string
+		ppVals := make([]string, 0, objValue.Len())
 		for i := 0; i < objValue.Len(); i++ {
 			ppVals = append(ppVals, valToString(objValue.Index(i).Interface()))
 		}
-		pathParams[parentName] = strings.Join(ppVals, ",")
+		return map[string]string{parentName: "." + strings.Join(ppVals, sep)}
 	case reflect.Map:
-		// check if optionalnullable.OptionalNullable[T]
-		if nullableValue, ok := optionalnullable.AsOptionalNullable(objValue); ok {
-			// Handle optionalnullable.OptionalNullable[T] using GetUntyped method
-			if value, isSet := nullableValue.GetUntyped(); isSet && value != nil {
-				pathParams[parentName] = valToString(value)
-			}
-			// If not set or explicitly null, return nil (skip parameter)
-			return pathParams
-		}
-
 		if objValue.Len() == 0 {
 			return nil
 		}
 		var ppVals []string
 		objMap := objValue.MapRange()
 		for objMap.Next() {
-			if explode {
-				ppVals = append(ppVals, fmt.Sprintf("%s=%s", objMap.Key().String(), valToString(objMap.Value().Interface())))
-			} else {
-				ppVals = append(ppVals, fmt.Sprintf("%s,%s", objMap.Key().String(), valToString(objMap.Value().Interface())))
-			}
+			ppVals = append(ppVals, formatKeyValue(objMap.Key().String(), valToString(objMap.Value().Interface()), explode))
 		}
-		pathParams[parentName] = strings.Join(ppVals, ",")
-	case reflect.Struct:
-		switch objValue.Interface().(type) {
-		case time.Time:
-			pathParams[parentName] = valToString(objValue.Interface())
-		case types.Date:
-			pathParams[parentName] = valToString(objValue.Interface())
-		case big.Int:
-			pathParams[parentName] = valToString(objValue.Interface())
-		default:
-			var ppVals []string
-			for i := 0; i < objType.NumField(); i++ {
-				fieldType := objType.Field(i)
-				valType := objValue.Field(i)
-
-				ppTag := parseParamTag(pathParamTagKey, fieldType, "simple", explode)
-				if ppTag == nil {
-					continue
-				}
-
-				if isNil(fieldType.Type, valType) {
-					continue
-				}
-
-				if fieldType.Type.Kind() == reflect.Pointer {
-					valType = valType.Elem()
-				}
-
-				if explode {
-					ppVals = append(ppVals, fmt.Sprintf("%s=%s", ppTag.ParamName, valToString(valType.Interface())))
-				} else {
-					ppVals = append(ppVals, fmt.Sprintf("%s,%s", ppTag.ParamName, valToString(valType.Interface())))
-				}
-			}
-			pathParams[parentName] = strings.Join(ppVals, ",")
-		}
+		return map[string]string{parentName: "." + strings.Join(ppVals, sep)}
 	default:
-		pathParams[parentName] = valToString(objValue.Interface())
+		return map[string]string{parentName: "." + valToString(objValue.Interface())}
+	}
+}
+
+const matrixParamFormat = ";%s=%s"
+
+func getMatrixPathParams(parentName string, objType reflect.Type, objValue reflect.Value, explode bool) map[string]string {
+	if isNil(objType, objValue) {
+		return nil
 	}
 
-	return pathParams
+	if objType.Kind() == reflect.Ptr {
+		objType = objType.Elem()
+		objValue = objValue.Elem()
+	}
+
+	switch objType.Kind() {
+	case reflect.Array, reflect.Slice:
+		return matrixSlicePathParams(parentName, objValue, explode)
+	case reflect.Map:
+		return matrixMapPathParams(parentName, objValue, explode)
+	default:
+		return map[string]string{parentName: fmt.Sprintf(matrixParamFormat, parentName, valToString(objValue.Interface()))}
+	}
+}
+
+func matrixSlicePathParams(parentName string, objValue reflect.Value, explode bool) map[string]string {
+	if objValue.Len() == 0 {
+		return nil
+	}
+
+	ppVals := make([]string, 0, objValue.Len())
+	for i := 0; i < objValue.Len(); i++ {
+		v := valToString(objValue.Index(i).Interface())
+		if explode {
+			ppVals = append(ppVals, fmt.Sprintf(matrixParamFormat, parentName, v))
+		} else {
+			ppVals = append(ppVals, v)
+		}
+	}
+
+	if explode {
+		return map[string]string{parentName: strings.Join(ppVals, "")}
+	}
+	return map[string]string{parentName: fmt.Sprintf(matrixParamFormat, parentName, strings.Join(ppVals, ","))}
+}
+
+func matrixMapPathParams(parentName string, objValue reflect.Value, explode bool) map[string]string {
+	if objValue.Len() == 0 {
+		return nil
+	}
+
+	var ppVals []string
+	objMap := objValue.MapRange()
+	for objMap.Next() {
+		k := objMap.Key().String()
+		v := valToString(objMap.Value().Interface())
+		if explode {
+			ppVals = append(ppVals, fmt.Sprintf(matrixParamFormat, k, v))
+		} else {
+			ppVals = append(ppVals, fmt.Sprintf("%s,%s", k, v))
+		}
+	}
+
+	if explode {
+		return map[string]string{parentName: strings.Join(ppVals, "")}
+	}
+	return map[string]string{parentName: fmt.Sprintf(matrixParamFormat, parentName, strings.Join(ppVals, ","))}
+}
+
+func formatKeyValue(key, value string, explode bool) string {
+	if explode {
+		return fmt.Sprintf("%s=%s", key, value)
+	}
+	return fmt.Sprintf("%s,%s", key, value)
 }

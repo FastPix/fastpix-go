@@ -95,127 +95,143 @@ func countFields(candidate *UnionCandidate, raw any) {
 }
 
 func countFieldsRecursive(candidate *UnionCandidate, typ reflect.Type, val reflect.Value, raw any) {
-	kind := typ.Kind()
-
-	// Handle interface{}/any types - can hold any JSON value
-	if kind == reflect.Interface {
+	if typ.Kind() == reflect.Interface {
 		candidate.Matched++
 		return
 	}
 
 	if typ.Kind() == reflect.Ptr {
 		if raw == nil {
-			// Handle null JSON value match
 			candidate.Matched++
 			return
 		}
 		typ, val = dereferencePointers(typ, val)
-		kind = typ.Kind()
 	}
 
-	// Handle primitives
-	if kind == reflect.String ||
-		kind == reflect.Bool ||
-		kind == reflect.Int || kind == reflect.Int8 || kind == reflect.Int16 || kind == reflect.Int32 || kind == reflect.Int64 ||
-		kind == reflect.Uint || kind == reflect.Uint8 || kind == reflect.Uint16 || kind == reflect.Uint32 || kind == reflect.Uint64 ||
-		kind == reflect.Float32 || kind == reflect.Float64 ||
-		typ == reflect.TypeOf(time.Time{}) ||
-		typ == reflect.TypeOf(big.Int{}) ||
-		typ == reflect.TypeOf(types.Date{}) ||
-		typ == reflect.TypeOf([]byte{}) {
+	switch {
+	case isPrimitiveKind(typ):
+		countPrimitive(candidate, val, raw)
+	case isUnionType(typ, val):
+		countUnionVariant(candidate, typ, val, raw)
+	case typ.Kind() == reflect.Struct:
+		countStruct(candidate, typ, val, raw)
+	case typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array:
+		countSlice(candidate, typ, val, raw)
+	case typ.Kind() == reflect.Map:
+		countMap(candidate, typ, val, raw)
+	default:
 		candidate.Matched++
-		if !isExact(val) || raw == nil {
-			candidate.Inexact++
-		}
-		return
 	}
-
-	// Handle unions
-	if isUnion, activeVariant, variantVal := findActiveUnionVariant(typ, val); isUnion {
-		if activeVariant != nil && !variantVal.IsNil() {
-			countFieldsRecursive(candidate, activeVariant.Type.Elem(), variantVal.Elem(), raw)
-		}
-		return
-	}
-
-	// Handle regular structs
-	if kind == reflect.Struct {
-		rawObj, ok := raw.(map[string]any)
-		if !ok {
-			return
-		}
-
-		for i := 0; i < typ.NumField(); i++ {
-			field := typ.Field(i)
-			fieldVal := val.Field(i)
-
-			if field.Tag.Get("additionalProperties") == "true" {
-				if field.Type.Kind() == reflect.Map && !fieldVal.IsNil() {
-					candidate.AdditionalProperties += fieldVal.Len()
-				}
-				continue
-			}
-
-			jsonName, ok := jsonFieldName(field)
-			if !ok {
-				continue
-			}
-
-			rawField, exists := rawObj[jsonName]
-			if !exists {
-				candidate.Unmatched++
-				continue
-			}
-
-			countFieldsRecursive(candidate, field.Type, fieldVal, rawField)
-		}
-		return
-	}
-
-	// Handle slices and arrays
-	if kind == reflect.Slice || kind == reflect.Array {
-		if val.IsNil() || val.Len() == 0 {
-			return
-		}
-
-		rawArr, ok := raw.([]any)
-		if !ok {
-			return
-		}
-
-		// Count each array/slice element
-		for i := 0; i < val.Len() && i < len(rawArr); i++ {
-			itemVal := val.Index(i)
-			countFieldsRecursive(candidate, itemVal.Type(), itemVal, rawArr[i])
-		}
-		return
-	}
-
-	// Handle maps
-	if kind == reflect.Map {
-		if val.IsNil() || val.Len() == 0 {
-			return
-		}
-
-		rawObj, ok := raw.(map[string]any)
-		if !ok {
-			return
-		}
-
-		for _, key := range val.MapKeys() {
-			keyStr := key.String()
-			rawVal, exists := rawObj[keyStr]
-			if exists {
-				mapVal := val.MapIndex(key)
-				countFieldsRecursive(candidate, mapVal.Type(), mapVal, rawVal)
-			}
-		}
-		return
-	}
-	// Anything else
-	candidate.Matched++
-	return
 }
+
+func isPrimitiveKind(typ reflect.Type) bool {
+	switch typ.Kind() {
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	}
+	switch typ {
+	case reflect.TypeOf(time.Time{}),
+		reflect.TypeOf(big.Int{}),
+		reflect.TypeOf(types.Date{}),
+		reflect.TypeOf([]byte{}):
+		return true
+	}
+	return false
+}
+
+func countPrimitive(candidate *UnionCandidate, val reflect.Value, raw any) {
+	candidate.Matched++
+	if !isExact(val) || raw == nil {
+		candidate.Inexact++
+	}
+}
+
+func isUnionType(typ reflect.Type, val reflect.Value) bool {
+	isUnion, _, _ := findActiveUnionVariant(typ, val)
+	return isUnion
+}
+
+func countUnionVariant(candidate *UnionCandidate, typ reflect.Type, val reflect.Value, raw any) {
+	_, activeVariant, variantVal := findActiveUnionVariant(typ, val)
+	if activeVariant != nil && !variantVal.IsNil() {
+		countFieldsRecursive(candidate, activeVariant.Type.Elem(), variantVal.Elem(), raw)
+	}
+}
+
+func countStruct(candidate *UnionCandidate, typ reflect.Type, val reflect.Value, raw any) {
+	rawObj, ok := raw.(map[string]any)
+	if !ok {
+		return
+	}
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fieldVal := val.Field(i)
+
+		if field.Tag.Get("additionalProperties") == "true" {
+			countAdditionalProperties(candidate, field, fieldVal)
+			continue
+		}
+
+		jsonName, ok := jsonFieldName(field)
+		if !ok {
+			continue
+		}
+
+		rawField, exists := rawObj[jsonName]
+		if !exists {
+			candidate.Unmatched++
+			continue
+		}
+
+		countFieldsRecursive(candidate, field.Type, fieldVal, rawField)
+	}
+}
+
+func countAdditionalProperties(candidate *UnionCandidate, field reflect.StructField, fieldVal reflect.Value) {
+	if field.Type.Kind() == reflect.Map && !fieldVal.IsNil() {
+		candidate.AdditionalProperties += fieldVal.Len()
+	}
+}
+
+func countSlice(candidate *UnionCandidate, typ reflect.Type, val reflect.Value, raw any) {
+	if val.IsNil() || val.Len() == 0 {
+		return
+	}
+
+	rawArr, ok := raw.([]any)
+	if !ok {
+		return
+	}
+
+	for i := 0; i < val.Len() && i < len(rawArr); i++ {
+		itemVal := val.Index(i)
+		countFieldsRecursive(candidate, itemVal.Type(), itemVal, rawArr[i])
+	}
+}
+
+func countMap(candidate *UnionCandidate, typ reflect.Type, val reflect.Value, raw any) {
+	if val.IsNil() || val.Len() == 0 {
+		return
+	}
+
+	rawObj, ok := raw.(map[string]any)
+	if !ok {
+		return
+	}
+
+	for _, key := range val.MapKeys() {
+		rawVal, exists := rawObj[key.String()]
+		if exists {
+			mapVal := val.MapIndex(key)
+			countFieldsRecursive(candidate, mapVal.Type(), mapVal, rawVal)
+		}
+	}
+}
+
 
 // jsonFieldName returns the JSON field name for a struct field.
 // Returns ("", false) if the field should be skipped (json:"-").

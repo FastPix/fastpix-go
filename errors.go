@@ -10,6 +10,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+
 	"github.com/FastPix/fastpix-go/internal/config"
 	"github.com/FastPix/fastpix-go/internal/hooks"
 	"github.com/FastPix/fastpix-go/internal/utils"
@@ -17,8 +20,6 @@ import (
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
 	"github.com/FastPix/fastpix-go/retry"
-	"net/http"
-	"net/url"
 )
 
 // Errors - Operations involving errors
@@ -36,22 +37,6 @@ func newErrors(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks *hoo
 	}
 }
 
-// List errors
-// This endpoint returns the total number of playback errors that occurred, along with the total number of views captured, based on the specified timespan and filters. It provides insights into the overall playback quality and helps identify potential issues that may impact viewer experience.
-//
-// #### Key fields in response
-//
-// * **percentage:** The percentage of views affected by the specific error.
-// * **uniqueViewersEffectedPercentage:** The percentage of unique viewers affected by the specific error (available only in the topErrors section).
-// * **notes:** Additional notes or information about the specific error.
-// * **message:** The error message or description.
-// * **lastSeen:** The timestamp of when the error was last observed.
-// * **id:** The unique identifier for the specific error.
-// * **description:** A description of the specific error.
-// * **count:** The number of occurrences of the specific error.
-// * **code:** The error code associated with the specific error.
-//
-// Related guide: <a href="https://fastpix.com/docs/working-with-video-data/troubleshoot-playback-errors">Troubleshoot errors</a>
 func (s *Errors) List(ctx context.Context, timespan *operations.ListErrorsTimespan, filterby *string, limit *int64, opts ...operations.Option) (*operations.ListErrorsResponse, error) {
 	request := operations.ListErrorsRequest{
 		Timespan: timespan,
@@ -59,24 +44,13 @@ func (s *Errors) List(ctx context.Context, timespan *operations.ListErrorsTimesp
 		Limit:    limit,
 	}
 
-	o := operations.Options{}
-	supportedOptions := []string{
-		operations.SupportedOptionRetries,
-		operations.SupportedOptionTimeout,
+	o, err := applyOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, opt := range opts {
-		if err := opt(&o, supportedOptions...); err != nil {
-			return nil, fmt.Errorf("error applying option: %w", err)
-		}
-	}
+	baseURL := resolveBaseURL(o, s.sdkConfiguration)
 
-	var baseURL string
-	if o.ServerURL == nil {
-		baseURL = utils.ReplaceParameters(s.sdkConfiguration.GetServerDetails())
-	} else {
-		baseURL = *o.ServerURL
-	}
 	opURL, err := url.JoinPath(baseURL, "/data/errors")
 	if err != nil {
 		return nil, fmt.Errorf("error generating URL: %w", err)
@@ -92,23 +66,15 @@ func (s *Errors) List(ctx context.Context, timespan *operations.ListErrorsTimesp
 		SecuritySource:   s.sdkConfiguration.Security,
 	}
 
-	timeout := o.Timeout
-	if timeout == nil {
-		timeout = s.sdkConfiguration.Timeout
-	}
-
-	if timeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *timeout)
-		defer cancel()
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
+	ctx, err = applyTimeout(ctx, o, s.sdkConfiguration)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", s.sdkConfiguration.UserAgent)
+
+	req, err := buildGetRequest(ctx, opURL, s.sdkConfiguration.UserAgent)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := utils.PopulateQueryParams(ctx, req, request, nil, nil); err != nil {
 		return nil, fmt.Errorf("error populating query params: %w", err)
@@ -122,95 +88,9 @@ func (s *Errors) List(ctx context.Context, timespan *operations.ListErrorsTimesp
 		req.Header.Set(k, v)
 	}
 
-	globalRetryConfig := s.sdkConfiguration.RetryConfig
-	retryConfig := o.Retries
-	if retryConfig == nil {
-		if globalRetryConfig != nil {
-			retryConfig = globalRetryConfig
-		}
-	}
-
-	var httpRes *http.Response
-	if retryConfig != nil {
-		httpRes, err = utils.Retry(ctx, utils.Retries{
-			Config: retryConfig,
-			StatusCodes: []string{
-				"429",
-				"500",
-				"502",
-				"503",
-				"504",
-			},
-		}, func() (*http.Response, error) {
-			if req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
-				copyBody, err := req.GetBody()
-
-				if err != nil {
-					return nil, err
-				}
-
-				req.Body = copyBody
-			}
-
-			req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-			if err != nil {
-				if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
-					return nil, err
-				}
-
-				return nil, retry.Permanent(err)
-			}
-
-			httpRes, err := s.sdkConfiguration.Client.Do(req)
-			if err != nil || httpRes == nil {
-				if err != nil {
-					err = fmt.Errorf("error sending request: %w", err)
-				} else {
-					err = fmt.Errorf("error sending request: no response")
-				}
-
-				_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			}
-			return httpRes, err
-		})
-
-		if err != nil {
-			return nil, err
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
-		if err != nil {
-			return nil, err
-		}
-
-		httpRes, err = s.sdkConfiguration.Client.Do(req)
-		if err != nil || httpRes == nil {
-			if err != nil {
-				err = fmt.Errorf("error sending request: %w", err)
-			} else {
-				err = fmt.Errorf("error sending request: no response")
-			}
-
-			_, err = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, err)
-			return nil, err
-		} else if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
-			_httpRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
-			if err != nil {
-				return nil, err
-			} else if _httpRes != nil {
-				httpRes = _httpRes
-			}
-		} else {
-			httpRes, err = s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
-			if err != nil {
-				return nil, err
-			}
-		}
+	httpRes, err := s.executeRequest(ctx, req, hookCtx, o)
+	if err != nil {
+		return nil, err
 	}
 
 	res := &operations.ListErrorsResponse{
@@ -220,63 +100,233 @@ func (s *Errors) List(ctx context.Context, timespan *operations.ListErrorsTimesp
 		},
 	}
 
-	switch {
-	case httpRes.StatusCode == 200:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
+	return s.handleListErrorsResponse(httpRes, res)
+}
 
-			var out operations.ListErrorsResponseBody
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.Object = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
+func applyOptions(opts []operations.Option) (operations.Options, error) {
+	o := operations.Options{}
+	supportedOptions := []string{
+		operations.SupportedOptionRetries,
+		operations.SupportedOptionTimeout,
+	}
+	for _, opt := range opts {
+		if err := opt(&o, supportedOptions...); err != nil {
+			return o, fmt.Errorf("error applying option: %w", err)
 		}
-	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 500:
-		rawBody, err := utils.ConsumeRawBody(httpRes)
+	}
+	return o, nil
+}
+
+func resolveBaseURL(o operations.Options, sdkConfig config.SDKConfiguration) string {
+	if o.ServerURL == nil {
+		return utils.ReplaceParameters(sdkConfig.GetServerDetails())
+	}
+	return *o.ServerURL
+}
+
+func applyTimeout(ctx context.Context, o operations.Options, sdkConfig config.SDKConfiguration) (context.Context, error) {
+	timeout := o.Timeout
+	if timeout == nil {
+		timeout = sdkConfig.Timeout
+	}
+	if timeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+	return ctx, nil
+}
+
+func buildGetRequest(ctx context.Context, opURL, userAgent string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	return req, nil
+}
+
+func (s *Errors) executeRequest(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, o operations.Options) (*http.Response, error) {
+	retryConfig := resolveRetryConfig(o, s.sdkConfiguration)
+
+	if retryConfig != nil {
+		return s.executeWithRetry(ctx, req, hookCtx, retryConfig)
+	}
+	return s.executeWithoutRetry(req, hookCtx)
+}
+
+func resolveRetryConfig(o operations.Options, sdkConfig config.SDKConfiguration) *retry.Config {
+	if o.Retries != nil {
+		return o.Retries
+	}
+	return sdkConfig.RetryConfig
+}
+
+func (s *Errors) executeWithRetry(ctx context.Context, req *http.Request, hookCtx hooks.HookContext, retryConfig *retry.Config) (*http.Response, error) {
+	httpRes, err := utils.Retry(ctx, utils.Retries{
+		Config:      retryConfig,
+		StatusCodes: []string{"429", "500", "502", "503", "504"},
+	}, func() (*http.Response, error) {
+		return s.retryAttempt(req, hookCtx)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+}
+
+func (s *Errors) retryAttempt(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	if err := refreshRequestBody(req); err != nil {
+		return nil, err
+	}
+
+	req, err := s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, classifyHookError(err)
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		sendErr := formatSendError(err)
+		_, sendErr = s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+		return nil, sendErr
+	}
+
+	return httpRes, nil
+}
+
+func refreshRequestBody(req *http.Request) error {
+	if req.Body == nil || req.Body == http.NoBody || req.GetBody == nil {
+		return nil
+	}
+	copyBody, err := req.GetBody()
+	if err != nil {
+		return err
+	}
+	req.Body = copyBody
+	return nil
+}
+
+func classifyHookError(err error) error {
+	if retry.IsPermanentError(err) || retry.IsTemporaryError(err) {
+		return err
+	}
+	return retry.Permanent(err)
+}
+
+func formatSendError(err error) error {
+	if err != nil {
+		return fmt.Errorf("error sending request: %w", err)
+	}
+	return fmt.Errorf("error sending request: no response")
+}
+
+func (s *Errors) executeWithoutRetry(req *http.Request, hookCtx hooks.HookContext) (*http.Response, error) {
+	var err error
+
+	req, err = s.hooks.BeforeRequest(hooks.BeforeRequestContext{HookContext: hookCtx}, req)
+	if err != nil {
+		return nil, err
+	}
+
+	httpRes, err := s.sdkConfiguration.Client.Do(req)
+	if err != nil || httpRes == nil {
+		return nil, buildSendError(err, hookCtx, s.hooks)
+	}
+
+	return s.handlePostResponse(httpRes, hookCtx)
+}
+
+func buildSendError(err error, hookCtx hooks.HookContext, h *hooks.Hooks) error {
+	sendErr := formatSendError(err)
+	_, sendErr = h.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, nil, sendErr)
+	return sendErr
+}
+
+func (s *Errors) handlePostResponse(httpRes *http.Response, hookCtx hooks.HookContext) (*http.Response, error) {
+	if utils.MatchStatusCodes([]string{"4XX", "5XX"}, httpRes.StatusCode) {
+		updatedRes, err := s.hooks.AfterError(hooks.AfterErrorContext{HookContext: hookCtx}, httpRes, nil)
 		if err != nil {
 			return nil, err
 		}
-		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
-	case httpRes.StatusCode >= 500 && httpRes.StatusCode < 600:
+		if updatedRes != nil {
+			return updatedRes, nil
+		}
+		return httpRes, nil
+	}
+
+	httpRes, err := s.hooks.AfterSuccess(hooks.AfterSuccessContext{HookContext: hookCtx}, httpRes)
+	if err != nil {
+		return nil, err
+	}
+	return httpRes, nil
+}
+
+func (s *Errors) handleListErrorsResponse(httpRes *http.Response, res *operations.ListErrorsResponse) (*operations.ListErrorsResponse, error) {
+	switch {
+	case httpRes.StatusCode == 200:
+		return s.handleStatus200(httpRes, res)
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
 		rawBody, err := utils.ConsumeRawBody(httpRes)
 		if err != nil {
 			return nil, err
 		}
 		return nil, apierrors.NewAPIError("API error occurred", httpRes.StatusCode, string(rawBody), httpRes)
 	default:
-		switch {
-		case utils.MatchContentType(httpRes.Header.Get("Content-Type"), `application/json`):
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
+		return s.handleDefaultStatus(httpRes, res)
+	}
+}
 
-			var out components.DefaultError
-			if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
-				return nil, err
-			}
-
-			res.DefaultError = &out
-		default:
-			rawBody, err := utils.ConsumeRawBody(httpRes)
-			if err != nil {
-				return nil, err
-			}
-			return nil, apierrors.NewAPIError(fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get("Content-Type")), httpRes.StatusCode, string(rawBody), httpRes)
-		}
+func (s *Errors) handleStatus200(httpRes *http.Response, res *operations.ListErrorsResponse) (*operations.ListErrorsResponse, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`) {
+		return nil, unknownContentTypeError(httpRes)
 	}
 
-	return res, nil
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
 
+	var out operations.ListErrorsResponseBody
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+
+	res.Object = &out
+	return res, nil
+}
+
+func (s *Errors) handleDefaultStatus(httpRes *http.Response, res *operations.ListErrorsResponse) (*operations.ListErrorsResponse, error) {
+	if !utils.MatchContentType(httpRes.Header.Get(contentType), `application/json`) {
+		return nil, unknownContentTypeError(httpRes)
+	}
+
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return nil, err
+	}
+
+	var out components.DefaultError
+	if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+		return nil, err
+	}
+
+	res.DefaultError = &out
+	return res, nil
+}
+
+func unknownContentTypeError(httpRes *http.Response) error {
+	rawBody, err := utils.ConsumeRawBody(httpRes)
+	if err != nil {
+		return err
+	}
+	return apierrors.NewAPIError(
+		fmt.Sprintf("unknown content-type received: %s", httpRes.Header.Get(contentType)),
+		httpRes.StatusCode,
+		string(rawBody),
+		httpRes,
+	)
 }

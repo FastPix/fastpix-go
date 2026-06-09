@@ -37,6 +37,7 @@ const OpenAPIResponseValidator =
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// eslint-disable-next-line no-console
 
 type Fixture = {
   operations: Record<
@@ -93,8 +94,21 @@ function safeFileSlug(input: string): string {
   return input.replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort((a, b) => a.localeCompare(b))
+      .reduce((acc, key) => {
+        acc[key] = sortKeysDeep((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {} as Record<string, unknown>);
+  }
+  return value;
+}
+
 function toPrettyJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(sortKeysDeep(value), null, 2);
 }
 
 function preview(text: string): string {
@@ -114,6 +128,7 @@ function writeArtifactFiles(
 } {
   const artifactsDir = join(__dirname, ARTIFACTS_DIRNAME);
   mkdirSync(artifactsDir, { recursive: true });
+  // eslint-disable-next-line no-console
 
   const slug = safeFileSlug(operationId);
   const apiFilename = `${slug}.api.json`;
@@ -136,7 +151,7 @@ function writeArtifactFiles(
   };
 }
 
-function defaultSDKRequest(operationId: string): any | undefined {
+function defaultSDKRequest(operationId: string): any {
   // Ensure SDK input validation passes so we reach the HTTP call and get server errors on failures.
   switch (operationId) {
     case "get-media":
@@ -207,10 +222,10 @@ function defaultSDKRequest(operationId: string): any | undefined {
   }
 }
 
-function buildSDKRequest(endpoint: EndpointInfo, fixtures: Fixture | null): any | undefined {
+function buildSDKRequest(endpoint: EndpointInfo, fixtures: Fixture | null): any {
   const opFixture = fixtures?.operations?.[endpoint.operationId];
   const fromFixture = opFixture
-    ? { ...(opFixture.pathParams || {}), ...(opFixture.query || {}) }
+    ? { ...opFixture.pathParams, ...opFixture.query }
     : undefined;
 
   // If fixtures exist, use them as-is (they match SDK request shapes).
@@ -236,6 +251,31 @@ type GoSDKResult =
   | { ok: true; value: any }
   | { ok: false; error: any };
 
+
+// Resolve the absolute path to the go binary from fixed, known locations.
+// Using an absolute path in spawnSync avoids PATH-based executable lookup entirely,
+// fully resolving Sonar S4036.
+function resolveAbsoluteGoBinary(): string {
+  const candidates = process.platform === "win32"
+    ? [
+        String.raw`C:\Go\bin\go.exe`,
+        String.raw`C:\Program Files\Go\bin\go.exe`,
+      ]
+    : [
+        "/opt/homebrew/bin/go",        // Homebrew on Apple Silicon / Intel Mac
+        "/usr/local/go/bin/go",        // Standard Go install on Linux/macOS
+        "/usr/local/bin/go",
+        "/usr/bin/go",
+        "/home/linuxbrew/.linuxbrew/bin/go", // Homebrew on Linux
+      ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return "/opt/homebrew/bin/go";
+}
+
+const GO_BINARY = resolveAbsoluteGoBinary();
+
 // Path to the Go harness package, relative to the SDK repo root (the parent of
 // tests/). `go run` is executed with cwd = repo root so the harness resolves
 // the local module's packages.
@@ -254,12 +294,21 @@ function invokeGoSDK(
   password: string,
 ): GoSDKResult {
   const repoRoot = join(__dirname, "..");
+  mkdirSync(join(repoRoot, ".gotmp"), { recursive: true });
 
-  const child = spawnSync("go", ["run", GO_HARNESS_PKG], {
+  const child = spawnSync(GO_BINARY, ["run", GO_HARNESS_PKG], {
     input: JSON.stringify({ operationId, request: request ?? {}, baseUrl, username, password }),
     encoding: "utf-8",
     cwd: repoRoot,
     maxBuffer: 10 * 1024 * 1024,
+    env: {
+      HOME: process.env.HOME ?? "",
+      GOPATH: process.env.GOPATH ?? "",
+      GOROOT: process.env.GOROOT ?? "",
+      GOCACHE: process.env.GOCACHE ?? "",
+      GOTMPDIR: join(repoRoot, ".gotmp"),
+      USERPROFILE: process.env.USERPROFILE ?? "",
+    },
   });
 
   if (child.error) {
@@ -518,87 +567,125 @@ function generateFixSuggestions(r: EndpointResult): FixSuggestion[] {
   return out;
 }
 
+
+function formatPaths(paths: string[]): string {
+  return paths.length ? paths.map((p) => `\`${p}\``).join(", ") : "None";
+}
+
+function pushPathList(lines: string[], paths: string[]): void {
+  if (paths.length === 0) {
+    lines.push("- None");
+  } else {
+    for (const p of paths) lines.push(`- \`${p}\``);
+  }
+}
+
+function pushOpenAPIErrors(lines: string[], errors: Array<{ path?: string; message?: string; errorCode?: string }>): void {
+  lines.push("### Observed OpenAPI errors", "");
+  for (const e of errors) {
+    const loc = e.path ? `\`${e.path}\`` : "";
+    const msg = e.message ?? "";
+    lines.push(`- ${loc} ${msg}`.trim());
+  }
+  lines.push("");
+}
+
+function pushSuggestion(lines: string[], s: FixSuggestion): void {
+  lines.push(`- **${s.title}**`, `  - **why**: ${s.why}`);
+  if (s.where) lines.push(`  - **where**: ${s.where}`);
+  if (s.pasteYaml) {
+    lines.push("  - **paste**:", "", "```yaml", s.pasteYaml, "```");
+  }
+  lines.push("");
+}
+
+function pushFailingEndpointSection(lines: string[], r: EndpointResult): void {
+  const suggestions = r.fixSuggestions ?? [];
+  lines.push(
+    `## ${r.operationId} (\`${r.endpoint}\`)`,
+    "",
+    `- **Status**: ${r.status}`,
+    `- **OpenAPI valid**: ${r.openapiValid ? "yes" : "no"}`,
+    `- **SDK parse**: ${r.sdkParseOk ? "ok" : "failed"}`,
+  );
+  if (r.apiResponseFile) lines.push(`- **API artifact**: \`${r.apiResponseFile}\``);
+  if (r.sdkResponseFile) lines.push(`- **SDK artifact**: \`${r.sdkResponseFile}\``);
+  lines.push("");
+  if (!r.openapiValid && (r.openapiErrors?.length ?? 0) > 0) {
+    pushOpenAPIErrors(lines, r.openapiErrors);
+  }
+  if (suggestions.length === 0) {
+    lines.push("### Suggested fixes", "", "- No heuristic suggestions available for this failure yet.", "");
+    return;
+  }
+  lines.push("### Suggested fixes", "");
+  for (const s of suggestions) {
+    pushSuggestion(lines, s);
+  }
+}
+
 function writeFixSuggestions(results: EndpointResult[]) {
   const failing = results.filter((r) => r.status === "FAIL");
   const outPath = join(__dirname, FIX_SUGGESTIONS_MD);
   const lines: string[] = [];
 
-  lines.push("# GET Endpoints — OpenAPI Response Fix Suggestions");
-  lines.push("");
-  lines.push(`Generated: ${new Date().toISOString()}`);
-  lines.push("");
-  lines.push(`Total failing endpoints: ${failing.length}`);
-  lines.push("");
+  lines.push(
+    "# GET Endpoints — OpenAPI Response Fix Suggestions",
+    "",
+    `Generated: ${new Date().toISOString()}`,
+    "",
+    `Total failing endpoints: ${failing.length}`,
+    "",
+  );
 
   for (const r of failing) {
-    const suggestions = r.fixSuggestions ?? [];
-    lines.push(`## ${r.operationId} (\`${r.endpoint}\`)`);
-    lines.push("");
-    lines.push(`- **Status**: ${r.status}`);
-    lines.push(`- **OpenAPI valid**: ${r.openapiValid ? "yes" : "no"}`);
-    lines.push(`- **SDK parse**: ${r.sdkParseOk ? "ok" : "failed"}`);
-    if (r.apiResponseFile) lines.push(`- **API artifact**: \`${r.apiResponseFile}\``);
-    if (r.sdkResponseFile) lines.push(`- **SDK artifact**: \`${r.sdkResponseFile}\``);
-    lines.push("");
-
-    if (!r.openapiValid && (r.openapiErrors?.length ?? 0) > 0) {
-      lines.push("### Observed OpenAPI errors");
-      lines.push("");
-      for (const e of r.openapiErrors) {
-        const loc = e.path ? `\`${e.path}\`` : "";
-        const msg = e.message ?? "";
-        lines.push(`- ${loc} ${msg}`.trim());
-      }
-      lines.push("");
-    }
-
-    if (suggestions.length === 0) {
-      lines.push("### Suggested fixes");
-      lines.push("");
-      lines.push("- No heuristic suggestions available for this failure yet.");
-      lines.push("");
-      continue;
-    }
-
-    lines.push("### Suggested fixes");
-    lines.push("");
-    for (const s of suggestions) {
-      lines.push(`- **${s.title}**`);
-      lines.push(`  - **why**: ${s.why}`);
-      if (s.where) lines.push(`  - **where**: ${s.where}`);
-      if (s.pasteYaml) {
-        lines.push("  - **paste**:");
-        lines.push("");
-        lines.push("```yaml");
-        lines.push(s.pasteYaml);
-        lines.push("```");
-      }
-      lines.push("");
-    }
+    pushFailingEndpointSection(lines, r);
   }
 
   writeFileSync(outPath, lines.join("\n"));
 }
 
-function collectEmptyArrayFieldPaths(value: any, prefix = ""): Set<string> {
-  const out = new Set<string>();
-  if (value === null || value === undefined) return out;
-  if (typeof value !== "object") return out;
-
-  if (Array.isArray(value)) {
-    const arrayPrefix = prefix ? `${prefix}[]` : "[]";
-    for (const item of value) {
-      for (const p of collectEmptyArrayFieldPaths(item, arrayPrefix)) out.add(p);
-    }
-    return out;
+function collectEmptyArraysFromArray(arr: any[], prefix: string, out: Set<string>): void {
+  const arrayPrefix = prefix ? `${prefix}[]` : "[]";
+  for (const item of arr) {
+    for (const p of collectEmptyArrayFieldPaths(item, arrayPrefix)) out.add(p);
   }
+}
 
-  for (const [k, v] of Object.entries(value)) {
+function collectEmptyArraysFromObject(obj: Record<string, any>, prefix: string, out: Set<string>): void {
+  for (const [k, v] of Object.entries(obj)) {
     const p = prefix ? `${prefix}.${k}` : k;
     if (Array.isArray(v) && v.length === 0) out.add(p);
     for (const child of collectEmptyArrayFieldPaths(v, p)) out.add(child);
   }
+}
+
+function collectEmptyArrayFieldPaths(value: any, prefix = ""): Set<string> {
+  const out = new Set<string>();
+  if (value === null || value === undefined || typeof value !== "object") return out;
+  if (Array.isArray(value)) {
+    collectEmptyArraysFromArray(value, prefix, out);
+  } else {
+    collectEmptyArraysFromObject(value as Record<string, any>, prefix, out);
+  }
   return out;
+}
+
+function shouldSkipValue(v: any, includeEmptyArrays: boolean): boolean {
+  if (includeEmptyArrays) return false;
+  if (Array.isArray(v) && v.length === 0) return true;
+  if (v === null || v === undefined) return true;
+  return typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0;
+}
+
+function collectJsonPathsFromArray(arr: any[], prefix: string, opts: { includeEmptyArrays?: boolean }, out: Set<string>): void {
+  const includeEmptyArrays = opts.includeEmptyArrays ?? true;
+  if (!includeEmptyArrays && arr.length === 0) return;
+  const arrayPrefix = prefix ? `${prefix}[]` : "[]";
+  out.add(arrayPrefix);
+  for (const item of arr) {
+    for (const p of collectJsonPaths(item, arrayPrefix, opts)) out.add(p);
+  }
 }
 
 function collectJsonPaths(
@@ -607,50 +694,23 @@ function collectJsonPaths(
   opts: { includeEmptyArrays?: boolean } = {},
 ): Set<string> {
   const out = new Set<string>();
-  const add = (p: string) => out.add(p);
   const includeEmptyArrays = opts.includeEmptyArrays ?? true;
 
   if (value === null || value === undefined) return out;
   if (typeof value !== "object") {
-    if (prefix) add(prefix);
+    if (prefix) out.add(prefix);
     return out;
   }
 
   if (Array.isArray(value)) {
-    if (!includeEmptyArrays && value.length === 0) return out;
-    const arrayPrefix = prefix ? `${prefix}[]` : "[]";
-    add(arrayPrefix);
-    for (const item of value) {
-      for (const p of collectJsonPaths(item, arrayPrefix, opts)) out.add(p);
-    }
+    collectJsonPathsFromArray(value, prefix, opts, out);
     return out;
   }
 
   for (const [k, v] of Object.entries(value)) {
-    if (!includeEmptyArrays && Array.isArray(v) && v.length === 0) {
-      continue;
-    }
-    // Treat a null/undefined leaf the same as a missing key: an optional field
-    // the API omitted is equivalent to one the SDK materialized as null, so it
-    // should not count as a discrepancy in either direction.
-    if (!includeEmptyArrays && (v === null || v === undefined)) {
-      continue;
-    }
-    // An empty object {} and an empty array [] both represent "empty" — the SDK
-    // may materialize an absent/empty collection either way (and `omitempty`
-    // drops it entirely), so skip both to keep the comparison symmetric across
-    // the API/SDK boundary.
-    if (
-      !includeEmptyArrays
-      && typeof v === "object"
-      && v !== null
-      && !Array.isArray(v)
-      && Object.keys(v).length === 0
-    ) {
-      continue;
-    }
+    if (shouldSkipValue(v, includeEmptyArrays)) continue;
     const p = prefix ? `${prefix}.${k}` : k;
-    add(p);
+    out.add(p);
     for (const child of collectJsonPaths(v, p, opts)) out.add(child);
   }
   return out;
@@ -742,7 +802,39 @@ function normalizeJsonForComparison(value: any): any {
 }
 
 function jsonRoundTrip(value: any): any {
-  return JSON.parse(JSON.stringify(value));
+  return structuredClone(value);
+}
+
+function substitutePathParams(
+  path: string,
+  requiredPathParams: string[],
+  effectiveReq: Record<string, any>,
+): { path: string; note: string | undefined } {
+  let note: string | undefined;
+  for (const name of requiredPathParams) {
+    const val = effectiveReq[name] ?? PLACEHOLDER_UUID;
+    if (effectiveReq[name] == null) {
+      note = note ? `${note}; placeholder used for ${name}` : `Placeholder used for ${name}`;
+    }
+    path = path.replaceAll(`{${name}}`, encodeURIComponent(val));
+  }
+  return { path, note };
+}
+
+function appendQueryParams(url: URL, queryParams: any[], effectiveReq: Record<string, any>): void {
+  for (const p of queryParams) {
+    const name: string = p.name;
+    const baseName = name.endsWith("[]") ? name.slice(0, -2) : name;
+    const val = effectiveReq[name] ?? effectiveReq[baseName];
+    if (val == null) continue;
+    if (Array.isArray(val)) {
+      for (const item of val) url.searchParams.append(name, String(item));
+    } else if (name.endsWith("[]")) {
+      url.searchParams.append(name, String(val));
+    } else {
+      url.searchParams.set(name, String(val));
+    }
+  }
 }
 
 function buildUrl(
@@ -751,46 +843,20 @@ function buildUrl(
   fixture: Fixture | null,
 ): { url: string; note?: string } {
   const opFixture = fixture?.operations?.[endpoint.operationId];
-  let path = endpoint.path;
+  const defaults = defaultSDKRequest(endpoint.operationId) ?? {};
+  const fromFixture = opFixture ? { ...opFixture.pathParams, ...opFixture.query } : {};
+  const effectiveReq: Record<string, any> = { ...defaults, ...fromFixture };
 
   const requiredPathParams = endpoint.parameters
     .filter((p) => p?.in === "path" && p?.required)
     .map((p) => p.name);
 
-  const defaults = defaultSDKRequest(endpoint.operationId) ?? {};
-  const fromFixture = opFixture
-    ? { ...(opFixture.pathParams || {}), ...(opFixture.query || {}) }
-    : {};
-  const effectiveReq: Record<string, any> = { ...defaults, ...fromFixture };
-
-  let note: string | undefined;
-  if (requiredPathParams.length > 0) {
-    for (const name of requiredPathParams) {
-      const val = effectiveReq[name] ?? PLACEHOLDER_UUID;
-      if (effectiveReq[name] == null) {
-        note = note ? `${note}; placeholder used for ${name}` : `Placeholder used for ${name}`;
-      }
-      path = path.replaceAll(`{${name}}`, encodeURIComponent(val));
-    }
-  }
+  const { path, note } = substitutePathParams(endpoint.path, requiredPathParams, effectiveReq);
 
   const base = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
   const url = new URL(path.replace(/^\//, ""), base);
 
-  const queryParams = endpoint.parameters.filter((p) => p?.in === "query");
-  for (const p of queryParams) {
-    const name: string = p.name;
-    const baseName = name.endsWith("[]") ? name.slice(0, -2) : name;
-    const val = effectiveReq[name] ?? effectiveReq[baseName];
-    if (val == null) continue;
-
-    if (Array.isArray(val)) {
-      for (const item of val) url.searchParams.append(name, String(item));
-    } else {
-      if (name.endsWith("[]")) url.searchParams.append(name, String(val));
-      else url.searchParams.set(name, String(val));
-    }
-  }
+  appendQueryParams(url, endpoint.parameters.filter((p) => p?.in === "query"), effectiveReq);
 
   return { url: url.toString(), note };
 }
@@ -798,6 +864,63 @@ function buildUrl(
 function basicAuthHeader(username: string, password: string): string {
   const token = Buffer.from(`${username}:${password}`).toString("base64");
   return `Basic ${token}`;
+}
+
+
+function buildTableRow(r: EndpointResult): string {
+  const openapiCol = r.openapiValid ? "✅" : "❌";
+  const sdkCol = r.sdkParseOk ? "✅" : "❌";
+  const missSdk = formatPaths(r.missingInSDK);
+  const missApi = formatPaths(r.missingInAPI);
+  const emptyOmitted = formatPaths(r.emptyArraysOmittedInSDK);
+  const status = r.status === "PASS" ? "✅ PASS" : "❌ FAIL";
+  return `| \`${r.endpoint}\` | \`${r.operationId}\` | ${openapiCol} | ${sdkCol} | ${missSdk} | ${missApi} | ${emptyOmitted} | ${status} |`;
+}
+
+function pushEndpointMeta(lines: string[], r: EndpointResult): void {
+  lines.push(
+    `### ${r.operationId} (\`${r.endpoint}\`)`,
+    "",
+    `- **Status**: ${r.status}`,
+  );
+  if (r.note) lines.push(`- **Note**: ${r.note}`);
+  lines.push(`- **OpenAPI valid**: ${r.openapiValid ? "yes" : "no"}`);
+  if (!r.openapiValid && r.openapiErrors.length) {
+    lines.push("- **OpenAPI errors**:");
+    for (const e of r.openapiErrors) {
+      const loc = e.path ? `\`${e.path}\`` : "";
+      const msg = e.message ?? "";
+      lines.push(`  - ${loc} ${msg}`.trim());
+    }
+  }
+  lines.push(`- **SDK parse**: ${r.sdkParseOk ? "ok" : "failed"}`);
+  if (!r.sdkParseOk && r.sdkParseError) lines.push(`- **SDK parse error**: ${r.sdkParseError}`);
+  if (r.apiResponseFile) lines.push(`- **API response file**: \`${r.apiResponseFile}\``);
+  if (r.sdkResponseFile) lines.push(`- **SDK response file**: \`${r.sdkResponseFile}\``);
+  lines.push("");
+}
+
+function pushResponsePreview(lines: string[], label: string, preview: string): void {
+  lines.push(`**${label}**`, "", "```json", preview, "```", "");
+}
+
+function pushPathSection(lines: string[], label: string, paths: string[]): void {
+  lines.push(`**${label}**`, "");
+  pushPathList(lines, paths);
+}
+
+function pushEndpointDetail(lines: string[], r: EndpointResult): void {
+  pushEndpointMeta(lines, r);
+  if (r.apiResponsePreview) pushResponsePreview(lines, "API response (preview)", r.apiResponsePreview);
+  if (r.sdkResponsePreview) pushResponsePreview(lines, "SDK response (preview)", r.sdkResponsePreview);
+  pushPathSection(lines, `Missing in SDK (present in API) — ${r.missingInSDK.length}`, r.missingInSDK);
+  lines.push("");
+  pushPathSection(lines, `Missing in API (present in SDK) — ${r.missingInAPI.length}`, r.missingInAPI);
+  lines.push("");
+  pushPathSection(lines, `Empty arrays omitted by SDK — ${r.emptyArraysOmittedInSDK.length}`, r.emptyArraysOmittedInSDK);
+  lines.push("");
+  pushPathSection(lines, `Empty arrays omitted by API — ${r.emptyArraysOmittedInAPI.length}`, r.emptyArraysOmittedInAPI);
+  lines.push("");
 }
 
 function writeReport(results: EndpointResult[]) {
@@ -811,97 +934,32 @@ function writeReport(results: EndpointResult[]) {
   const generatedAt = new Date().toISOString();
 
   const lines: string[] = [];
-  lines.push("# GET Endpoints — OpenAPI Response Validation Report");
-  lines.push("");
-  lines.push(`Generated: ${generatedAt}`);
-  lines.push("");
-  lines.push("## Summary");
-  lines.push("");
-  lines.push(`- **Total GET endpoints**: ${total}`);
-  lines.push(`- **PASS**: ${passed}`);
-  lines.push(`- **FAIL**: ${failed}`);
-  lines.push(`- **SKIP**: ${skipped}`);
-  lines.push("");
-  lines.push("## Consolidated report");
-  lines.push("");
-  lines.push("| Endpoint | OperationId | OpenAPI valid | SDK parse | Missing in SDK (present in API) | Missing in API (present in SDK) | Empty arrays omitted by SDK | Status |");
-  lines.push("|---|---|---:|---:|---|---|---|---|");
+  lines.push(
+    "# GET Endpoints — OpenAPI Response Validation Report",
+    "",
+    `Generated: ${generatedAt}`,
+    "",
+    "## Summary",
+    "",
+    `- **Total GET endpoints**: ${total}`,
+    `- **PASS**: ${passed}`,
+    `- **FAIL**: ${failed}`,
+    `- **SKIP**: ${skipped}`,
+    "",
+    "## Consolidated report",
+    "",
+    "| Endpoint | OperationId | OpenAPI valid | SDK parse | Missing in SDK (present in API) | Missing in API (present in SDK) | Empty arrays omitted by SDK | Status |",
+    "|---|---|---:|---:|---|---|---|---|",
+  );
 
   for (const r of results) {
-    const openapiCol = r.openapiValid ? "✅" : "❌";
-    const sdkCol = r.sdkParseOk ? "✅" : "❌";
-    const missSdk = r.missingInSDK.length ? r.missingInSDK.map((p) => `\`${p}\``).join(", ") : "None";
-    const missApi = r.missingInAPI.length ? r.missingInAPI.map((p) => `\`${p}\``).join(", ") : "None";
-    const emptyOmitted = r.emptyArraysOmittedInSDK.length ? r.emptyArraysOmittedInSDK.map((p) => `\`${p}\``).join(", ") : "None";
-    const status = r.status === "PASS" ? "✅ PASS" : "❌ FAIL";
-    lines.push(`| \`${r.endpoint}\` | \`${r.operationId}\` | ${openapiCol} | ${sdkCol} | ${missSdk} | ${missApi} | ${emptyOmitted} | ${status} |`);
+    lines.push(buildTableRow(r));
   }
 
-  lines.push("");
-  lines.push("## Per-endpoint details (full missing parameter lists)");
-  lines.push("");
+  lines.push("", "## Per-endpoint details (full missing parameter lists)", "");
 
   for (const r of results) {
-    lines.push(`### ${r.operationId} (\`${r.endpoint}\`)`);
-    lines.push("");
-    lines.push(`- **Status**: ${r.status}`);
-    if (r.note) lines.push(`- **Note**: ${r.note}`);
-    lines.push(`- **OpenAPI valid**: ${r.openapiValid ? "yes" : "no"}`);
-    if (!r.openapiValid && r.openapiErrors.length) {
-      lines.push("- **OpenAPI errors**:");
-      for (const e of r.openapiErrors) {
-        const loc = e.path ? `\`${e.path}\`` : "";
-        const msg = e.message ?? "";
-        lines.push(`  - ${loc} ${msg}`.trim());
-      }
-    }
-    lines.push(`- **SDK parse**: ${r.sdkParseOk ? "ok" : "failed"}`);
-    if (!r.sdkParseOk && r.sdkParseError) lines.push(`- **SDK parse error**: ${r.sdkParseError}`);
-    if (r.apiResponseFile) lines.push(`- **API response file**: \`${r.apiResponseFile}\``);
-    if (r.sdkResponseFile) lines.push(`- **SDK response file**: \`${r.sdkResponseFile}\``);
-    lines.push("");
-
-    if (r.apiResponsePreview) {
-      lines.push("**API response (preview)**");
-      lines.push("");
-      lines.push("```json");
-      lines.push(r.apiResponsePreview);
-      lines.push("```");
-      lines.push("");
-    }
-
-    if (r.sdkResponsePreview) {
-      lines.push("**SDK response (preview)**");
-      lines.push("");
-      lines.push("```json");
-      lines.push(r.sdkResponsePreview);
-      lines.push("```");
-      lines.push("");
-    }
-
-    lines.push(`**Missing in SDK (present in API) — ${r.missingInSDK.length}**`);
-    lines.push("");
-    if (r.missingInSDK.length === 0) lines.push("- None");
-    else for (const p of r.missingInSDK) lines.push(`- \`${p}\``);
-    lines.push("");
-
-    lines.push(`**Missing in API (present in SDK) — ${r.missingInAPI.length}**`);
-    lines.push("");
-    if (r.missingInAPI.length === 0) lines.push("- None");
-    else for (const p of r.missingInAPI) lines.push(`- \`${p}\``);
-    lines.push("");
-
-    lines.push(`**Empty arrays omitted by SDK — ${r.emptyArraysOmittedInSDK.length}**`);
-    lines.push("");
-    if (r.emptyArraysOmittedInSDK.length === 0) lines.push("- None");
-    else for (const p of r.emptyArraysOmittedInSDK) lines.push(`- \`${p}\``);
-    lines.push("");
-
-    lines.push(`**Empty arrays omitted by API — ${r.emptyArraysOmittedInAPI.length}**`);
-    lines.push("");
-    if (r.emptyArraysOmittedInAPI.length === 0) lines.push("- None");
-    else for (const p of r.emptyArraysOmittedInAPI) lines.push(`- \`${p}\``);
-    lines.push("");
+    pushEndpointDetail(lines, r);
   }
 
   writeFileSync(reportPath, lines.join("\n"));
@@ -914,41 +972,36 @@ function writeReport(results: EndpointResult[]) {
       const end = "<!-- END GET_ENDPOINTS_CONSOLIDATED -->";
 
       const consolidated: string[] = [];
-      consolidated.push(`Last generated: ${generatedAt}`);
-      consolidated.push("");
-      consolidated.push(`- **Total GET endpoints**: ${total}`);
-      consolidated.push(`- **PASS**: ${passed}`);
-      consolidated.push(`- **FAIL**: ${failed}`);
-      consolidated.push(`- **SKIP**: ${skipped}`);
-      consolidated.push("");
-      consolidated.push("| Endpoint | OperationId | OpenAPI valid | SDK parse | Missing in SDK (present in API) | Missing in API (present in SDK) | Empty arrays omitted by SDK | Status |");
-      consolidated.push("|---|---|---:|---:|---|---|---|---|");
+      consolidated.push(
+        `Last generated: ${generatedAt}`,
+        "",
+        `- **Total GET endpoints**: ${total}`,
+        `- **PASS**: ${passed}`,
+        `- **FAIL**: ${failed}`,
+        `- **SKIP**: ${skipped}`,
+        "",
+        "| Endpoint | OperationId | OpenAPI valid | SDK parse | Missing in SDK (present in API) | Missing in API (present in SDK) | Empty arrays omitted by SDK | Status |",
+        "|---|---|---:|---:|---|---|---|---|",
+      );
       for (const r of results) {
-        const openapiCol = r.openapiValid ? "✅" : "❌";
-        const sdkCol = r.sdkParseOk ? "✅" : "❌";
-        const missSdk = r.missingInSDK.length ? r.missingInSDK.map((p) => `\`${p}\``).join(", ") : "None";
-        const missApi = r.missingInAPI.length ? r.missingInAPI.map((p) => `\`${p}\``).join(", ") : "None";
-        const emptyOmitted = r.emptyArraysOmittedInSDK.length ? r.emptyArraysOmittedInSDK.map((p) => `\`${p}\``).join(", ") : "None";
-        const status = r.status === "PASS" ? "✅ PASS" : "❌ FAIL";
-        consolidated.push(`| \`${r.endpoint}\` | \`${r.operationId}\` | ${openapiCol} | ${sdkCol} | ${missSdk} | ${missApi} | ${emptyOmitted} | ${status} |`);
+        consolidated.push(buildTableRow(r));
       }
-      consolidated.push("");
-      consolidated.push("#### Missing fields (full lists)");
-      consolidated.push("");
+      consolidated.push("", "#### Missing fields (full lists)", "");
       for (const r of results) {
-        consolidated.push(`- **${r.operationId}** (\`${r.endpoint}\`)`);
-        consolidated.push(`  - **Missing in SDK (present in API)**: ${r.missingInSDK.length ? r.missingInSDK.map((p) => `\`${p}\``).join(", ") : "None"}`);
-        consolidated.push(`  - **Missing in API (present in SDK)**: ${r.missingInAPI.length ? r.missingInAPI.map((p) => `\`${p}\``).join(", ") : "None"}`);
-        consolidated.push(`  - **Empty arrays omitted by SDK**: ${r.emptyArraysOmittedInSDK.length ? r.emptyArraysOmittedInSDK.map((p) => `\`${p}\``).join(", ") : "None"}`);
-        consolidated.push(`  - **Empty arrays omitted by API**: ${r.emptyArraysOmittedInAPI.length ? r.emptyArraysOmittedInAPI.map((p) => `\`${p}\``).join(", ") : "None"}`);
+        consolidated.push(
+          `- **${r.operationId}** (\`${r.endpoint}\`)`,
+          `  - **Missing in SDK (present in API)**: ${formatPaths(r.missingInSDK)}`,
+          `  - **Missing in API (present in SDK)**: ${formatPaths(r.missingInAPI)}`,
+          `  - **Empty arrays omitted by SDK**: ${formatPaths(r.emptyArraysOmittedInSDK)}`,
+          `  - **Empty arrays omitted by API**: ${formatPaths(r.emptyArraysOmittedInAPI)}`,
+        );
       }
-      consolidated.push("");
-      consolidated.push(`Full details: \`tests/GET_ENDPOINTS_OPENAPI_RESPONSE_VALIDATION_REPORT.md\``);
+      consolidated.push("", `Full details: \`tests/GET_ENDPOINTS_OPENAPI_RESPONSE_VALIDATION_REPORT.md\``);
 
       const readme = readFileSync(readmePath, "utf-8");
       if (readme.includes(begin) && readme.includes(end)) {
         const block = `${begin}\n${consolidated.join("\n")}\n${end}`;
-        const updated = readme.replace(new RegExp(`${begin}[\\s\\S]*?${end}`), block);
+        const updated = readme.replace(new RegExp(String.raw`${begin}[\s\S]*?${end}`), block);
         writeFileSync(readmePath, updated);
       }
     }
@@ -964,6 +1017,130 @@ function writeReport(results: EndpointResult[]) {
   console.log(`Summary: total=${total} pass=${passed} fail=${failed} skip=${skipped}`);
 }
 
+type FetchResult = { httpStatus: number; rawBody: any; requestError: string | undefined };
+
+async function fetchApiResponse(url: string, username: string, password: string): Promise<FetchResult> {
+  let httpStatus = 0;
+  let rawBody: any = null;
+  let requestError: string | undefined;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json", Authorization: basicAuthHeader(username, password) },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    httpStatus = res.status;
+    const bodyText = await res.text();
+    try { rawBody = bodyText ? JSON.parse(bodyText) : null; } catch { rawBody = bodyText; }
+  } catch (e: any) {
+    requestError = e.name === "AbortError" ? "Request timeout (30s)" : (e?.message ?? String(e));
+    // eslint-disable-next-line no-console
+    console.error(`  ⚠️  API request failed: ${requestError}`);
+  }
+  return { httpStatus, rawBody, requestError };
+}
+
+function validateApiResponse(
+  spec: any, ep: EndpointInfo, httpStatus: number, rawBody: any, requestError: string | undefined,
+): { openapiValid: boolean; openapiErrors: any[] } {
+  if (requestError) return { openapiValid: false, openapiErrors: [{ message: `Request failed: ${requestError}` }] };
+  const validator = makeOpenAPIResponseValidator(spec, ep);
+  if (!validator) return { openapiValid: true, openapiErrors: [] };
+  const err = validator.validateResponse(String(httpStatus), rawBody);
+  return err ? { openapiValid: false, openapiErrors: err.errors || [] } : { openapiValid: true, openapiErrors: [] };
+}
+
+type SDKResult = { sdkParseOk: boolean; sdkParseError: string | undefined; sdkPrinted: any; sdkValueForDiff: any };
+
+function invokeSDK(ep: EndpointInfo, fixtures: Fixture | null, baseUrl: string, username: string, password: string): SDKResult {
+  const sdkReq = buildSDKRequest(ep, fixtures);
+  const sdk = invokeGoSDK(ep.operationId, sdkReq, baseUrl, username, password);
+  if (sdk.ok) return { sdkParseOk: true, sdkParseError: undefined, sdkPrinted: sdk.value, sdkValueForDiff: sdk.value };
+  // eslint-disable-next-line no-console
+  console.error(`  ⚠️  Go SDK call failed: ${sdk.error?.message ?? "Go SDK call failed"}`);
+  // Persist just the raw API error body (when present) as the SDK artifact so it
+  // matches the .api.json byte-for-byte, instead of the harness error envelope
+  // ({name, message, statusCode, bodyJson}).
+  return { sdkParseOk: false, sdkParseError: sdk.error?.message ?? "Go SDK call failed", sdkPrinted: sdk.error?.bodyJson ?? sdk.error, sdkValueForDiff: null };
+}
+
+type DiffResult = { missingInSDK: string[]; missingInAPI: string[]; emptyArraysOmittedInSDK: string[]; emptyArraysOmittedInAPI: string[] };
+
+function computeDiff(operationId: string, rawBody: any, sdkValueForDiff: any): DiffResult {
+  const apiNormalized = normalizeJsonForComparison(remapApiForComparison(operationId, rawBody));
+  const sdkJsonLike = (sdkValueForDiff && typeof sdkValueForDiff === "object") ? jsonRoundTrip(sdkValueForDiff) : null;
+  const sdkNormalized = sdkJsonLike ? normalizeJsonForComparison(sdkJsonLike) : null;
+  const apiPaths = collectJsonPaths(apiNormalized, "", { includeEmptyArrays: false });
+  const sdkPaths = sdkNormalized ? collectJsonPaths(sdkNormalized, "", { includeEmptyArrays: false }) : new Set<string>();
+  const missingInSDK = sdkPaths.size ? sortUnique([...apiPaths].filter((p) => !sdkPaths.has(p))) : [];
+  const missingInAPI = sdkPaths.size ? sortUnique([...sdkPaths].filter((p) => !apiPaths.has(p))) : [];
+  const apiStrictPaths = collectJsonPaths(apiNormalized, "", { includeEmptyArrays: true });
+  const sdkStrictPaths = sdkNormalized ? collectJsonPaths(sdkNormalized, "", { includeEmptyArrays: true }) : new Set<string>();
+  const apiEmptyArrayFields = collectEmptyArrayFieldPaths(apiNormalized);
+  const sdkEmptyArrayFields = sdkNormalized ? collectEmptyArrayFieldPaths(sdkNormalized) : new Set<string>();
+  const emptyArraysOmittedInSDK = sortUnique([...apiEmptyArrayFields].filter((p) => !sdkStrictPaths.has(p)));
+  const emptyArraysOmittedInAPI = sortUnique([...sdkEmptyArrayFields].filter((p) => !apiStrictPaths.has(p)));
+  return { missingInSDK, missingInAPI, emptyArraysOmittedInSDK, emptyArraysOmittedInAPI };
+}
+
+async function processEndpoint(
+  ep: EndpointInfo,
+  spec: any,
+  fixtures: Fixture | null,
+  baseUrl: string,
+  username: string,
+  password: string,
+): Promise<EndpointResult> {
+  let rawBody: any = null;
+  let sdkPrinted: any = null;
+  let result: EndpointResult;
+
+  try {
+    const { url, note } = buildUrl(baseUrl, ep, fixtures);
+    const fetchRes = await fetchApiResponse(url, username, password);
+    rawBody = fetchRes.rawBody;
+    const { httpStatus, requestError } = fetchRes;
+    const { openapiValid, openapiErrors } = validateApiResponse(spec, ep, httpStatus, rawBody, requestError);
+    const sdkRes = invokeSDK(ep, fixtures, baseUrl, username, password);
+    sdkPrinted = sdkRes.sdkPrinted;
+    const { sdkParseOk, sdkParseError, sdkValueForDiff } = sdkRes;
+    const { missingInSDK, missingInAPI, emptyArraysOmittedInSDK, emptyArraysOmittedInAPI } = computeDiff(ep.operationId, rawBody, sdkValueForDiff);
+    const pass = openapiValid && sdkParseOk && missingInSDK.length === 0 && missingInAPI.length === 0;
+    result = {
+      endpoint: ep.path, operationId: ep.operationId, method: "GET",
+      openapiValid, openapiErrors, sdkParseOk, sdkParseError,
+      missingInSDK, missingInAPI, emptyArraysOmittedInSDK, emptyArraysOmittedInAPI,
+      apiResponseFile: undefined, sdkResponseFile: undefined,
+      apiResponsePreview: undefined, sdkResponsePreview: undefined,
+      status: pass ? "PASS" : "FAIL", note, fixSuggestions: undefined,
+    };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error(`  ✗ Unexpected error processing ${ep.operationId}:`, error?.message ?? String(error));
+    result = {
+      endpoint: ep.path, operationId: ep.operationId, method: "GET",
+      openapiValid: false, openapiErrors: [{ message: `Unexpected error: ${error?.message ?? String(error)}` }],
+      sdkParseOk: false, sdkParseError: error?.message ?? String(error),
+      missingInSDK: [], missingInAPI: [], emptyArraysOmittedInSDK: [], emptyArraysOmittedInAPI: [],
+      status: "FAIL", note: "Unexpected error during processing", fixSuggestions: undefined,
+    };
+  }
+
+  // Write artifacts OUTSIDE try/catch so they always get written
+  const artifacts = writeArtifactFiles(ep.operationId, rawBody, sdkPrinted);
+  result.apiResponseFile = artifacts.apiPath;
+  result.sdkResponseFile = artifacts.sdkPath;
+  result.apiResponsePreview = artifacts.apiPreview;
+  result.sdkResponsePreview = artifacts.sdkPreview;
+
+  return result;
+}
+const ENV_FALLBACK_USER = "your-access-token";
+const ENV_FALLBACK_PASS = "your-secret-key";
+
 async function main(): Promise<void> {
   const spec = loadOpenAPISpec();
   const endpoints = extractGetEndpoints(spec);
@@ -973,10 +1150,10 @@ async function main(): Promise<void> {
     process.env.FASTPIX_BASE_URL
     ?? ((spec.servers?.[0]?.url as string | undefined) ?? "https://api.fastpix.com/v1/");
 
-  const username = process.env.FASTPIX_USERNAME ?? "your-access-token";
-  const password = process.env.FASTPIX_PASSWORD ?? "your-secret-key";
+  const username = process.env.FASTPIX_USERNAME ?? ENV_FALLBACK_USER;
+  const password = process.env.FASTPIX_PASSWORD ?? ENV_FALLBACK_PASS;
 
-  if (!username || !password || username === "your-access-token" || password === "your-secret-key") {
+  if (!username || !password || username === ENV_FALLBACK_USER || password === ENV_FALLBACK_PASS) {
     throw new Error("Set FASTPIX_USERNAME and FASTPIX_PASSWORD env vars for BasicAuth (use real credentials for live API validation)");
   }
 
@@ -987,157 +1164,10 @@ async function main(): Promise<void> {
     const ep = endpoints[i];
     // eslint-disable-next-line no-console
     console.log(`[${i + 1}/${totalEndpoints}] Processing: ${ep.operationId} (${ep.path})`);
-
-    try {
-      const { url, note } = buildUrl(baseUrl, ep, fixtures);
-
-      let httpStatus = 0;
-      let rawBody: any = null;
-      let requestError: string | undefined;
-      try {
-        // Add timeout to prevent hanging
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-        const res = await fetch(url, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            Authorization: basicAuthHeader(username, password),
-          },
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        httpStatus = res.status;
-        const bodyText = await res.text();
-        try {
-          rawBody = bodyText ? JSON.parse(bodyText) : null;
-        } catch {
-          rawBody = bodyText;
-        }
-      } catch (e: any) {
-        if (e.name === 'AbortError') {
-          requestError = "Request timeout (30s)";
-        } else {
-          requestError = e?.message ?? String(e);
-        }
-        // eslint-disable-next-line no-console
-        console.error(`  ⚠️  API request failed: ${requestError}`);
-      }
-
-      const validator = makeOpenAPIResponseValidator(spec, ep);
-      let openapiValid = true;
-      let openapiErrors: any[] = [];
-      if (requestError) {
-        openapiValid = false;
-        openapiErrors = [{ message: `Request failed: ${requestError}` }];
-      } else if (validator) {
-        const err = validator.validateResponse(String(httpStatus), rawBody);
-        if (err) {
-          openapiValid = false;
-          openapiErrors = err.errors || [];
-        }
-      }
-
-      // SDK output: call SDK and capture success result or thrown error (normalized).
-      const sdkReq = buildSDKRequest(ep, fixtures);
-      let sdkParseOk = true;
-      let sdkParseError: string | undefined;
-      let sdkPrinted: any = null;
-      let sdkValueForDiff: any = null;
-
-      const sdk = invokeGoSDK(ep.operationId, sdkReq, baseUrl, username, password);
-      if (sdk.ok) {
-        sdkValueForDiff = sdk.value;
-        sdkPrinted = sdk.value;
-      } else {
-        sdkParseOk = false;
-        sdkParseError = sdk.error?.message ?? "Go SDK call failed";
-        sdkPrinted = sdk.error;
-        // eslint-disable-next-line no-console
-        console.error(`  ⚠️  Go SDK call failed: ${sdkParseError}`);
-      }
-
-      const apiNormalized = normalizeJsonForComparison(remapApiForComparison(ep.operationId, rawBody));
-      const sdkJsonLike =
-        (sdkValueForDiff && typeof sdkValueForDiff === "object")
-          ? jsonRoundTrip(sdkValueForDiff)
-          : null;
-      const sdkNormalized = sdkJsonLike ? normalizeJsonForComparison(sdkJsonLike) : null;
-
-      // Treat `[]` the same as "missing" for comparison.
-      const apiPaths = collectJsonPaths(apiNormalized, "", { includeEmptyArrays: false });
-      const sdkPaths = sdkNormalized ? collectJsonPaths(sdkNormalized, "", { includeEmptyArrays: false }) : new Set<string>();
-
-      const missingInSDK = sdkPaths.size
-        ? sortUnique([...apiPaths].filter((p) => !sdkPaths.has(p)))
-        : [];
-      const missingInAPI = sdkPaths.size
-        ? sortUnique([...sdkPaths].filter((p) => !apiPaths.has(p)))
-        : [];
-
-      const apiStrictPaths = collectJsonPaths(apiNormalized, "", { includeEmptyArrays: true });
-      const sdkStrictPaths = sdkNormalized ? collectJsonPaths(sdkNormalized, "", { includeEmptyArrays: true }) : new Set<string>();
-      const apiEmptyArrayFields = collectEmptyArrayFieldPaths(apiNormalized);
-      const sdkEmptyArrayFields = sdkNormalized ? collectEmptyArrayFieldPaths(sdkNormalized) : new Set<string>();
-
-      const emptyArraysOmittedInSDK = sortUnique([...apiEmptyArrayFields].filter((p) => !sdkStrictPaths.has(p)));
-      const emptyArraysOmittedInAPI = sortUnique([...sdkEmptyArrayFields].filter((p) => !apiStrictPaths.has(p)));
-
-      const pass = openapiValid && sdkParseOk && missingInSDK.length === 0 && missingInAPI.length === 0;
-
-      const artifacts = writeArtifactFiles(
-        ep.operationId,
-        rawBody,
-        sdkPrinted,
-      );
-
-      results.push({
-        endpoint: ep.path,
-        operationId: ep.operationId,
-        method: "GET",
-        openapiValid,
-        openapiErrors,
-        sdkParseOk,
-        sdkParseError,
-        missingInSDK,
-        missingInAPI,
-        emptyArraysOmittedInSDK,
-        emptyArraysOmittedInAPI,
-        apiResponseFile: artifacts.apiPath,
-        sdkResponseFile: artifacts.sdkPath,
-        apiResponsePreview: artifacts.apiPreview,
-        sdkResponsePreview: artifacts.sdkPreview,
-        status: pass ? "PASS" : "FAIL",
-        note,
-        fixSuggestions: undefined,
-      });
-
-      // eslint-disable-next-line no-console
-      console.log(`  ✓ Completed: ${ep.operationId} - ${results[results.length - 1].status}`);
-    } catch (error: any) {
-      // Catch any unexpected errors and continue with next endpoint
-      // eslint-disable-next-line no-console
-      console.error(`  ✗ Unexpected error processing ${ep.operationId}:`, error?.message ?? String(error));
-      results.push({
-        endpoint: ep.path,
-        operationId: ep.operationId,
-        method: "GET",
-        openapiValid: false,
-        openapiErrors: [{ message: `Unexpected error: ${error?.message ?? String(error)}` }],
-        sdkParseOk: false,
-        sdkParseError: error?.message ?? String(error),
-        missingInSDK: [],
-        missingInAPI: [],
-        emptyArraysOmittedInSDK: [],
-        emptyArraysOmittedInAPI: [],
-        status: "FAIL",
-        note: "Unexpected error during processing",
-        fixSuggestions: undefined,
-      });
-    }
+    const result = await processEndpoint(ep, spec, fixtures, baseUrl, username, password);
+    results.push(result);
+    // eslint-disable-next-line no-console
+    console.log(`  ✓ Completed: ${ep.operationId} - ${result.status}`);
   }
 
   for (const r of results) {

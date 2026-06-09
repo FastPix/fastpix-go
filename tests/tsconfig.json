@@ -10,6 +10,6 @@
     "lib": ["ESNext", "DOM"],
     "types": ["node"]
   },
-  "include": ["**/*"],
+  "include": ["**/*.ts","**/*.tsx"],
   "exclude": ["node_modules"]
 }

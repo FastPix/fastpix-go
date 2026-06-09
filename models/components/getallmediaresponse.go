@@ -224,15 +224,15 @@ func (u *GetAllMediaResponseTrack) UnmarshalJSON(data []byte) error {
 			Value: &subtitleTrack,
 		})
 	}
-
+    const errNotSupported = "could not unmarshal `%s` into any supported union types for GetAllMediaResponseTrack"
 	if len(candidates) == 0 {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for GetAllMediaResponseTrack", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Pick the best candidate using multi-stage filtering
 	best := utils.PickBestUnionCandidate(candidates, data)
 	if best == nil {
-		return fmt.Errorf("could not unmarshal `%s` into any supported union types for GetAllMediaResponseTrack", string(data))
+		return fmt.Errorf(errNotSupported, string(data))
 	}
 
 	// Set the union type and value based on the best candidate
@@ -249,7 +249,7 @@ func (u *GetAllMediaResponseTrack) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return fmt.Errorf("could not unmarshal `%s` into any supported union types for GetAllMediaResponseTrack", string(data))
+	return fmt.Errorf(errNotSupported, string(data))
 }
 
 func (u GetAllMediaResponseTrack) MarshalJSON() ([]byte, error) {
