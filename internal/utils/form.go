@@ -7,179 +7,180 @@
 package utils
 
 import (
-    "fmt"
-    "math/big"
-    "net/url"
-    "reflect"
-    "strings"
-    "time"
+	"fmt"
+	"math/big"
+	"net/url"
+	"reflect"
+	"strings"
+	"time"
 
-    "github.com/FastPix/fastpix-go/optionalnullable"
-    "github.com/FastPix/fastpix-go/types"
+	"github.com/FastPix/fastpix-go/optionalnullable"
+	"github.com/FastPix/fastpix-go/types"
 )
+
 type FormPopulateConfig struct {
-    ParamName       string
-    DefaultValue    *string
-    AllowEmptyValue map[string]struct{}
-    GetFieldName    func(reflect.StructField) string
+	ParamName       string
+	DefaultValue    *string
+	AllowEmptyValue map[string]struct{}
+	GetFieldName    func(reflect.StructField) string
 }
 type reflectContext struct {
-    objType   reflect.Type
-    objValue  reflect.Value
-    delimiter string
-    explode   bool
+	objType   reflect.Type
+	objValue  reflect.Value
+	delimiter string
+	explode   bool
 }
 
 func populateForm(cfg FormPopulateConfig, rctx reflectContext) url.Values {
-    formValues := url.Values{}
+	formValues := url.Values{}
 
-    if isNil(rctx.objType, rctx.objValue) {
-        return handleNilValue(cfg, formValues)
-    }
+	if isNil(rctx.objType, rctx.objValue) {
+		return handleNilValue(cfg, formValues)
+	}
 
-    if rctx.objType.Kind() == reflect.Pointer {
-        rctx.objType = rctx.objType.Elem()
-        rctx.objValue = rctx.objValue.Elem()
-    }
+	if rctx.objType.Kind() == reflect.Pointer {
+		rctx.objType = rctx.objType.Elem()
+		rctx.objValue = rctx.objValue.Elem()
+	}
 
-    switch rctx.objType.Kind() {
-    case reflect.Struct:
-        populateFormStruct(cfg, rctx, formValues)
-    case reflect.Map:
-        populateFormMap(cfg, rctx, formValues)
-    case reflect.Slice, reflect.Array:
-        populateFormSlice(cfg, rctx, formValues)
-    default:
-        populateFormScalar(cfg, rctx, formValues)
-    }
+	switch rctx.objType.Kind() {
+	case reflect.Struct:
+		populateFormStruct(cfg, rctx, formValues)
+	case reflect.Map:
+		populateFormMap(cfg, rctx, formValues)
+	case reflect.Slice, reflect.Array:
+		populateFormSlice(cfg, rctx, formValues)
+	default:
+		populateFormScalar(cfg, rctx, formValues)
+	}
 
-    return formValues
+	return formValues
 }
 func handleNilValue(cfg FormPopulateConfig, formValues url.Values) url.Values {
-    if cfg.DefaultValue != nil {
-        formValues.Add(cfg.ParamName, *cfg.DefaultValue)
-    } else if _, ok := cfg.AllowEmptyValue[cfg.ParamName]; ok {
-        formValues.Add(cfg.ParamName, "")
-    }
-    return formValues
+	if cfg.DefaultValue != nil {
+		formValues.Add(cfg.ParamName, *cfg.DefaultValue)
+	} else if _, ok := cfg.AllowEmptyValue[cfg.ParamName]; ok {
+		formValues.Add(cfg.ParamName, "")
+	}
+	return formValues
 }
 
 func populateFormStruct(cfg FormPopulateConfig, rctx reflectContext, formValues url.Values) {
-    switch rctx.objValue.Interface().(type) {
-    case time.Time, types.Date, big.Int:
-        formValues.Add(cfg.ParamName, valToString(rctx.objValue.Interface()))
-    default:
-        populateFormStructFields(cfg, rctx, formValues)
-    }
+	switch rctx.objValue.Interface().(type) {
+	case time.Time, types.Date, big.Int:
+		formValues.Add(cfg.ParamName, valToString(rctx.objValue.Interface()))
+	default:
+		populateFormStructFields(cfg, rctx, formValues)
+	}
 }
 
 func populateFormStructFields(cfg FormPopulateConfig, rctx reflectContext, formValues url.Values) {
-    var items []string
+	var items []string
 
-    for i := 0; i < rctx.objType.NumField(); i++ {
-        fieldType := rctx.objType.Field(i)
-        valType := rctx.objValue.Field(i)
+	for i := 0; i < rctx.objType.NumField(); i++ {
+		fieldType := rctx.objType.Field(i)
+		valType := rctx.objValue.Field(i)
 
-        if isNil(fieldType.Type, valType) {
-            continue
-        }
+		if isNil(fieldType.Type, valType) {
+			continue
+		}
 
-        if valType.Kind() == reflect.Pointer {
-            valType = valType.Elem()
-        }
+		if valType.Kind() == reflect.Pointer {
+			valType = valType.Elem()
+		}
 
-        fieldName := cfg.GetFieldName(fieldType)
-        if fieldName == "" {
-            continue
-        }
+		fieldName := cfg.GetFieldName(fieldType)
+		if fieldName == "" {
+			continue
+		}
 
-        if rctx.explode {
-            addExplodedStructField(fieldName, valType, formValues)
-        } else {
-            items = append(items, fmt.Sprintf("%s%s%s", fieldName, rctx.delimiter, valToString(valType.Interface())))
-        }
-    }
+		if rctx.explode {
+			addExplodedStructField(fieldName, valType, formValues)
+		} else {
+			items = append(items, fmt.Sprintf("%s%s%s", fieldName, rctx.delimiter, valToString(valType.Interface())))
+		}
+	}
 
-    if len(items) > 0 {
-        formValues.Add(cfg.ParamName, strings.Join(items, rctx.delimiter))
-    }
+	if len(items) > 0 {
+		formValues.Add(cfg.ParamName, strings.Join(items, rctx.delimiter))
+	}
 }
 func addExplodedStructField(fieldName string, valType reflect.Value, formValues url.Values) {
-    if valType.Kind() == reflect.Slice || valType.Kind() == reflect.Array {
-        for i := 0; i < valType.Len(); i++ {
-            formValues.Add(fieldName, valToString(valType.Index(i).Interface()))
-        }
-    } else {
-        formValues.Add(fieldName, valToString(valType.Interface()))
-    }
+	if valType.Kind() == reflect.Slice || valType.Kind() == reflect.Array {
+		for i := 0; i < valType.Len(); i++ {
+			formValues.Add(fieldName, valToString(valType.Index(i).Interface()))
+		}
+	} else {
+		formValues.Add(fieldName, valToString(valType.Interface()))
+	}
 }
 
 func populateFormMap(cfg FormPopulateConfig, rctx reflectContext, formValues url.Values) {
-    if nullableValue, ok := optionalnullable.AsOptionalNullable(rctx.objValue); ok {
-        if value, isSet := nullableValue.GetUntyped(); isSet && value != nil {
-            formValues.Add(cfg.ParamName, valToString(value))
-        }
-        return
-    }
+	if nullableValue, ok := optionalnullable.AsOptionalNullable(rctx.objValue); ok {
+		if value, isSet := nullableValue.GetUntyped(); isSet && value != nil {
+			formValues.Add(cfg.ParamName, valToString(value))
+		}
+		return
+	}
 
-    var items []string
+	var items []string
 
-    iter := rctx.objValue.MapRange()
-    for iter.Next() {
-        if rctx.explode {
-            formValues.Add(iter.Key().String(), valToString(iter.Value().Interface()))
-        } else {
-            items = append(items, fmt.Sprintf("%s%s%s", iter.Key().String(), rctx.delimiter, valToString(iter.Value().Interface())))
-        }
-    }
+	iter := rctx.objValue.MapRange()
+	for iter.Next() {
+		if rctx.explode {
+			formValues.Add(iter.Key().String(), valToString(iter.Value().Interface()))
+		} else {
+			items = append(items, fmt.Sprintf("%s%s%s", iter.Key().String(), rctx.delimiter, valToString(iter.Value().Interface())))
+		}
+	}
 
-    if len(items) > 0 {
-        formValues.Add(cfg.ParamName, strings.Join(items, rctx.delimiter))
-    }
+	if len(items) > 0 {
+		formValues.Add(cfg.ParamName, strings.Join(items, rctx.delimiter))
+	}
 }
 
 func populateFormSlice(cfg FormPopulateConfig, rctx reflectContext, formValues url.Values) {
-    if rctx.objValue.Len() == 0 {
-        if _, ok := cfg.AllowEmptyValue[cfg.ParamName]; ok {
-            formValues.Add(cfg.ParamName, "")
-        }
-        return
-    }
+	if rctx.objValue.Len() == 0 {
+		if _, ok := cfg.AllowEmptyValue[cfg.ParamName]; ok {
+			formValues.Add(cfg.ParamName, "")
+		}
+		return
+	}
 
-    for _, v := range parseDelimitedArray(rctx.explode, rctx.objValue, rctx.delimiter) {
-        formValues.Add(cfg.ParamName, v)
-    }
+	for _, v := range parseDelimitedArray(rctx.explode, rctx.objValue, rctx.delimiter) {
+		formValues.Add(cfg.ParamName, v)
+	}
 }
 
 func populateFormScalar(cfg FormPopulateConfig, rctx reflectContext, formValues url.Values) {
-    if rctx.objType.Kind() == reflect.String {
-        formValues.Add(cfg.ParamName, rctx.objValue.String())
-        return
-    }
+	if rctx.objType.Kind() == reflect.String {
+		formValues.Add(cfg.ParamName, rctx.objValue.String())
+		return
+	}
 
-    stringValue := valToString(rctx.objValue.Interface())
-    if stringValue != "" {
-        formValues.Add(cfg.ParamName, stringValue)
-    } else if _, ok := cfg.AllowEmptyValue[cfg.ParamName]; ok {
-        formValues.Add(cfg.ParamName, "")
-    }
+	stringValue := valToString(rctx.objValue.Interface())
+	if stringValue != "" {
+		formValues.Add(cfg.ParamName, stringValue)
+	} else if _, ok := cfg.AllowEmptyValue[cfg.ParamName]; ok {
+		formValues.Add(cfg.ParamName, "")
+	}
 }
 
 func parseDelimitedArray(explode bool, objValue reflect.Value, delimiter string) []string {
-    values := []string{}
-    items := []string{}
+	values := []string{}
+	items := []string{}
 
-    for i := 0; i < objValue.Len(); i++ {
-        if explode {
-            values = append(values, valToString(objValue.Index(i).Interface()))
-        } else {
-            items = append(items, valToString(objValue.Index(i).Interface()))
-        }
-    }
+	for i := 0; i < objValue.Len(); i++ {
+		if explode {
+			values = append(values, valToString(objValue.Index(i).Interface()))
+		} else {
+			items = append(items, valToString(objValue.Index(i).Interface()))
+		}
+	}
 
-    if len(items) > 0 {
-        values = append(values, strings.Join(items, delimiter))
-    }
+	if len(items) > 0 {
+		values = append(values, strings.Join(items, delimiter))
+	}
 
-    return values
+	return values
 }

@@ -199,7 +199,9 @@ func (s *Playback) Create(ctx context.Context, mediaID string, body *operations.
 	}
 	return res, nil
 }
- const onDemandMediaPlaybackID = "/on-demand/{mediaId}/playback-ids"
+
+const onDemandMediaPlaybackID = "/on-demand/{mediaId}/playback-ids"
+
 // List - Get all playback IDs details for a media
 func (s *Playback) List(ctx context.Context, mediaID string, opts ...operations.Option) (*operations.ListPlaybackIdsResponse, error) {
 	o, err := applyOptions(opts)

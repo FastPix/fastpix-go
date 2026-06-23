@@ -12,6 +12,7 @@ import (
 	fastpixgo "github.com/FastPix/fastpix-go"
 	"github.com/FastPix/fastpix-go/models/components"
 	"github.com/FastPix/fastpix-go/models/operations"
+	"github.com/FastPix/fastpix-go/optionalnullable"
 )
 
 const dataPoints = "Data points: %d\n"
@@ -31,9 +32,9 @@ func main() {
 	fmt.Println("\n--- Listing Video Views ---")
 
 	viewsRequest := operations.ListVideoViewsRequest{
-		Timespan: operations.ListVideoViewsTimespanTwentyFourhours,
+		Timespan: operations.ListVideoViewsTimespanTwentyFourhours.ToPointer(),
 		Limit:    fastpixgo.Int64(10),
-		Offset:   fastpixgo.Int64(0),
+		Offset:   fastpixgo.Int64(1),
 	}
 
 	viewsResponse, err := client.Views.ListVideoViews(ctx, viewsRequest)
@@ -43,16 +44,14 @@ func main() {
 		printVideoViews(viewsResponse)
 	}
 
-	if viewsResponse.Object != nil && len(viewsResponse.Object.Data) > 0 {
-		printViewDetails(ctx, client, viewsResponse.Object.Data[0].ViewID)
+	if viewsResponse != nil && viewsResponse.Object != nil && len(viewsResponse.Object.Data) > 0 {
+		printViewDetails(ctx, client, getStringValue(viewsResponse.Object.Data[0].ViewID))
 	}
 
 	listTopContent(ctx, client)
-	getTimeseriesViews(ctx, client)
 	getFilteredViews(ctx, client)
 	runMetricsAnalytics(ctx, client)
 	runDimensionsAnalytics(ctx, client)
-	runErrorAnalytics(ctx, client)
 	runAdvancedAnalyticsQueries(ctx, client)
 	runAnalyticsDashboardSummary(ctx, client)
 
@@ -60,36 +59,43 @@ func main() {
 }
 
 func printVideoViews(viewsResponse *operations.ListVideoViewsResponse) {
+	if viewsResponse.Object == nil {
+		return
+	}
 	fmt.Printf("Found %d video views in the last 24 hours:\n", len(viewsResponse.Object.Data))
 	for i, view := range viewsResponse.Object.Data {
-		fmt.Printf("  %d. View ID: %s, Media ID: %s, Duration: %d seconds\n",
-			i+1, view.ViewID, getStringValue(view.MediaID), getInt64Value(view.Duration))
+		fmt.Printf("  %d. View ID: %s, Title: %s, Watch Time: %.0f\n",
+			i+1, getStringValue(view.ViewID),
+			getOptString(view.VideoTitle), getOptFloat(view.ViewWatchTime))
 	}
 }
 
-func printViewDetails(ctx context.Context, client *fastpixgo.FastPix, viewID string) {
+func printViewDetails(ctx context.Context, client *fastpixgo.Fastpixgo, viewID string) {
 	fmt.Printf("\n--- Getting View Details: %s ---\n", viewID)
 
-	viewDetailsResponse, err := client.Views.GetVideoViewDetails(ctx, viewID)
+	viewDetailsResponse, err := client.Views.GetDetails(ctx, viewID)
 	if err != nil {
 		log.Printf("Error getting view details: %v", err)
 		return
 	}
+	if viewDetailsResponse.Object == nil || viewDetailsResponse.Object.Data == nil {
+		return
+	}
 
 	view := viewDetailsResponse.Object.Data
-	fmt.Printf("View ID: %s\n", view.ViewID)
-	fmt.Printf("Media ID: %s\n", getStringValue(view.MediaID))
-	fmt.Printf("Duration: %d seconds\n", getInt64Value(view.Duration))
-	fmt.Printf("Started: %s\n", getStringValue(view.StartedAt))
-	fmt.Printf("Ended: %s\n", getStringValue(view.EndedAt))
+	fmt.Printf("View ID: %s\n", getStringValue(view.ViewID))
+	fmt.Printf("Media ID: %s\n", getOptString(view.MediaID))
+	fmt.Printf("Video Title: %s\n", getOptString(view.VideoTitle))
+	fmt.Printf("View Start: %s\n", getOptString(view.ViewStart))
+	fmt.Printf("View End: %s\n", getOptString(view.ViewEnd))
 }
 
-func listTopContent(ctx context.Context, client *fastpixgo.FastPix) {
+func listTopContent(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Top Content ---")
 
 	topContentResponse, err := client.Views.ListByTopContent(
 		ctx,
-		operations.ListByTopContentTimespanTwentyFourhours,
+		operations.ListByTopContentTimespanTwentyFourhours.ToPointer(),
 		nil,
 		fastpixgo.Int64(10),
 	)
@@ -97,38 +103,31 @@ func listTopContent(ctx context.Context, client *fastpixgo.FastPix) {
 		log.Printf("Error listing top content: %v", err)
 		return
 	}
-
-	fmt.Printf("Found %d top content items:\n", len(topContentResponse.Object.Data))
-	for i, content := range topContentResponse.Object.Data {
-		fmt.Printf("  %d. Media ID: %s, Views: %d\n",
-			i+1, getStringValue(content.MediaID), getInt64Value(content.Views))
-	}
-}
-
-func getTimeseriesViews(ctx context.Context, client *fastpixgo.FastPix) {
-	fmt.Println("\n--- Timeseries Views ---")
-
-	timeseriesResponse, err := client.Views.GetDataViewlistCurrentViewsGetTimeseriesViews(ctx)
-	if err != nil {
-		log.Printf("Error getting timeseries views: %v", err)
+	if topContentResponse.Object == nil {
 		return
 	}
 
-	fmt.Printf("Timeseries views data retrieved successfully!\n")
-	fmt.Printf(dataPoints, len(timeseriesResponse.Object.Data))
+	fmt.Printf("Found %d top content items:\n", len(topContentResponse.Object.Data))
+	for i, content := range topContentResponse.Object.Data {
+		fmt.Printf("  %d. Title: %s, Views: %d, Unique Views: %d\n",
+			i+1, getStringValue(content.VideoTitle),
+			getInt64Value(content.Views), getInt64Value(content.UniqueViews))
+	}
 }
 
-func getFilteredViews(ctx context.Context, client *fastpixgo.FastPix) {
+func getFilteredViews(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Filtered Views by OS ---")
 
-	dimension := operations.GetDataViewlistCurrentViewsFilterDimensionOsName
-	filterResponse, err := client.Views.GetDataViewlistCurrentViewsFilter(
-		ctx,
-		&dimension,
-		fastpixgo.Int64(10),
-	)
+	filterResponse, err := client.Views.ListVideoViews(ctx, operations.ListVideoViewsRequest{
+		Timespan: operations.ListVideoViewsTimespanTwentyFourhours.ToPointer(),
+		Filterby: fastpixgo.String("os_name:macOS"),
+		Limit:    fastpixgo.Int64(10),
+	})
 	if err != nil {
 		log.Printf("Error filtering views: %v", err)
+		return
+	}
+	if filterResponse.Object == nil {
 		return
 	}
 
@@ -136,7 +135,7 @@ func getFilteredViews(ctx context.Context, client *fastpixgo.FastPix) {
 	fmt.Printf(dataPoints, len(filterResponse.Object.Data))
 }
 
-func runMetricsAnalytics(ctx context.Context, client *fastpixgo.FastPix) {
+func runMetricsAnalytics(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Metrics Analytics ===")
 
 	listBreakdownValues(ctx, client)
@@ -145,15 +144,16 @@ func runMetricsAnalytics(ctx context.Context, client *fastpixgo.FastPix) {
 	listComparisonValues(ctx, client)
 }
 
-func listBreakdownValues(ctx context.Context, client *fastpixgo.FastPix) {
+func listBreakdownValues(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Breakdown Values ---")
 
 	breakdownRequest := operations.ListBreakdownValuesRequest{
 		MetricID:    operations.ListBreakdownValuesMetricIDViews,
-		Timespan:    operations.ListBreakdownValuesTimespanTwentyFourhours,
+		Timespan:    operations.ListBreakdownValuesTimespanTwentyFourhours.ToPointer(),
+		GroupBy:     fastpixgo.String("browser_name"),
 		Limit:       fastpixgo.Int64(10),
-		Offset:      fastpixgo.Int64(0),
-		Measurement: fastpixgo.Pointer("count"),
+		Offset:      fastpixgo.Int64(1),
+		Measurement: fastpixgo.String("count"),
 	}
 
 	breakdownResponse, err := client.Metrics.ListBreakdownValues(ctx, breakdownRequest)
@@ -161,42 +161,48 @@ func listBreakdownValues(ctx context.Context, client *fastpixgo.FastPix) {
 		log.Printf("Error listing breakdown values: %v", err)
 		return
 	}
+	if breakdownResponse.Object == nil {
+		return
+	}
 
 	fmt.Printf("Found %d breakdown values:\n", len(breakdownResponse.Object.Data))
 	for i, value := range breakdownResponse.Object.Data {
-		fmt.Printf("  %d. Dimension: %s, Value: %s, Count: %d\n",
-			i+1, getStringValue(value.Dimension), getStringValue(value.Value), getInt64Value(value.Count))
+		fmt.Printf("  %d. Field: %s, Value: %.2f, Views: %d\n",
+			i+1, getOptString(value.Field),
+			getOptFloat(value.Value), getOptInt64(value.Views))
 	}
 }
 
-func listOverallValues(ctx context.Context, client *fastpixgo.FastPix) {
+func listOverallValues(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Overall Values ---")
 
 	overallResponse, err := client.Metrics.ListOverallValues(
 		ctx,
 		operations.ListOverallValuesMetricIDViews,
-		operations.ListOverallValuesTimespanTwentyFourhours,
-		fastpixgo.Pointer("count"),
+		fastpixgo.String("count"),
+		operations.ListOverallValuesTimespanTwentyFourhours.ToPointer(),
 		nil,
 	)
 	if err != nil {
 		log.Printf("Error listing overall values: %v", err)
 		return
 	}
+	if overallResponse.Object == nil || overallResponse.Object.Data == nil {
+		return
+	}
 
 	fmt.Printf("Overall values retrieved successfully!\n")
-	fmt.Printf("Total views: %d\n", getInt64Value(overallResponse.Object.Data.Total))
+	fmt.Printf("Total views: %d\n", getOptInt64(overallResponse.Object.Data.TotalViews))
 }
 
-func getTimeseriesData(ctx context.Context, client *fastpixgo.FastPix) {
+func getTimeseriesData(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Timeseries Data ---")
 
-	groupBy := operations.GroupByHour
 	timeseriesRequest := operations.GetTimeseriesDataRequest{
 		MetricID:    operations.GetTimeseriesDataMetricIDViews,
-		Timespan:    operations.GetTimeseriesDataTimespanTwentyFourhours,
-		GroupBy:     &groupBy,
-		Measurement: fastpixgo.Pointer("count"),
+		Timespan:    operations.GetTimeseriesDataTimespanTwentyFourhours.ToPointer(),
+		GroupBy:     operations.GroupByHour.ToPointer(),
+		Measurement: fastpixgo.String("count"),
 	}
 
 	timeseriesDataResponse, err := client.Metrics.GetTimeseriesData(ctx, timeseriesRequest)
@@ -204,19 +210,22 @@ func getTimeseriesData(ctx context.Context, client *fastpixgo.FastPix) {
 		log.Printf("Error getting timeseries data: %v", err)
 		return
 	}
+	if timeseriesDataResponse.Object == nil {
+		return
+	}
 
 	fmt.Printf("Timeseries data retrieved successfully!\n")
 	fmt.Printf(dataPoints, len(timeseriesDataResponse.Object.Data))
 }
 
-func listComparisonValues(ctx context.Context, client *fastpixgo.FastPix) {
+func listComparisonValues(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Comparison Values ---")
 
-	dimensionComp := operations.ListComparisonValuesDimensionBrowserName
+	dimensionComp := operations.DimensionBrowserName
 	value := "Chrome"
 	comparisonResponse, err := client.Metrics.ListComparisonValues(
 		ctx,
-		operations.ListComparisonValuesTimespanTwentyFourhours,
+		operations.ListComparisonValuesTimespanTwentyFourhours.ToPointer(),
 		nil,
 		&dimensionComp,
 		&value,
@@ -225,45 +234,53 @@ func listComparisonValues(ctx context.Context, client *fastpixgo.FastPix) {
 		log.Printf("Error listing comparison values: %v", err)
 		return
 	}
+	if comparisonResponse.Object == nil {
+		return
+	}
 
 	fmt.Printf("Comparison values retrieved successfully!\n")
 	fmt.Printf(dataPoints, len(comparisonResponse.Object.Data))
 }
 
-func runDimensionsAnalytics(ctx context.Context, client *fastpixgo.FastPix) {
+func runDimensionsAnalytics(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Dimensions ===")
 
 	listDimensions(ctx, client)
 	listFilterValuesForDimension(ctx, client)
 }
 
-func listDimensions(ctx context.Context, client *fastpixgo.FastPix) {
+func listDimensions(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Available Dimensions ---")
 
-	dimensionsResponse, err := client.Dimensions.ListDimensions(ctx)
+	dimensionsResponse, err := client.Dimensions.List(ctx)
 	if err != nil {
 		log.Printf("Error listing dimensions: %v", err)
+		return
+	}
+	if dimensionsResponse.Object == nil {
 		return
 	}
 
 	fmt.Printf("Found %d dimensions:\n", len(dimensionsResponse.Object.Data))
 	for i, dimension := range dimensionsResponse.Object.Data {
-		fmt.Printf("  %d. ID: %s, Name: %s\n",
-			i+1, getStringValue(dimension.ID), getStringValue(dimension.Name))
+		fmt.Printf("  %d. %s\n", i+1, dimension)
 	}
 }
 
-func listFilterValuesForDimension(ctx context.Context, client *fastpixgo.FastPix) {
+func listFilterValuesForDimension(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n--- Filter Values for Browser Name ---")
 
-	filterValuesResponse, err := client.Dimensions.ListFilterValuesForDimension(
+	filterValuesResponse, err := client.Dimensions.ListFilterValues(
 		ctx,
 		operations.DimensionsIDBrowserName,
-		operations.ListFilterValuesForDimensionTimespanTwentyFourhours,
+		operations.ListFilterValuesForDimensionTimespanTwentyFourhours.ToPointer(),
 		nil,
 	)
 	if err != nil {
 		log.Printf("Error listing filter values: %v", err)
+		return
+	}
+	if filterValuesResponse.Object == nil {
 		return
 	}
 
@@ -274,33 +291,11 @@ func listFilterValuesForDimension(ctx context.Context, client *fastpixgo.FastPix
 	}
 }
 
-func runErrorAnalytics(ctx context.Context, client *fastpixgo.FastPix) {
-	fmt.Println("\n=== Error Analytics ===")
-	fmt.Println("\n--- Recent Errors ---")
-
-	errorsResponse, err := client.Errors.ListErrors(
-		ctx,
-		operations.ListErrorsTimespanTwentyFourhours,
-		nil,
-		fastpixgo.Int64(10),
-	)
-	if err != nil {
-		log.Printf("Error listing errors: %v", err)
-		return
-	}
-
-	fmt.Printf("Found %d errors in the last 24 hours:\n", len(errorsResponse.Object.Data))
-	for i, error := range errorsResponse.Object.Data {
-		fmt.Printf("  %d. Error ID: %s, Type: %s, Message: %s\n",
-			i+1, error.ErrorID, getStringValue(error.Type), getStringValue(error.Message))
-	}
-}
-
-func runAdvancedAnalyticsQueries(ctx context.Context, client *fastpixgo.FastPix) {
+func runAdvancedAnalyticsQueries(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Advanced Analytics Queries ===")
 
 	timespans := []operations.ListVideoViewsTimespan{
-		operations.ListVideoViewsTimespanOnehour,
+		operations.ListVideoViewsTimespanSixtyminutes,
 		operations.ListVideoViewsTimespanTwentyFourhours,
 		operations.ListVideoViewsTimespanSevendays,
 		operations.ListVideoViewsTimespanThirtydays,
@@ -311,54 +306,47 @@ func runAdvancedAnalyticsQueries(ctx context.Context, client *fastpixgo.FastPix)
 	}
 }
 
-func printViewsForTimespan(ctx context.Context, client *fastpixgo.FastPix, timespan operations.ListVideoViewsTimespan) {
+func printViewsForTimespan(ctx context.Context, client *fastpixgo.Fastpixgo, timespan operations.ListVideoViewsTimespan) {
 	fmt.Printf("\n--- Views for %s ---\n", timespan)
 
 	response, err := client.Views.ListVideoViews(ctx, operations.ListVideoViewsRequest{
-		Timespan: timespan,
+		Timespan: timespan.ToPointer(),
 		Limit:    fastpixgo.Int64(5),
 	})
 	if err != nil {
 		log.Printf("Error getting views for %s: %v", timespan, err)
 		return
 	}
+	if response.Object == nil {
+		return
+	}
 
 	fmt.Printf("Found %d views\n", len(response.Object.Data))
 }
 
-func runAnalyticsDashboardSummary(ctx context.Context, client *fastpixgo.FastPix) {
+func runAnalyticsDashboardSummary(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Analytics Dashboard Summary ===")
 	fmt.Println("Generating analytics summary...")
 
 	overall, err := client.Metrics.ListOverallValues(
 		ctx,
 		operations.ListOverallValuesMetricIDViews,
-		operations.ListOverallValuesTimespanTwentyFourhours,
-		fastpixgo.Pointer("count"),
+		fastpixgo.String("count"),
+		operations.ListOverallValuesTimespanTwentyFourhours.ToPointer(),
 		nil,
 	)
-	if err == nil {
-		fmt.Printf("Total views (24h): %d\n", getInt64Value(overall.Object.Data.Total))
+	if err == nil && overall.Object != nil && overall.Object.Data != nil {
+		fmt.Printf("Total views (24h): %d\n", getOptInt64(overall.Object.Data.TotalViews))
 	}
 
 	topContent, err := client.Views.ListByTopContent(
 		ctx,
-		operations.ListByTopContentTimespanTwentyFourhours,
+		operations.ListByTopContentTimespanTwentyFourhours.ToPointer(),
 		nil,
 		fastpixgo.Int64(5),
 	)
-	if err == nil {
+	if err == nil && topContent.Object != nil {
 		fmt.Printf("Top 5 content items: %d items\n", len(topContent.Object.Data))
-	}
-
-	errors, err := client.Errors.ListErrors(
-		ctx,
-		operations.ListErrorsTimespanTwentyFourhours,
-		nil,
-		fastpixgo.Int64(5),
-	)
-	if err == nil {
-		fmt.Printf("Recent errors: %d errors\n", len(errors.Object.Data))
 	}
 }
 
@@ -374,4 +362,19 @@ func getInt64Value(ptr *int64) int64 {
 		return 0
 	}
 	return *ptr
+}
+
+func getOptString(n optionalnullable.OptionalNullable[string]) string {
+	v, _ := n.GetOrZero()
+	return v
+}
+
+func getOptInt64(n optionalnullable.OptionalNullable[int64]) int64 {
+	v, _ := n.GetOrZero()
+	return v
+}
+
+func getOptFloat(n optionalnullable.OptionalNullable[float64]) float64 {
+	v, _ := n.GetOrZero()
+	return v
 }

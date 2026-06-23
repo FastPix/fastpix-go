@@ -87,24 +87,24 @@ func (e *LanguageCode) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	var validLanguageCodes = map[string]struct{}{
-	"ar-SA": {}, "bn-BD": {}, "bn-IN": {}, "ca-ES": {}, "cs-CZ": {},
-	"da-DK": {}, "de-AT": {}, "de-CH": {}, "de-DE": {}, "el-GR": {},
-	"en-AU": {}, "en-CA": {}, "en-GB": {}, "en-IE": {}, "en-IN": {},
-	"en-NZ": {}, "en-US": {}, "en-ZA": {}, "es-AR": {}, "es-CL": {},
-	"es-CO": {}, "es-ES": {}, "es-MX": {}, "es-US": {}, "fi-FI": {},
-	"fr-BE": {}, "fr-CA": {}, "fr-CH": {}, "fr-FR": {}, "he-IL": {},
-	"hi-IN": {}, "hr-HR": {}, "hu-HU": {}, "id-ID": {}, "it-CH": {},
-	"it-IT": {}, "ja-JP": {}, "ko-KR": {}, "ms-MY": {}, "nb-NO": {},
-	"nl-BE": {}, "nl-NL": {}, "no-NO": {}, "pl-PL": {}, "pt-BR": {},
-	"pt-PT": {}, "ro-RO": {}, "ru-RU": {}, "sk-SK": {}, "sv-SE": {},
-	"ta-IN": {}, "ta-LK": {}, "te-IN": {}, "th-TH": {}, "tr-TR": {},
-	"uk-UA": {}, "vi-VN": {}, "bg-BG": {}, "zh-CN": {}, "zh-HK": {},
-	"zh-TW": {},
-}
+		"ar-SA": {}, "bn-BD": {}, "bn-IN": {}, "ca-ES": {}, "cs-CZ": {},
+		"da-DK": {}, "de-AT": {}, "de-CH": {}, "de-DE": {}, "el-GR": {},
+		"en-AU": {}, "en-CA": {}, "en-GB": {}, "en-IE": {}, "en-IN": {},
+		"en-NZ": {}, "en-US": {}, "en-ZA": {}, "es-AR": {}, "es-CL": {},
+		"es-CO": {}, "es-ES": {}, "es-MX": {}, "es-US": {}, "fi-FI": {},
+		"fr-BE": {}, "fr-CA": {}, "fr-CH": {}, "fr-FR": {}, "he-IL": {},
+		"hi-IN": {}, "hr-HR": {}, "hu-HU": {}, "id-ID": {}, "it-CH": {},
+		"it-IT": {}, "ja-JP": {}, "ko-KR": {}, "ms-MY": {}, "nb-NO": {},
+		"nl-BE": {}, "nl-NL": {}, "no-NO": {}, "pl-PL": {}, "pt-BR": {},
+		"pt-PT": {}, "ro-RO": {}, "ru-RU": {}, "sk-SK": {}, "sv-SE": {},
+		"ta-IN": {}, "ta-LK": {}, "te-IN": {}, "th-TH": {}, "tr-TR": {},
+		"uk-UA": {}, "vi-VN": {}, "bg-BG": {}, "zh-CN": {}, "zh-HK": {},
+		"zh-TW": {},
+	}
 
-if _, ok := validLanguageCodes[v]; ok {
-	*e = LanguageCode(v)
-	return nil
-}
-return fmt.Errorf("invalid value for LanguageCode: %v", v)
+	if _, ok := validLanguageCodes[v]; ok {
+		*e = LanguageCode(v)
+		return nil
+	}
+	return fmt.Errorf("invalid value for LanguageCode: %v", v)
 }

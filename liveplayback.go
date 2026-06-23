@@ -56,7 +56,6 @@ func (s *LivePlayback) resolveRetryConfig(o operations.Options) *retry.Config {
 	return s.sdkConfiguration.RetryConfig
 }
 
-
 // consumeAPIError reads the body and wraps it in a generic API error.
 func consumeAPIError(httpRes *http.Response) error {
 	rawBody, err := utils.ConsumeRawBody(httpRes)
@@ -133,7 +132,7 @@ func (s *LivePlayback) executeWithRetry(
 	retryConfig *retry.Config,
 ) (*http.Response, error) {
 	httpRes, err := utils.Retry(ctx, utils.Retries{
-		Config: retryConfig,
+		Config:      retryConfig,
 		StatusCodes: []string{"429", "500", "502", "503", "504"},
 	}, func() (*http.Response, error) {
 		return s.executeSingleAttempt(req, hookCtx)

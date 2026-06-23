@@ -19,6 +19,7 @@ type PlaybackTest struct {
 }
 
 func setupPlaybackTest(t *testing.T) *PlaybackTest {
+	RequireCredentials(t)
 	livestreamServerURL, baseServerUrl, username, password := LoadConfig()
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 	t.Logf("Using base server URL: %s", baseServerUrl)

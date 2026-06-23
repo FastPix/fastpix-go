@@ -23,7 +23,7 @@ The FastPix Go SDK simplifies integration with the FastPix platform. It provides
 To get started with the FastPix Go SDK, ensure you have the following:
 
 - The FastPix APIs are authenticated using a **Username** and a **Password**. You must generate these credentials to use the SDK.
-- Follow the steps in the [Authentication with Basic Auth](https://fastpix.com/docs/get-started/quickstart) guide to obtain your credentials.
+- Follow the steps in the [Authentication with Basic Auth](https://fastpix.com/docs/getting-started/activate-your-account) guide to obtain your credentials.
 
 ### Environment Variables (Optional)
 
@@ -203,7 +203,7 @@ Comprehensive Go SDK for FastPix platform integration with full API coverage.
 
 Upload, manage, and transform video content with comprehensive media management capabilities.
 
-For detailed documentation, see [FastPix Video on Demand Overview](https://fastpix.com/docs/get-started/overview).
+For detailed documentation, see [FastPix Video on Demand Overview](https://fastpix.com/docs/video-on-demand-api/overview).
 
 #### Input Video
 - [Create from URL](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/inputvideo/README.md#create) - Upload video content from external URL
@@ -251,7 +251,7 @@ For detailed documentation, see [FastPix Video on Demand Overview](https://fastp
 
 Stream, manage, and transform live video content with real-time broadcasting capabilities.
 
-For detailed documentation, see [FastPix Live Stream Overview](https://fastpix.com/docs/get-started/live-overview).
+For detailed documentation, see [FastPix Live Stream Overview](https://fastpix.com/docs/live-stream-api/overview).
 
 #### Start Live Stream
 - [Create Stream](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/startlivestream/README.md#create) - Initialize new live streaming session
@@ -281,7 +281,7 @@ For detailed documentation, see [FastPix Live Stream Overview](https://fastpix.c
 
 Monitor video performance and quality with comprehensive analytics and real-time metrics.
 
-For detailed documentation, see [FastPix Video Data Overview](https://fastpix.com/docs/get-started/video-data-introduction).
+For detailed documentation, see [FastPix Video Data Overview](https://fastpix.com/docs/video-data-api/overview).
 
 #### Metrics
 - [List Breakdown Values](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/metrics/README.md#listbreakdownvalues) - Get detailed breakdown of metrics by dimension

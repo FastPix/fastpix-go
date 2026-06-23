@@ -128,7 +128,7 @@ func (u *VideoInputSegmentUnion) UnmarshalJSON(data []byte) error {
 			Value: &videoInputSegment2,
 		})
 	}
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for VideoInputSegmentUnion"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for VideoInputSegmentUnion"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}

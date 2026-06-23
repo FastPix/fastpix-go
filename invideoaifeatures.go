@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	errApplyingOption    = "error applying option: %w"
-	userAgent            = "User-Agent"
-	applicationJSON      = "application/json"
+	errApplyingOption = "error applying option: %w"
+	userAgent         = "User-Agent"
+	applicationJSON   = "application/json"
 )
 
 type InVideoAIFeatures struct {

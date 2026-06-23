@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	errContentType               = "unknown content-type received: %s"
-	dimContentType               = "Content-Type"
+	errContentType = "unknown content-type received: %s"
+	dimContentType = "Content-Type"
 )
 
 // Dimensions - Operations involving dimensions

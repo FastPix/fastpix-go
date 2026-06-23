@@ -43,6 +43,7 @@ var (
 		http.MethodPut,
 	}
 )
+
 func Retry(ctx context.Context, r Retries, operation func() (*http.Response, error)) (*http.Response, error) {
 	if r.Config.Strategy != "backoff" {
 		return operation()

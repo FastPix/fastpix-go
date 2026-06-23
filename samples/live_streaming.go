@@ -28,72 +28,71 @@ func main() {
 
 	// 1. Create New Live Stream
 	fmt.Println("=== Creating New Live Stream ===")
+	reconnectWindow := int64(60)
 	createStreamRequest := components.CreateLiveStreamRequest{
 		PlaybackSettings: components.PlaybackSettings{
-			// Configure playback settings
+			AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
 		},
 		InputMediaSettings: components.InputMediaSettings{
-			// Configure input media settings
-		},
-		Metadata: map[string]string{
-			"name":        "My Live Stream",
-			"description": "A test live stream",
-			"category":    "gaming",
+			MaxResolution:   components.CreateLiveStreamRequestMaxResolutionOneThousandAndEightyp.ToPointer(),
+			ReconnectWindow: &reconnectWindow,
+			MediaPolicy:     components.BasicAccessPolicyPublic.ToPointer(),
 		},
 	}
-    createResponse, err := client.StartLiveStream.CreateNewStream(ctx, createStreamRequest)
+	createResponse, err := client.StartLiveStream.Create(ctx, createStreamRequest)
 	if err != nil {
 		log.Printf("Error creating live stream: %v", err)
 	} else {
-		printCreateStreamResult(createResponse)
+		printCreateStreamResult(createResponse.LiveStreamResponseDTO)
 	}
 
+	// 2. List All Live Streams
 	fmt.Println("\n=== Listing All Live Streams ===")
 	limit := int64(10)
 	offset := int64(0)
-	orderBy := components.SortOrderDesc
+	orderBy := operations.OrderByDesc
 
-	streamsResponse, err := client.ManageLiveStream.GetAllStreams(ctx, &limit, &offset, &orderBy)
+	streamsResponse, err := client.ManageLiveStream.List(ctx, &limit, &offset, &orderBy)
 	if err != nil {
 		log.Printf("Error listing streams: %v", err)
-	} else {
-		printStreamList(streamsResponse)
-	}
-
-	if streamsResponse.GetStreamsResponse == nil || len(streamsResponse.GetStreamsResponse.Data) == 0 {
 		return
 	}
+	if streamsResponse.GetStreamsResponse == nil || len(streamsResponse.GetStreamsResponse.Data) == 0 {
+		fmt.Println("No live streams found")
+		return
+	}
+	printStreamList(streamsResponse.GetStreamsResponse.Data)
 
 	streamID := *streamsResponse.GetStreamsResponse.Data[0].StreamID
 	manageStream(ctx, client, streamID)
+}
 
-func printCreateStreamResult(createResponse *operations.CreateNewStreamResponse) {
-	if createResponse.LiveStreamResponseDTO == nil || createResponse.LiveStreamResponseDTO.Data == nil {
+func printCreateStreamResult(dto *components.LiveStreamResponseDTO) {
+	if dto == nil || dto.Data == nil {
 		fmt.Println("Live stream created but no data returned")
 		return
 	}
 
-	data := createResponse.LiveStreamResponseDTO.Data
+	data := dto.Data
 	if data.StreamID != nil {
 		fmt.Printf("Live stream created successfully! Stream ID: %s\n", *data.StreamID)
 	}
-	fmt.Printf("RTMP URL: %s\n", getStringValue(data.RtmpURL))
 	fmt.Printf("Stream Key: %s\n", getStringValue(data.StreamKey))
+	fmt.Printf("Status: %s\n", getStringValue(data.Status))
 }
 
-func printStreamList(streamsResponse *operations.GetAllStreamsResponse) {
-	fmt.Printf("Found %d live streams:\n", len(streamsResponse.GetStreamsResponse.Data))
-	for i, stream := range streamsResponse.GetStreamsResponse.Data {
-		fmt.Printf("  %d. ID: %s, Name: %s, Status: %s\n",
-			i+1, *stream.StreamID, getStringValue(stream.Name), getStringValue(stream.Status))
+func printStreamList(streams []components.GetCreateLiveStreamResponseDTO) {
+	fmt.Printf("Found %d live streams:\n", len(streams))
+	for i, stream := range streams {
+		fmt.Printf("  %d. ID: %s, Status: %s\n",
+			i+1, getStringValue(stream.StreamID), getStringValue(stream.Status))
 	}
 }
 
-func manageStream(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
+func manageStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	getStreamDetails(ctx, client, streamID)
 	updateStream(ctx, client, streamID)
 	enableStream(ctx, client, streamID)
-	getViewerCount(ctx, client, streamID)
 
 	playbackID := managePlayback(ctx, client, streamID)
 	if playbackID != "" {
@@ -105,35 +104,41 @@ func manageStream(ctx context.Context, client *fastpixgo.FastPix, streamID strin
 		manageSimulcastDetails(ctx, client, streamID, simulcastID)
 	}
 
-	disableStream(ctx, client, streamID)
 	completeStream(ctx, client, streamID)
 	deleteStream(ctx, client, streamID)
 }
 
-func getStreamDetails(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
+func getStreamDetails(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	fmt.Printf("\n=== Getting Stream Details for ID: %s ===\n", streamID)
 
-	streamResponse, err := client.ManageLiveStream.GetLiveStreamByID(ctx, streamID)
+	streamResponse, err := client.LiveStreams.GetByID(ctx, streamID)
 	if err != nil {
 		log.Printf("Error getting stream details: %v", err)
 		return
 	}
+	if streamResponse.LivestreamgetResponse == nil || streamResponse.LivestreamgetResponse.Data == nil {
+		fmt.Println("No stream data returned")
+		return
+	}
 
 	stream := streamResponse.LivestreamgetResponse.Data
-	fmt.Printf("Name: %s\n", getStringValue(stream.Name))
+	fmt.Printf("Stream ID: %s\n", getStringValue(stream.StreamID))
 	fmt.Printf("Status: %s\n", getStringValue(stream.Status))
-	fmt.Printf("Created: %s\n", getStringValue(stream.CreatedAt))
-	fmt.Printf("RTMP URL: %s\n", getStringValue(stream.RtmpURL))
+	if stream.CreatedAt != nil {
+		fmt.Printf("Created: %s\n", stream.CreatedAt.Format(time.RFC3339))
+	}
+	fmt.Printf("Max Resolution: %s\n", getStringValue(stream.MaxResolution))
 }
 
-func updateStream(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
+func updateStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	fmt.Printf("\n=== Updating Live Stream: %s ===\n", streamID)
 
+	reconnectWindow := int64(120)
 	updateRequest := components.PatchLiveStreamRequest{
+		ReconnectWindow: &reconnectWindow,
 		Metadata: map[string]string{
-			"name":        "Updated Live Stream",
-			"description": "Updated description for testing",
-			"category":    "updated-gaming",
+			"name":     "Updated Live Stream",
+			"category": "updated-gaming",
 		},
 	}
 
@@ -145,110 +150,111 @@ func updateStream(ctx context.Context, client *fastpixgo.FastPix, streamID strin
 	}
 }
 
-func enableStream(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
+func enableStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	fmt.Printf("\n=== Enabling Live Stream: %s ===\n", streamID)
 
-	enableResponse, err := client.ManageLiveStream.EnableLiveStream(ctx, streamID)
+	_, err := client.ManageLiveStream.Enable(ctx, streamID)
 	if err != nil {
 		log.Printf("Error enabling stream: %v", err)
 	} else {
 		fmt.Println("Live stream enabled successfully!")
-		fmt.Printf("Response: %+v\n", enableResponse)
 	}
 }
 
-func getViewerCount(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
-	fmt.Printf("\n=== Getting Viewer Count for Stream: %s ===\n", streamID)
-
-	viewerResponse, err := client.ManageLiveStream.GetLiveStreamViewerCountByID(ctx, streamID)
-	if err != nil {
-		log.Printf("Error getting viewer count: %v", err)
-	} else {
-		fmt.Printf("Current viewer count: %d\n", getInt64Value(viewerResponse.Object.Data.ViewerCount))
-	}
-}
-
-func managePlayback(ctx context.Context, client *fastpixgo.FastPix, streamID string) string {
+func managePlayback(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) string {
 	fmt.Printf("\n=== Creating Playback ID for Stream: %s ===\n", streamID)
 
-	playbackRequest := operations.CreatePlaybackIDOfStreamRequestBody{
-		AccessPolicy: components.AccessPolicyPublic,
+	playbackRequest := components.PlaybackIDRequest{
+		AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
 	}
 
-	playbackResponse, err := client.LivePlayback.CreatePlaybackIDOfStream(ctx, streamID, &playbackRequest)
+	playbackResponse, err := client.LivePlayback.Create(ctx, streamID, playbackRequest)
 	if err != nil {
 		log.Printf("Error creating playback ID: %v", err)
 		return ""
 	}
+	if playbackResponse.PlaybackIDSuccessResponse == nil ||
+		playbackResponse.PlaybackIDSuccessResponse.Data == nil ||
+		playbackResponse.PlaybackIDSuccessResponse.Data.ID == nil {
+		return ""
+	}
 
-	fmt.Printf("Playback ID created successfully! ID: %s\n", *playbackResponse.Object.Data.PlaybackID)
-	return *playbackResponse.Object.Data.PlaybackID
+	playbackID := *playbackResponse.PlaybackIDSuccessResponse.Data.ID
+	fmt.Printf("Playback ID created successfully! ID: %s\n", playbackID)
+	return playbackID
 }
 
-func managePlaybackDetails(ctx context.Context, client *fastpixgo.FastPix, streamID, playbackID string) {
+func managePlaybackDetails(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, playbackID string) {
 	fmt.Printf("\n=== Getting Playback ID Details: %s ===\n", playbackID)
 
-	playbackDetailsResponse, err := client.LivePlayback.GetLiveStreamPlaybackID(ctx, streamID, playbackID)
+	playbackDetailsResponse, err := client.LivePlayback.GetPlaybackIDDetails(ctx, streamID, playbackID)
 	if err != nil {
 		log.Printf("Error getting playback ID details: %v", err)
-	} else {
-		fmt.Printf("Playback ID details retrieved successfully!\n")
-		fmt.Printf("Access Policy: %s\n", getStringValue(playbackDetailsResponse.Object.Data.AccessPolicy))
+	} else if playbackDetailsResponse.PlaybackIDSuccessResponse != nil &&
+		playbackDetailsResponse.PlaybackIDSuccessResponse.Data != nil {
+		fmt.Println("Playback ID details retrieved successfully!")
+		fmt.Printf("Access Policy: %s\n", getStringValue(playbackDetailsResponse.PlaybackIDSuccessResponse.Data.AccessPolicy))
 	}
 
 	deletePlayback(ctx, client, streamID, playbackID)
 }
 
-func deletePlayback(ctx context.Context, client *fastpixgo.FastPix, streamID, playbackID string) {
+func deletePlayback(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, playbackID string) {
 	fmt.Printf("\n=== Deleting Playback ID: %s ===\n", playbackID)
 
-	deletePlaybackResponse, err := client.LivePlayback.DeletePlaybackIDOfStream(ctx, streamID, playbackID)
+	_, err := client.LivePlayback.DeletePlaybackID(ctx, streamID, playbackID)
 	if err != nil {
 		log.Printf("Error deleting playback ID: %v", err)
 	} else {
 		fmt.Println("Playback ID deleted successfully!")
-		fmt.Printf("Response: %+v\n", deletePlaybackResponse)
 	}
 }
 
-func manageSimulcast(ctx context.Context, client *fastpixgo.FastPix, streamID string) string {
+func manageSimulcast(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) string {
 	fmt.Printf("\n=== Creating Simulcast for Stream: %s ===\n", streamID)
 
-	simulcastRequest := components.CreateSimulcastRequest{
-		Platform: components.SimulcastPlatformYoutube,
-		URL:      "https://youtube.com/watch?v=example",
+	simulcastRequest := components.SimulcastRequest{
+		URL:       fastpixgo.Pointer("rtmp://example.contribute.live-video.net/app/"),
+		StreamKey: fastpixgo.Pointer("live_example_streamkey"),
 	}
 
-	simulcastResponse, err := client.SimulcastStream.CreateSimulcastOfStream(ctx, streamID, simulcastRequest)
+	simulcastResponse, err := client.SimulcastStreams.Create(ctx, streamID, simulcastRequest)
 	if err != nil {
 		log.Printf("Error creating simulcast: %v", err)
 		return ""
 	}
+	if simulcastResponse.SimulcastResponse == nil ||
+		simulcastResponse.SimulcastResponse.Data == nil ||
+		simulcastResponse.SimulcastResponse.Data.SimulcastID == nil {
+		return ""
+	}
 
-	fmt.Printf("Simulcast created successfully! ID: %s\n", *simulcastResponse.Object.Data.ID)
-	return *simulcastResponse.Object.Data.ID
+	simulcastID := *simulcastResponse.SimulcastResponse.Data.SimulcastID
+	fmt.Printf("Simulcast created successfully! ID: %s\n", simulcastID)
+	return simulcastID
 }
 
-func manageSimulcastDetails(ctx context.Context, client *fastpixgo.FastPix, streamID, simulcastID string) {
+func manageSimulcastDetails(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, simulcastID string) {
 	fmt.Printf("\n=== Getting Simulcast Details: %s ===\n", simulcastID)
 
-	simulcastDetailsResponse, err := client.SimulcastStream.GetSpecificSimulcastOfStream(ctx, streamID, simulcastID)
+	simulcastDetailsResponse, err := client.SimulcastStreams.GetSpecific(ctx, streamID, simulcastID)
 	if err != nil {
 		log.Printf("Error getting simulcast details: %v", err)
-	} else {
-		fmt.Printf("Simulcast details retrieved successfully!\n")
-		fmt.Printf("Platform: %s\n", getStringValue(simulcastDetailsResponse.Object.Data.Platform))
+	} else if simulcastDetailsResponse.SimulcastResponse != nil &&
+		simulcastDetailsResponse.SimulcastResponse.Data != nil {
+		fmt.Println("Simulcast details retrieved successfully!")
+		fmt.Printf("URL: %s\n", getStringValue(simulcastDetailsResponse.SimulcastResponse.Data.URL))
 	}
 
 	updateSimulcast(ctx, client, streamID, simulcastID)
 	deleteSimulcast(ctx, client, streamID, simulcastID)
 }
 
-func updateSimulcast(ctx context.Context, client *fastpixgo.FastPix, streamID, simulcastID string) {
+func updateSimulcast(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, simulcastID string) {
 	fmt.Printf("\n=== Updating Simulcast: %s ===\n", simulcastID)
 
-	_, err := client.SimulcastStream.UpdateSpecificSimulcastOfStream(ctx, streamID, simulcastID, components.UpdateSimulcastRequest{
-		URL: "https://youtube.com/watch?v=updated-example",
+	_, err := client.SimulcastStreams.Update(ctx, streamID, simulcastID, components.SimulcastUpdateRequest{
+		IsEnabled: fastpixgo.Pointer(false),
 	})
 	if err != nil {
 		log.Printf("Error updating simulcast: %v", err)
@@ -257,10 +263,10 @@ func updateSimulcast(ctx context.Context, client *fastpixgo.FastPix, streamID, s
 	}
 }
 
-func deleteSimulcast(ctx context.Context, client *fastpixgo.FastPix, streamID, simulcastID string) {
+func deleteSimulcast(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, simulcastID string) {
 	fmt.Printf("\n=== Deleting Simulcast: %s ===\n", simulcastID)
 
-	_, err := client.SimulcastStream.DeleteSimulcastOfStream(ctx, streamID, simulcastID)
+	_, err := client.SimulcastStream.Delete(ctx, streamID, simulcastID)
 	if err != nil {
 		log.Printf("Error deleting simulcast: %v", err)
 	} else {
@@ -268,21 +274,10 @@ func deleteSimulcast(ctx context.Context, client *fastpixgo.FastPix, streamID, s
 	}
 }
 
-func disableStream(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
-	fmt.Printf("\n=== Disabling Live Stream: %s ===\n", streamID)
-
-	_, err := client.ManageLiveStream.DisableLiveStream(ctx, streamID)
-	if err != nil {
-		log.Printf("Error disabling stream: %v", err)
-	} else {
-		fmt.Println("Live stream disabled successfully!")
-	}
-}
-
-func completeStream(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
+func completeStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	fmt.Printf("\n=== Completing Live Stream: %s ===\n", streamID)
 
-	_, err := client.ManageLiveStream.CompleteLiveStream(ctx, streamID)
+	_, err := client.ManageLiveStream.Complete(ctx, streamID)
 	if err != nil {
 		log.Printf("Error completing stream: %v", err)
 	} else {
@@ -290,29 +285,21 @@ func completeStream(ctx context.Context, client *fastpixgo.FastPix, streamID str
 	}
 }
 
-func deleteStream(ctx context.Context, client *fastpixgo.FastPix, streamID string) {
+func deleteStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	fmt.Printf("\n=== Deleting Live Stream: %s ===\n", streamID)
 
-	_, err := client.ManageLiveStream.DeleteLiveStream(ctx, streamID)
+	_, err := client.LiveStreams.Delete(ctx, streamID)
 	if err != nil {
 		log.Printf("Error deleting stream: %v", err)
 	} else {
 		fmt.Println("Live stream deleted successfully!")
 	}
 }
-}
 
-// Helper functions to safely get values from pointers
+// Helper to safely dereference a string pointer.
 func getStringValue(ptr *string) string {
 	if ptr == nil {
 		return ""
-	}
-	return *ptr
-}
-
-func getInt64Value(ptr *int64) int64 {
-	if ptr == nil {
-		return 0
 	}
 	return *ptr
 }

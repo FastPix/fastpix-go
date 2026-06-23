@@ -23,8 +23,6 @@ import (
 	"github.com/FastPix/fastpix-go/retry"
 )
 
-
-
 type InputVideo struct {
 	rootSDK          *Fastpixgo
 	sdkConfiguration config.SDKConfiguration

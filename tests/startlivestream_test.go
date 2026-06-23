@@ -13,6 +13,7 @@ type StartLiveStreamTest struct {
 }
 
 func setupStartLiveStreamTest(t *testing.T) *StartLiveStreamTest {
+	RequireCredentials(t)
 	livestreamServerURL, _, username, password := LoadConfig()
 
 	// Log the livestream server URL

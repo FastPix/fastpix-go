@@ -224,7 +224,7 @@ func (u *GetAllMediaResponseTrack) UnmarshalJSON(data []byte) error {
 			Value: &subtitleTrack,
 		})
 	}
-    const errNotSupported = "could not unmarshal `%s` into any supported union types for GetAllMediaResponseTrack"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for GetAllMediaResponseTrack"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}

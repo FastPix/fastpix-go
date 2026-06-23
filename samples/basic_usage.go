@@ -39,28 +39,28 @@ func main() {
 
 	// Example: List all media
 	fmt.Println("\n=== Listing Media ===")
-	mediaResponse, err := client.ManageVideos.ListMedia(ctx, nil, nil, nil)
+	mediaResponse, err := client.ManageVideos.List(ctx, nil, nil, nil)
 	if err != nil {
 		log.Printf("Error listing media: %v", err)
-	} else {
+	} else if mediaResponse.Object != nil {
 		fmt.Printf("Found %d media items\n", len(mediaResponse.Object.Data))
 	}
 
 	// Example: List all live streams
 	fmt.Println("\n=== Listing Live Streams ===")
-	streamsResponse, err := client.ManageLiveStream.GetAllStreams(ctx, nil, nil, nil)
+	streamsResponse, err := client.ManageLiveStream.List(ctx, nil, nil, nil)
 	if err != nil {
 		log.Printf("Error listing streams: %v", err)
-	} else {
+	} else if streamsResponse.GetStreamsResponse != nil {
 		fmt.Printf("Found %d live streams\n", len(streamsResponse.GetStreamsResponse.Data))
 	}
 
 	// Example: List signing keys
 	fmt.Println("\n=== Listing Signing Keys ===")
-	keysResponse, err := client.SigningKeys.ListSigningKeys(ctx, nil, nil)
+	keysResponse, err := client.SigningKeys.List(ctx, nil, nil)
 	if err != nil {
 		log.Printf("Error listing signing keys: %v", err)
-	} else {
-		fmt.Printf("Found %d signing keys\n", len(keysResponse.GetAllSigningKeyResponse.Data))
+	} else if keysResponse.GetAllSigningKeysResponse != nil {
+		fmt.Printf("Found %d signing keys\n", len(keysResponse.GetAllSigningKeysResponse.Data))
 	}
 }

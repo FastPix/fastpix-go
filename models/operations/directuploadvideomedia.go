@@ -134,7 +134,7 @@ func (u *Input) UnmarshalJSON(data []byte) error {
 			Value: &subtitleInput,
 		})
 	}
-    const errNotSupported = "could not unmarshal `%s` into any supported union types for Input"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for Input"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}
