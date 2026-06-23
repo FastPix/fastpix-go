@@ -16,6 +16,7 @@ type ManageLivestreamTest struct {
 }
 
 func setupManageLivestreamTest(t *testing.T) *ManageLivestreamTest {
+	RequireCredentials(t)
 	livestreamServerURL, _, username, password := LoadConfig()
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 

@@ -123,7 +123,7 @@ func (u *PlayerHeight) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for PlayerHeight"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for PlayerHeight"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}
@@ -213,7 +213,7 @@ func (u *PlayerViewCount) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for PlayerViewCount"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for PlayerViewCount"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}
@@ -304,7 +304,7 @@ func (u *PropertyID) UnmarshalJSON(data []byte) error {
 		})
 	}
 
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for PropertyID"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for PropertyID"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}
@@ -394,7 +394,7 @@ func (u *ViewerTime) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for ViewerTime"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for ViewerTime"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}
@@ -484,7 +484,7 @@ func (u *EventTime) UnmarshalJSON(data []byte) error {
 			Value: &integer,
 		})
 	}
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for EventTime"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for EventTime"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}

@@ -15,6 +15,7 @@ type InputVideoTest struct {
 }
 
 func setupInputVideoTest(t *testing.T) *InputVideoTest {
+	RequireCredentials(t)
 	_, serverURL, username, password := LoadConfig()
 
 	sdk := fastpixgo.New(

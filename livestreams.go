@@ -35,9 +35,6 @@ func newLiveStreams(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, hooks
 
 // ── shared infrastructure ────────────────────────────────────────────────────
 
-
-
-
 // resolveRetryConfig picks the effective retry configuration.
 func (s *LiveStreams) resolveRetryConfig(o operations.Options) *retry.Config {
 	if o.Retries != nil {

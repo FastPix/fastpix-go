@@ -232,7 +232,6 @@ func countMap(candidate *UnionCandidate, typ reflect.Type, val reflect.Value, ra
 	}
 }
 
-
 // jsonFieldName returns the JSON field name for a struct field.
 // Returns ("", false) if the field should be skipped (json:"-").
 func jsonFieldName(field reflect.StructField) (string, bool) {

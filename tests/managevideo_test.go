@@ -14,6 +14,7 @@ type ManageVideosTest struct {
 }
 
 func setupTest(t *testing.T) *ManageVideosTest {
+	RequireCredentials(t)
 	_, serverURL, username, password := LoadConfig()
 
 	sdk := fastpixgo.New(

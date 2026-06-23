@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build, Vet, Format & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        with:
+          go-version: '1.22'
+
+      - name: Cache Go modules
+        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "::error::The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            echo "Run 'gofmt -w .' to fix."
+            exit 1
+          fi
+
+      - name: Static analysis (go vet)
+        run: go vet $(go list ./... | grep -v /samples)
+
+      - name: Build
+        run: go build $(go list ./... | grep -v /samples)
+
+      - name: Compile-check examples
+        run: bash samples/verify.sh
+
+      - name: Run unit tests
+        # The tests/ package holds live integration tests that require
+        # FASTPIX_USERNAME / FASTPIX_PASSWORD; they self-skip when absent.
+        # Run the full suite (race-enabled) so integration tests execute when
+        # credentials are supplied via repository secrets.
+        env:
+          FASTPIX_USERNAME: ${{ secrets.FASTPIX_USERNAME }}
+          FASTPIX_PASSWORD: ${{ secrets.FASTPIX_PASSWORD }}
+        run: go test -race -v $(go list ./... | grep -v /samples)

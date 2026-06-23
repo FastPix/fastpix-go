@@ -106,7 +106,6 @@ func (s *ManageVideos) retryAttempt(hookCtx hooks.HookContext, req *http.Request
 	return s.handleDoError(hookCtx, res, doErr)
 }
 
-
 // handleDoError processes the raw result of Client.Do and fires AfterError if needed.
 func (s *ManageVideos) handleDoError(hookCtx hooks.HookContext, res *http.Response, doErr error) (*http.Response, error) {
 	if doErr != nil {
@@ -185,7 +184,6 @@ func handleAPIError(httpRes *http.Response) error {
 	}
 	return apierrors.NewAPIError(errAPIError, httpRes.StatusCode, string(rawBody), httpRes)
 }
-
 
 // parseJSONBody reads the response body and unmarshals it into out.
 func parseJSONBody(httpRes *http.Response, out interface{}) error {

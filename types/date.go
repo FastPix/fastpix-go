@@ -74,7 +74,9 @@ func MustDateFromString(str string) Date {
 func (d Date) GetTime() time.Time {
 	return d.Time
 }
+
 const dateLayout = "2006-01-02"
+
 func (d Date) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, d.Time.Format(dateLayout))), nil
 }

@@ -62,30 +62,29 @@ type errOut struct {
 
 // Request key constants — eliminates S1192 duplicate string literals.
 const (
-	keyMediaID     = "mediaId"
-	keyStreamID    = "streamId"
-	keyPlaylistID  = "playlistId"
-	keyPlaybackID  = "playbackId"
-	keySimulcastID = "simulcastId"
-	keyTrackID     = "trackId"
-	keyMetricID    = "metricId"
-	keyTimespan    = "timespan"
-	keyGroupBy     = "groupBy"
-	keyDimension   = "dimension"
-	keyLimit       = "limit"
-	keyOffset      = "offset"
+	keyMediaID      = "mediaId"
+	keyStreamID     = "streamId"
+	keyPlaylistID   = "playlistId"
+	keyPlaybackID   = "playbackId"
+	keySimulcastID  = "simulcastId"
+	keyTrackID      = "trackId"
+	keyMetricID     = "metricId"
+	keyTimespan     = "timespan"
+	keyGroupBy      = "groupBy"
+	keyDimension    = "dimension"
+	keyLimit        = "limit"
+	keyOffset       = "offset"
 	keySigningKeyID = "signingKeyId"
-	keyUploadID    = "uploadId"
-	keyViewID      = "viewId"
-	keyDimID       = "dimensionsId"
+	keyUploadID     = "uploadId"
+	keyViewID       = "viewId"
+	keyDimID        = "dimensionsId"
 	keyLivestreamID = "livestreamId"
-	keyDrmConfigID = "drmConfigurationId"
-	keyValue          = "value"
-	keyOrderBy        = "orderBy"
-	keyName           = "name"
-	errNoSDKMapping   = "no Go SDK mapping for operationId %q"
+	keyDrmConfigID  = "drmConfigurationId"
+	keyValue        = "value"
+	keyOrderBy      = "orderBy"
+	keyName         = "name"
+	errNoSDKMapping = "no Go SDK mapping for operationId %q"
 )
-
 
 func emitErr(e errOut) {
 	out, _ := json.Marshal(map[string]any{"ok": false, "error": e})
@@ -383,7 +382,6 @@ func dispatch(s *fastpixgo.Fastpixgo, op string, req map[string]any) (any, error
 	return dispatchUpdate(s, op, req)
 }
 
-
 // ptrTimespan returns a typed timespan pointer if the "timespan" key is present.
 func ptrStr[T ~string](req map[string]any, key string) *T {
 	if s := str(req, key); s != nil {
@@ -539,7 +537,7 @@ func dispatchCreate(s *fastpixgo.Fastpixgo, op string, req map[string]any, sdkVa
 			PushMediaSettings: &operations.PushMediaSettings{Metadata: map[string]string{"source": "sdk-validate"}},
 		})
 
-	// --------------------------- PUT / PATCH (update) ---------------------------
+		// --------------------------- PUT / PATCH (update) ---------------------------
 	}
 	return nil, fmt.Errorf(errNoSDKMapping, op)
 }
@@ -605,7 +603,7 @@ func dispatchUpdate(s *fastpixgo.Fastpixgo, op string, req map[string]any) (any,
 	case "cancel-upload":
 		return s.ManageVideos.CancelUpload(ctx, strVal(req, keyUploadID))
 
-	// ----------------------------- DELETE -----------------------------
+		// ----------------------------- DELETE -----------------------------
 	}
 	return nil, fmt.Errorf(errNoSDKMapping, op)
 }

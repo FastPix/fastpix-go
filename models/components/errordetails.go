@@ -66,7 +66,7 @@ func (u *ErrorDetailsPercentage) UnmarshalJSON(data []byte) error {
 			Value: &number,
 		})
 	}
-    const errNotSupported = "could not unmarshal `%s` into any supported union types for ErrorDetailsPercentage"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for ErrorDetailsPercentage"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}

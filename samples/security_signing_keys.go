@@ -36,10 +36,10 @@ func main() {
 	fmt.Println("Remember to implement proper key management in production!")
 }
 
-func createSigningKey(ctx context.Context, client *fastpixgo.FastPix) {
+func createSigningKey(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("=== Creating Signing Key ===")
 
-	createKeyResponse, err := client.SigningKeys.CreateSigningKey(ctx)
+	createKeyResponse, err := client.SigningKeys.Create(ctx)
 	if err != nil {
 		log.Printf("Error creating signing key: %v", err)
 		return
@@ -55,97 +55,114 @@ func createSigningKey(ctx context.Context, client *fastpixgo.FastPix) {
 		fmt.Printf("Signing key created successfully! ID: %s\n", *data.ID)
 	}
 	fmt.Printf("Private Key: %s\n", getStringValue(data.PrivateKey))
-	fmt.Printf("Public Key: %s\n", getStringValue(data.PublicKey))
+	fmt.Printf("Created: %s\n", getTimeValue(data.CreatedAt))
 }
 
-func listSigningKeys(ctx context.Context, client *fastpixgo.FastPix) {
+func listSigningKeys(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Listing All Signing Keys ===")
 
-	limit := 10.0
-	offset := 0.0
+	limit := int64(10)
+	offset := int64(0)
 
-	keysResponse, err := client.SigningKeys.ListSigningKeys(ctx, &limit, &offset)
+	keysResponse, err := client.SigningKeys.List(ctx, &limit, &offset)
 	if err != nil {
 		log.Printf("Error listing signing keys: %v", err)
 		return
 	}
 
-	fmt.Printf("Found %d signing keys:\n", len(keysResponse.GetAllSigningKeyResponse.Data))
-	for i, key := range keysResponse.GetAllSigningKeyResponse.Data {
+	if keysResponse.GetAllSigningKeysResponse == nil {
+		fmt.Println("No signing keys data returned")
+		return
+	}
+
+	keys := keysResponse.GetAllSigningKeysResponse.Data
+	fmt.Printf("Found %d signing keys:\n", len(keys))
+	for i, key := range keys {
 		fmt.Printf("  %d. ID: %s, Created: %s\n",
-			i+1, *key.ID, getStringValue(key.CreatedAt))
+			i+1, getStringValue(key.ID), getTimeValue(key.CreatedAt))
 	}
 }
 
-func manageFirstSigningKey(ctx context.Context, client *fastpixgo.FastPix) {
-	limit := 10.0
-	offset := 0.0
+func manageFirstSigningKey(ctx context.Context, client *fastpixgo.Fastpixgo) {
+	limit := int64(10)
+	offset := int64(0)
 
-	keysResponse, err := client.SigningKeys.ListSigningKeys(ctx, &limit, &offset)
+	keysResponse, err := client.SigningKeys.List(ctx, &limit, &offset)
 	if err != nil {
 		log.Printf("Error listing signing keys: %v", err)
 		return
 	}
 
-	if keysResponse.GetAllSigningKeyResponse == nil || len(keysResponse.GetAllSigningKeyResponse.Data) == 0 {
+	if keysResponse.GetAllSigningKeysResponse == nil ||
+		len(keysResponse.GetAllSigningKeysResponse.Data) == 0 ||
+		keysResponse.GetAllSigningKeysResponse.Data[0].ID == nil {
 		return
 	}
 
-	keyID := *keysResponse.GetAllSigningKeyResponse.Data[0].ID
+	keyID := *keysResponse.GetAllSigningKeysResponse.Data[0].ID
 	getSigningKeyDetails(ctx, client, keyID)
 	deleteSigningKey(ctx, client, keyID)
 }
 
-func getSigningKeyDetails(ctx context.Context, client *fastpixgo.FastPix, keyID string) {
+func getSigningKeyDetails(ctx context.Context, client *fastpixgo.Fastpixgo, keyID string) {
 	fmt.Printf("\n=== Getting Signing Key Details: %s ===\n", keyID)
 
-	keyDetailsResponse, err := client.SigningKeys.GetSigningKeyByID(ctx, keyID)
+	keyDetailsResponse, err := client.SigningKeys.GetByID(ctx, keyID)
 	if err != nil {
 		log.Printf("Error getting signing key details: %v", err)
 		return
 	}
 
+	if keyDetailsResponse.GetPublicPemUsingSigningKeyIDResponseDTO == nil ||
+		keyDetailsResponse.GetPublicPemUsingSigningKeyIDResponseDTO.Data == nil {
+		fmt.Println("No signing key details returned")
+		return
+	}
+
 	key := keyDetailsResponse.GetPublicPemUsingSigningKeyIDResponseDTO.Data
-	fmt.Printf("Key ID: %s\n", *key.ID)
+	fmt.Printf("Signing Key ID: %s\n", getStringValue(key.SigningKeyID))
+	fmt.Printf("Workspace ID: %s\n", getStringValue(key.WorkspaceID))
 	fmt.Printf("Public Key: %s\n", getStringValue(key.PublicKey))
-	fmt.Printf("Created: %s\n", getStringValue(key.CreatedAt))
 }
 
-func deleteSigningKey(ctx context.Context, client *fastpixgo.FastPix, keyID string) {
+func deleteSigningKey(ctx context.Context, client *fastpixgo.Fastpixgo, keyID string) {
 	fmt.Printf("\n=== Deleting Signing Key: %s ===\n", keyID)
 
-	deleteResponse, err := client.SigningKeys.DeleteSigningKey(ctx, keyID)
+	deleteResponse, err := client.SigningKeys.Delete(ctx, keyID)
 	if err != nil {
 		log.Printf("Error deleting signing key: %v", err)
 		return
 	}
 
 	fmt.Println("Signing key deleted successfully!")
-	fmt.Printf("Response: %+v\n", deleteResponse)
+	if deleteResponse.DeleteSigningKeyResponse != nil &&
+		deleteResponse.DeleteSigningKeyResponse.Data != nil {
+		fmt.Printf("Message: %s\n", getStringValue(deleteResponse.DeleteSigningKeyResponse.Data.Message))
+	}
 }
 
-func signingKeyManagementWorkflow(ctx context.Context, client *fastpixgo.FastPix) {
+func signingKeyManagementWorkflow(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Signing Key Management Workflow ===")
 	fmt.Println("Creating multiple signing keys for rotation...")
 
 	createdKeys := createMultipleSigningKeys(ctx, client, 3)
 
 	fmt.Println("\nListing all signing keys after creation...")
-	allKeysResponse, err := client.SigningKeys.ListSigningKeys(ctx, nil, nil)
+	allKeysResponse, err := client.SigningKeys.List(ctx, nil, nil)
 	if err != nil {
 		log.Printf("Error listing all keys: %v", err)
-	} else {
-		fmt.Printf("Total signing keys: %d\n", len(allKeysResponse.GetAllSigningKeyResponse.Data))
+	} else if allKeysResponse.GetAllSigningKeysResponse != nil {
+		fmt.Printf("Total signing keys: %d\n", len(allKeysResponse.GetAllSigningKeysResponse.Data))
 	}
 
 	rotateSigningKeys(ctx, client, createdKeys)
 }
 
-func createMultipleSigningKeys(ctx context.Context, client *fastpixgo.FastPix, count int) []string {
+func createMultipleSigningKeys(ctx context.Context, client *fastpixgo.Fastpixgo, count int) []string {
 	var createdKeys []string
 
 	for i := 0; i < count; i++ {
-		createResponse, err := client.SigningKeys.CreateSigningKey(ctx)
+		createResponse, err := client.SigningKeys.Create(ctx)
 		if err != nil {
 			log.Printf("Error creating signing key %d: %v", i+1, err)
 			continue
@@ -165,7 +182,7 @@ func createMultipleSigningKeys(ctx context.Context, client *fastpixgo.FastPix, c
 	return createdKeys
 }
 
-func rotateSigningKeys(ctx context.Context, client *fastpixgo.FastPix, createdKeys []string) {
+func rotateSigningKeys(ctx context.Context, client *fastpixgo.Fastpixgo, createdKeys []string) {
 	fmt.Println("\n=== Key Rotation Example ===")
 
 	if len(createdKeys) == 0 {
@@ -176,7 +193,7 @@ func rotateSigningKeys(ctx context.Context, client *fastpixgo.FastPix, createdKe
 
 	for i, keyID := range createdKeys[:len(createdKeys)-1] {
 		fmt.Printf("Deleting old key %d: %s\n", i+1, keyID)
-		_, err := client.SigningKeys.DeleteSigningKey(ctx, keyID)
+		_, err := client.SigningKeys.Delete(ctx, keyID)
 		if err != nil {
 			log.Printf("Error deleting key %s: %v", keyID, err)
 		} else {
@@ -187,21 +204,24 @@ func rotateSigningKeys(ctx context.Context, client *fastpixgo.FastPix, createdKe
 	activeKeyID := createdKeys[len(createdKeys)-1]
 	fmt.Printf("Active key: %s\n", activeKeyID)
 
-	activeKeyResponse, err := client.SigningKeys.GetSigningKeyByID(ctx, activeKeyID)
+	activeKeyResponse, err := client.SigningKeys.GetByID(ctx, activeKeyID)
 	if err != nil {
 		log.Printf("Error getting active key details: %v", err)
 		return
 	}
 
-	fmt.Printf("Active key public key: %s\n",
-		getStringValue(activeKeyResponse.GetPublicPemUsingSigningKeyIDResponseDTO.Data.PublicKey))
+	if activeKeyResponse.GetPublicPemUsingSigningKeyIDResponseDTO != nil &&
+		activeKeyResponse.GetPublicPemUsingSigningKeyIDResponseDTO.Data != nil {
+		fmt.Printf("Active key public key: %s\n",
+			getStringValue(activeKeyResponse.GetPublicPemUsingSigningKeyIDResponseDTO.Data.PublicKey))
+	}
 }
 
-func securityBestPractices(ctx context.Context, client *fastpixgo.FastPix) {
+func securityBestPractices(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Security Best Practices ===")
 	fmt.Println("Creating a new signing key for security demonstration...")
 
-	newKeyResponse, err := client.SigningKeys.CreateSigningKey(ctx)
+	newKeyResponse, err := client.SigningKeys.Create(ctx)
 	if err != nil {
 		log.Printf("Error creating new signing key: %v", err)
 		return
@@ -230,10 +250,10 @@ func printSecurityRecommendations() {
 	fmt.Println("5. Monitor key usage and access")
 }
 
-func cleanupDemonstrationKey(ctx context.Context, client *fastpixgo.FastPix, keyID string) {
+func cleanupDemonstrationKey(ctx context.Context, client *fastpixgo.Fastpixgo, keyID string) {
 	fmt.Printf("\nCleaning up demonstration key: %s\n", keyID)
 
-	_, err := client.SigningKeys.DeleteSigningKey(ctx, keyID)
+	_, err := client.SigningKeys.Delete(ctx, keyID)
 	if err != nil {
 		log.Printf("Error cleaning up key: %v", err)
 		return
@@ -242,19 +262,19 @@ func cleanupDemonstrationKey(ctx context.Context, client *fastpixgo.FastPix, key
 	fmt.Println("Demonstration key cleaned up successfully")
 }
 
-func securityErrorHandling(ctx context.Context, client *fastpixgo.FastPix) {
+func securityErrorHandling(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Security Error Handling ===")
 
 	fakeKeyID := "non-existent-key-id"
 
-	_, err := client.SigningKeys.GetSigningKeyByID(ctx, fakeKeyID)
+	_, err := client.SigningKeys.GetByID(ctx, fakeKeyID)
 	if err != nil {
 		fmt.Printf("Expected error for non-existent key: %v\n", err)
 	} else {
 		fmt.Println("Unexpected success for non-existent key")
 	}
 
-	_, err = client.SigningKeys.DeleteSigningKey(ctx, fakeKeyID)
+	_, err = client.SigningKeys.Delete(ctx, fakeKeyID)
 	if err != nil {
 		fmt.Printf("Expected error deleting non-existent key: %v\n", err)
 	} else {
@@ -262,32 +282,36 @@ func securityErrorHandling(ctx context.Context, client *fastpixgo.FastPix) {
 	}
 }
 
-func paginationExample(ctx context.Context, client *fastpixgo.FastPix) {
+func paginationExample(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Pagination Example ===")
 
-	pageSize := 5.0
-	pageOffset := 0.0
+	pageSize := int64(5)
+	pageOffset := int64(0)
 
-	fmt.Printf("Fetching signing keys with pagination (limit: %.0f, offset: %.0f)\n", pageSize, pageOffset)
+	fmt.Printf("Fetching signing keys with pagination (limit: %d, offset: %d)\n", pageSize, pageOffset)
 
-	paginatedResponse, err := client.SigningKeys.ListSigningKeys(ctx, &pageSize, &pageOffset)
+	paginatedResponse, err := client.SigningKeys.List(ctx, &pageSize, &pageOffset)
 	if err != nil {
 		log.Printf("Error with paginated request: %v", err)
 		return
 	}
 
-	fmt.Printf("Page 1: Found %d keys\n", len(paginatedResponse.GetAllSigningKeyResponse.Data))
+	if paginatedResponse.GetAllSigningKeysResponse != nil {
+		fmt.Printf("Page 1: Found %d keys\n", len(paginatedResponse.GetAllSigningKeysResponse.Data))
+	}
 
-	pageOffset = 5.0
-	fmt.Printf("Fetching next page (limit: %.0f, offset: %.0f)\n", pageSize, pageOffset)
+	pageOffset = int64(5)
+	fmt.Printf("Fetching next page (limit: %d, offset: %d)\n", pageSize, pageOffset)
 
-	nextPageResponse, err := client.SigningKeys.ListSigningKeys(ctx, &pageSize, &pageOffset)
+	nextPageResponse, err := client.SigningKeys.List(ctx, &pageSize, &pageOffset)
 	if err != nil {
 		log.Printf("Error with next page request: %v", err)
 		return
 	}
 
-	fmt.Printf("Page 2: Found %d keys\n", len(nextPageResponse.GetAllSigningKeyResponse.Data))
+	if nextPageResponse.GetAllSigningKeysResponse != nil {
+		fmt.Printf("Page 2: Found %d keys\n", len(nextPageResponse.GetAllSigningKeysResponse.Data))
+	}
 }
 
 func getStringValue(ptr *string) string {
@@ -295,4 +319,11 @@ func getStringValue(ptr *string) string {
 		return ""
 	}
 	return *ptr
+}
+
+func getTimeValue(ptr *time.Time) string {
+	if ptr == nil {
+		return ""
+	}
+	return ptr.String()
 }

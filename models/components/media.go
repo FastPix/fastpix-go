@@ -224,7 +224,7 @@ func (u *MediaTrack) UnmarshalJSON(data []byte) error {
 			Value: &subtitleTrack,
 		})
 	}
-    const errNotSupported ="could not unmarshal `%s` into any supported union types for MediaTrack"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for MediaTrack"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}

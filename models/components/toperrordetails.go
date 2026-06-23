@@ -66,7 +66,7 @@ func (u *TopErrorDetailsPercentage) UnmarshalJSON(data []byte) error {
 			Value: &number,
 		})
 	}
-    const errNotSupported = "could not unmarshal `%s` into any supported union types for TopErrorDetailsPercentage"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for TopErrorDetailsPercentage"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}
@@ -157,7 +157,7 @@ func (u *UniqueViewersEffectedPercentage) UnmarshalJSON(data []byte) error {
 		})
 	}
 
-    const errNotSupported = "could not unmarshal `%s` into any supported union types for UniqueViewersEffectedPercentage"
+	const errNotSupported = "could not unmarshal `%s` into any supported union types for UniqueViewersEffectedPercentage"
 	if len(candidates) == 0 {
 		return fmt.Errorf(errNotSupported, string(data))
 	}

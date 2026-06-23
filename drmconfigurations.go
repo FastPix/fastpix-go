@@ -23,12 +23,12 @@ import (
 )
 
 const (
-	drmContentType        = "Content-Type"
-	drmErrSendingRequest  = "error sending request: %w"
-	drmErrNoResponse      = "error sending request: no response"
-	drmErrGeneratingURL   = "error generating URL: %w"
-	drmErrUnknownCT       = "unknown content-type received: %s"
-	drmErrAPIError        = "API error occurred"
+	drmContentType       = "Content-Type"
+	drmErrSendingRequest = "error sending request: %w"
+	drmErrNoResponse     = "error sending request: no response"
+	drmErrGeneratingURL  = "error generating URL: %w"
+	drmErrUnknownCT      = "unknown content-type received: %s"
+	drmErrAPIError       = "API error occurred"
 )
 
 type DrmConfigurations struct {

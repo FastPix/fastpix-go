@@ -14,6 +14,7 @@ type SimulcastStreamTest struct {
 }
 
 func setupSimulcastStreamTest(t *testing.T) *SimulcastStreamTest {
+	RequireCredentials(t)
 	livestreamServerURL, _, username, password := LoadConfig()
 	t.Logf("Using livestream server URL: %s", livestreamServerURL)
 

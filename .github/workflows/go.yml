@@ -30,7 +30,13 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Verify formatting
-        run: go fmt ./...
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "::error::The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
 
       - name: Run static analysis
         run: go vet $(go list ./... | grep -v /samples)

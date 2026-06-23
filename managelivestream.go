@@ -44,9 +44,6 @@ func newManageLiveStream(rootSDK *Fastpixgo, sdkConfig config.SDKConfiguration, 
 
 // ── shared infrastructure ────────────────────────────────────────────────────
 
-
-
-
 // applyOptions validates and collects variadic option funcs.
 func (s *ManageLiveStream) applyOptions(opts []operations.Option) (operations.Options, error) {
 	o := operations.Options{}
