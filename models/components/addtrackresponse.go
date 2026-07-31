@@ -41,6 +41,8 @@ type AddTrackResponse struct {
 	LanguageCode *string `json:"languageCode,omitzero"`
 	// The full name of the language corresponding to the `languageCode`.
 	LanguageName *string `json:"languageName,omitzero"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (a *AddTrackResponse) GetID() *string {
@@ -76,4 +78,11 @@ func (a *AddTrackResponse) GetLanguageName() *string {
 		return nil
 	}
 	return a.LanguageName
+}
+
+func (a *AddTrackResponse) GetTitle() *string {
+	if a == nil {
+		return nil
+	}
+	return a.Title
 }

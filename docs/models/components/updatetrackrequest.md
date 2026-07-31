@@ -1,12 +1,12 @@
 # UpdateTrackRequest
 
-Contains details about the track being added to the media file.
+Contains details about the track being updated. The track's file (`url`) cannot be changed — only its language and title.
 
 
 ## Fields
 
 | Field                                                                              | Type                                                                               | Required                                                                           | Description                                                                        | Example                                                                            |
 | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `URL`                                                                              | **string*                                                                          | :heavy_minus_sign:                                                                 | The direct URL of the track file. It must point to a valid audio or subtitle file. | http://commondatastorage.googleapis.com/codeskulptor-assets/sounddogs/thrust.vtt   |
 | `LanguageCode`                                                                     | **string*                                                                          | :heavy_minus_sign:                                                                 | The BCP 47 language code representing the track’s language.                        | fr                                                                                 |
 | `LanguageName`                                                                     | **string*                                                                          | :heavy_minus_sign:                                                                 | The full name of the language corresponding to the `languageCode`.                 | French                                                                             |
+| `Title`                                                                            | **string*                                                                          | :heavy_minus_sign:                                                                 | Title of the track.                                                                | French subtitles                                                                   |

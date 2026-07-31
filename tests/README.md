@@ -28,6 +28,10 @@ export FASTPIX_PASSWORD="your-password"
 # optional:
 # export FASTPIX_BASE_URL="https://api.fastpix.com/v1/"
 # export FASTPIX_OPENAPI_SPEC="/abs/path/to/spec.yaml"   # overrides spec auto-discovery
+#   Auto-discovery order: ../old.yaml, then ../fastpix-openai.yaml.
+#   old.yaml is the vendored spec for what this SDK actually implements =
+#   fastpix-openai.yaml minus the /ai/ endpoints (not exposed by the SDK), plus
+#   VideoTrackForGetAll.frameRate (removed from the spec, still returned by the API).
 ```
 
 4. Run:
@@ -95,7 +99,7 @@ accurate testing. If a fixture is missing, the GET driver falls back to a
 placeholder UUID, which typically yields a 404.
 
 <!-- BEGIN GET_ENDPOINTS_CONSOLIDATED -->
-Last generated: 2026-06-04T12:43:20.820Z
+Last generated: 2026-07-31T10:49:43.714Z
 
 - **Total GET endpoints**: 30
 - **PASS**: 26
@@ -125,7 +129,7 @@ Last generated: 2026-06-04T12:43:20.820Z
 | `/iam/signing-keys` | `list_signing_keys` | ✅ | ✅ | None | None | None | ✅ PASS |
 | `/iam/signing-keys/{signingKeyId}` | `get-signing_key_by_id` | ✅ | ✅ | None | None | None | ✅ PASS |
 | `/data/viewlist` | `list_video_views` | ✅ | ✅ | None | None | None | ✅ PASS |
-| `/data/viewlist/{viewId}` | `get_video_view_details` | ✅ | ❌ | None | None | None | ❌ FAIL |
+| `/data/viewlist/{viewId}` | `get_video_view_details` | ✅ | ✅ | `data.custom`, `data.custom.Device`, `data.custom.Device[]`, `data.custom.Device[].dimensionName`, `data.custom.Device[].displayName` | None | None | ❌ FAIL |
 | `/data/viewlist/top-content` | `list_by_top_content` | ✅ | ✅ | None | None | None | ✅ PASS |
 | `/data/dimensions` | `list_dimensions` | ✅ | ✅ | None | None | None | ✅ PASS |
 | `/data/dimensions/{dimensionsId}` | `list_filter_values_for_dimension` | ✅ | ✅ | None | None | None | ✅ PASS |
@@ -243,7 +247,7 @@ Last generated: 2026-06-04T12:43:20.820Z
   - **Empty arrays omitted by SDK**: None
   - **Empty arrays omitted by API**: None
 - **get_video_view_details** (`/data/viewlist/{viewId}`)
-  - **Missing in SDK (present in API)**: None
+  - **Missing in SDK (present in API)**: `data.custom`, `data.custom.Device`, `data.custom.Device[]`, `data.custom.Device[].dimensionName`, `data.custom.Device[].displayName`
   - **Missing in API (present in SDK)**: None
   - **Empty arrays omitted by SDK**: None
   - **Empty arrays omitted by API**: None

@@ -142,7 +142,7 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
@@ -364,7 +364,7 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
@@ -428,7 +428,7 @@ func main() {
                 RetryConnectionErrors: false,
             }),
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
@@ -486,7 +486,7 @@ func main() {
 
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
@@ -551,7 +551,7 @@ func main() {
     s := fastpixgo.New(
         fastpixgo.WithServerURL("your-server-url"),
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
@@ -608,7 +608,7 @@ func main() {
     s := fastpixgo.New(
         fastpixgo.WithClient(httpClient),
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
@@ -679,7 +679,7 @@ func main() {
     s := fastpixgo.New(
         fastpixgo.WithClient(loggingClient),
         fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
+            Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )

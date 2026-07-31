@@ -54,6 +54,8 @@ const (
 	LiveMediaClipsSourceResolutionSevenHundredAndTwenty           LiveMediaClipsSourceResolution = "720"
 	LiveMediaClipsSourceResolutionFourHundredAndEightyp           LiveMediaClipsSourceResolution = "480p"
 	LiveMediaClipsSourceResolutionFourHundredAndEighty            LiveMediaClipsSourceResolution = "480"
+	LiveMediaClipsSourceResolutionThreeHundredAndSixtyp           LiveMediaClipsSourceResolution = "360p"
+	LiveMediaClipsSourceResolutionThreeHundredAndSixty            LiveMediaClipsSourceResolution = "360"
 )
 
 func (e LiveMediaClipsSourceResolution) ToPointer() *LiveMediaClipsSourceResolution {
@@ -64,7 +66,7 @@ func (e LiveMediaClipsSourceResolution) ToPointer() *LiveMediaClipsSourceResolut
 func (e *LiveMediaClipsSourceResolution) IsExact() bool {
 	if e != nil {
 		switch *e {
-		case "2160p", "2160", "1440p", "1440", "1080p", "1080", "720p", "720", "480p", "480":
+		case "2160p", "2160", "1440p", "1440", "1080p", "1080", "720p", "720", "480p", "480", "360p", "360":
 			return true
 		}
 	}
@@ -216,33 +218,122 @@ func (u LiveMediaClipsTrack) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("could not marshal union type LiveMediaClipsTrack: all fields are null")
 }
 
-// LiveMediaClipsMp4Support - Determines the type of MP4 support for the media.
-// - **none**: Disables MP4 support.
-// - **capped_4k**: Enables MP4 downloads with resolutions up to 4K.
-// - **audioOnly**: Provides an MP4 stream containing only the audio.
-// - **audioOnly,capped_4k**: Enables both MP4 video downloads (up to 4K) and an audio-only stream.
-type LiveMediaClipsMp4Support string
+// LiveMediaClipsMp4SupportType - The MP4 rendition type. `capped_4k` is a downloadable MP4 video capped at 4K resolution, `audioOnly` is a downloadable m4a audio-only file.
+type LiveMediaClipsMp4SupportType string
 
 const (
-	LiveMediaClipsMp4SupportNone              LiveMediaClipsMp4Support = "none"
-	LiveMediaClipsMp4SupportCapped4k          LiveMediaClipsMp4Support = "capped_4k"
-	LiveMediaClipsMp4SupportAudioOnly         LiveMediaClipsMp4Support = "audioOnly"
-	LiveMediaClipsMp4SupportAudioOnlyCapped4k LiveMediaClipsMp4Support = "audioOnly,capped_4k"
+	LiveMediaClipsMp4SupportTypeCapped4k  LiveMediaClipsMp4SupportType = "capped_4k"
+	LiveMediaClipsMp4SupportTypeAudioOnly LiveMediaClipsMp4SupportType = "audioOnly"
 )
 
-func (e LiveMediaClipsMp4Support) ToPointer() *LiveMediaClipsMp4Support {
+func (e LiveMediaClipsMp4SupportType) ToPointer() *LiveMediaClipsMp4SupportType {
 	return &e
 }
 
 // IsExact returns true if the value matches a known enum value, false otherwise.
-func (e *LiveMediaClipsMp4Support) IsExact() bool {
+func (e *LiveMediaClipsMp4SupportType) IsExact() bool {
 	if e != nil {
 		switch *e {
-		case "none", "capped_4k", "audioOnly", "audioOnly,capped_4k":
+		case "capped_4k", "audioOnly":
 			return true
 		}
 	}
 	return false
+}
+
+// LiveMediaClipsMp4SupportStatus - Generation status of this MP4 rendition.
+type LiveMediaClipsMp4SupportStatus string
+
+const (
+	LiveMediaClipsMp4SupportStatusPreparing LiveMediaClipsMp4SupportStatus = "preparing"
+	LiveMediaClipsMp4SupportStatusReady     LiveMediaClipsMp4SupportStatus = "ready"
+	LiveMediaClipsMp4SupportStatusFailed    LiveMediaClipsMp4SupportStatus = "failed"
+)
+
+func (e LiveMediaClipsMp4SupportStatus) ToPointer() *LiveMediaClipsMp4SupportStatus {
+	return &e
+}
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *LiveMediaClipsMp4SupportStatus) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "preparing", "ready", "failed":
+			return true
+		}
+	}
+	return false
+}
+
+// LiveMediaClipsMp4SupportExt - File extension of the downloadable rendition.
+type LiveMediaClipsMp4SupportExt string
+
+const (
+	LiveMediaClipsMp4SupportExtMp4 LiveMediaClipsMp4SupportExt = "mp4"
+	LiveMediaClipsMp4SupportExtM4a LiveMediaClipsMp4SupportExt = "m4a"
+)
+
+func (e LiveMediaClipsMp4SupportExt) ToPointer() *LiveMediaClipsMp4SupportExt {
+	return &e
+}
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *LiveMediaClipsMp4SupportExt) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "mp4", "m4a":
+			return true
+		}
+	}
+	return false
+}
+
+type LiveMediaClipsMp4Support struct {
+	// The MP4 rendition type. `capped_4k` is a downloadable MP4 video capped at 4K resolution, `audioOnly` is a downloadable m4a audio-only file.
+	Type *LiveMediaClipsMp4SupportType `json:"type,omitzero"`
+	// Generation status of this MP4 rendition.
+	Status *LiveMediaClipsMp4SupportStatus `json:"status,omitzero"`
+	// Pixel height of the rendition. Omitted for the `audioOnly` type.
+	Height optionalnullable.OptionalNullable[int64] `json:"height,omitzero"`
+	// Pixel width of the rendition. Omitted for the `audioOnly` type.
+	Width optionalnullable.OptionalNullable[int64] `json:"width,omitzero"`
+	// File extension of the downloadable rendition.
+	Ext *LiveMediaClipsMp4SupportExt `json:"ext,omitzero"`
+}
+
+func (m *LiveMediaClipsMp4Support) GetType() *LiveMediaClipsMp4SupportType {
+	if m == nil {
+		return nil
+	}
+	return m.Type
+}
+
+func (m *LiveMediaClipsMp4Support) GetStatus() *LiveMediaClipsMp4SupportStatus {
+	if m == nil {
+		return nil
+	}
+	return m.Status
+}
+
+func (m *LiveMediaClipsMp4Support) GetHeight() optionalnullable.OptionalNullable[int64] {
+	if m == nil {
+		return nil
+	}
+	return m.Height
+}
+
+func (m *LiveMediaClipsMp4Support) GetWidth() optionalnullable.OptionalNullable[int64] {
+	if m == nil {
+		return nil
+	}
+	return m.Width
+}
+
+func (m *LiveMediaClipsMp4Support) GetExt() *LiveMediaClipsMp4SupportExt {
+	if m == nil {
+		return nil
+	}
+	return m.Ext
 }
 
 type LiveMediaClips struct {
@@ -266,17 +357,15 @@ type LiveMediaClips struct {
 	Status *LiveMediaClipsStatus `json:"status,omitzero"`
 	// The sourceAccess parameter determines whether the original media file is accessible. Set to true to enable access or false to restrict it.
 	SourceAccess *bool `json:"sourceAccess,omitzero"`
+	// Whether the audio track of the media has been volume-normalized.
+	OptimizeAudio optionalnullable.OptionalNullable[bool] `json:"optimizeAudio,omitzero"`
 	// A collection of Playback ID objects utilized for crafting HLS playback URLs.
 	PlaybackIds []PlaybackID `json:"playbackIds,omitzero"`
 	// A media consists of different media tracks, like video, audio, and subtitle, all combined.
 	Tracks []LiveMediaClipsTrack `json:"tracks,omitzero"`
-	// Determines the type of MP4 support for the media.
-	// - **none**: Disables MP4 support.
-	// - **capped_4k**: Enables MP4 downloads with resolutions up to 4K.
-	// - **audioOnly**: Provides an MP4 stream containing only the audio.
-	// - **audioOnly,capped_4k**: Enables both MP4 video downloads (up to 4K) and an audio-only stream.
+	// A list of MP4 renditions generated for the media when MP4 support is requested. Each entry represents one downloadable rendition (for example, a capped-4K video file or an audio-only m4a file) along with its generation status. Omitted when no MP4 support has been requested.
 	//
-	Mp4Support *LiveMediaClipsMp4Support `json:"mp4Support,omitzero"`
+	Mp4Support optionalnullable.OptionalNullable[[]LiveMediaClipsMp4Support] `json:"mp4Support,omitzero"`
 	// List of generated subtitle tracks associated with the media.
 	GeneratedSubtitles optionalnullable.OptionalNullable[[]TracksSubtitles] `json:"generatedSubtitles,omitzero"`
 	// Indicates whether the media contains only audio (no video track).
@@ -374,6 +463,13 @@ func (l *LiveMediaClips) GetSourceAccess() *bool {
 	return l.SourceAccess
 }
 
+func (l *LiveMediaClips) GetOptimizeAudio() optionalnullable.OptionalNullable[bool] {
+	if l == nil {
+		return nil
+	}
+	return l.OptimizeAudio
+}
+
 func (l *LiveMediaClips) GetPlaybackIds() []PlaybackID {
 	if l == nil {
 		return nil
@@ -388,7 +484,7 @@ func (l *LiveMediaClips) GetTracks() []LiveMediaClipsTrack {
 	return l.Tracks
 }
 
-func (l *LiveMediaClips) GetMp4Support() *LiveMediaClipsMp4Support {
+func (l *LiveMediaClips) GetMp4Support() optionalnullable.OptionalNullable[[]LiveMediaClipsMp4Support] {
 	if l == nil {
 		return nil
 	}

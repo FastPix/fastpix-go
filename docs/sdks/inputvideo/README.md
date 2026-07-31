@@ -46,10 +46,10 @@ Upon successful creation, the API returns an `id` that must be retained for futu
 
 4. Use the id in subsequent API calls, such as checking the status of the media with the <a href="https://fastpix.com/docs/video-on-demand-api/manage-videos/get-media">Get Media by ID</a> endpoint to determine when the media is ready for playback. 
 
-FastPix uses webhooks to tell your application about things that happen in the background, outside of the API regular request flow. For instance, after the media file is created (but not yet processed or encoded), FastPix sends a `POST` request to your specified webhook URL with the event <a href="https://fastpix.com/docs/vod-events/media-events#videomediacreated">video.media.created</a>. 
+FastPix uses webhooks to tell your application about things that happen in the background, outside of the API regular request flow. For instance, after the media file is created (but not yet processed or encoded), FastPix sends a `POST` request to your specified webhook URL with the event <a href="https://fastpix.com/docs/webhooks/media-events#videomediacreated">video.media.created</a>. 
 
 
-After processing completes, monitor the events <a href="https://fastpix.com/docs/vod-events/media-events#videomediaready">video.media.ready</a> and <a href="https://fastpix.com/docs/vod-events/media-events#videomediafailed">video.media.failed</a> to track the status of the media file.
+After processing completes, monitor the events <a href="https://fastpix.com/docs/webhooks/media-events#videomediaready">video.media.ready</a> and <a href="https://fastpix.com/docs/webhooks/media-events#videomediafailed">video.media.failed</a> to track the status of the media file.
 
 Related guide: <a href="https://fastpix.com/docs/upload-videos/upload-videos-from-a-url">Upload videos from URL</a>
 

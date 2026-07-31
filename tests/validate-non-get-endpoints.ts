@@ -291,11 +291,12 @@ async function waitForTrackReady(
 function resolveSpecPath(): string {
   const candidates = [
     process.env.FASTPIX_OPENAPI_SPEC,
-    join(__dirname, "../fixed 7.yaml"),
-    join(__dirname, "../fastpix.yaml"),
-    join(__dirname, "../fixed.yaml"),
-    join(__dirname, "../fastpix-openapi.yaml"),
-    join(__dirname, "../../fastpix-openapi.yaml"),
+    // Same ordering as the GET validator: old.yaml is the vendored spec for what
+    // this SDK actually implements, and is the default.
+    join(__dirname, "../old.yaml"),
+    join(__dirname, "../../old.yaml"),
+    join(__dirname, "../fastpix-openai.yaml"),
+    join(__dirname, "../../fastpix-openai.yaml"),
   ].filter((p): p is string => Boolean(p));
   for (const p of candidates) if (existsSync(p)) return p;
   throw new Error(`OpenAPI spec not found. Tried: ${candidates.join(", ")}`);

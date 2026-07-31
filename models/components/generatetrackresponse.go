@@ -128,6 +128,8 @@ type GenerateTrackResponse struct {
 	// You can search for videos with specific key value pairs using metadata, when you tag a video in "key" : "value" pairs. Dynamic metadata allows you to define a key that allows any value pair. You can have maximum of 255 characters and upto 10 entries are allowed.
 	//
 	Metadata map[string]string `json:"metadata,omitzero"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (g GenerateTrackResponse) MarshalJSON() ([]byte, error) {
@@ -174,4 +176,11 @@ func (g *GenerateTrackResponse) GetMetadata() map[string]string {
 		return nil
 	}
 	return g.Metadata
+}
+
+func (g *GenerateTrackResponse) GetTitle() *string {
+	if g == nil {
+		return nil
+	}
+	return g.Title
 }

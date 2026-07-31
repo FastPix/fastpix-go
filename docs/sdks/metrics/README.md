@@ -43,7 +43,7 @@ A developer wants to analyze how watch time varies across different device types
   * **field:** The grouping field value based on the groupBy parameter. 
 
 
-Related guide: <a href="https://fastpix.com/docs/concepts/understand-data-definitions">Understand data definitions</a>
+Related guide: <a href="https://fastpix.com/docs/video-data/understand-data-definitions">Understand data definitions</a>
 
 
 ### Example Usage
@@ -165,7 +165,7 @@ Retrieves overall values for a specified metric, providing summary statistics th
   * **globalValue:** A global metric value that reflects the overall performance of the specified metric across the entire dataset for the given timespan. This value is not affected by specific filters. 
 
 
-  Related guide: <a href="https://fastpix.com/docs/concepts/understand-data-definitions">Understand data definitions</a>
+  Related guide: <a href="https://fastpix.com/docs/video-data/understand-data-definitions">Understand data definitions</a>
 
 
 ### Example Usage
@@ -380,7 +380,7 @@ This endpoint lets you to compare multiple metrics across specified dimensions. 
   3. You Receive a response containing the comparison values for the specified metrics across the selected dimensions. 
 
 
-  Related guide: <a href="https://fastpix.com/docs/working-with-video-data/explore-the-dashboard#compare-metrics">Compare metrics in dashboard</a>
+  Related guide: <a href="https://fastpix.com/docs/video-data/explore-the-dashboard#compare-metrics">Compare metrics in dashboard</a>
 
 
 ### Example Usage

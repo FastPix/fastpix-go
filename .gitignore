@@ -85,6 +85,7 @@ node_modules/
 
 # Local scratch / manual smoke-test code (not part of the published SDK)
 tests/test-project/
+tests/examples
 
 # Compiled SDK test harness binary
 sdkharness
@@ -92,3 +93,5 @@ sdkharness
 # Generated/working spec files and scratch dirs
 fixed*.yaml
 .gotmp/
+/old.yaml
+/fastpix-openai.yaml

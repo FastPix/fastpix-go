@@ -26,8 +26,8 @@ func (g *GetMediaRequest) GetMediaID() string {
 // GetMediaResponseBody - Get a video media by id
 type GetMediaResponseBody struct {
 	// Demonstrates whether the request is successful or not.
-	Success *bool                        `json:"success,omitzero"`
-	Data    *components.GetMediaResponse `json:"data,omitzero"`
+	Success *bool                              `json:"success,omitzero"`
+	Data    *components.GetMediaDetailResponse `json:"data,omitzero"`
 }
 
 func (g GetMediaResponseBody) MarshalJSON() ([]byte, error) {
@@ -48,7 +48,7 @@ func (g *GetMediaResponseBody) GetSuccess() *bool {
 	return g.Success
 }
 
-func (g *GetMediaResponseBody) GetData() *components.GetMediaResponse {
+func (g *GetMediaResponseBody) GetData() *components.GetMediaDetailResponse {
 	if g == nil {
 		return nil
 	}

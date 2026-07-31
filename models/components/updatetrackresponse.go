@@ -41,6 +41,8 @@ type UpdateTrackResponse struct {
 	LanguageCode *string `json:"languageCode,omitzero"`
 	// The full name of the language corresponding to the `languageCode`.
 	LanguageName *string `json:"languageName,omitzero"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (u *UpdateTrackResponse) GetID() *string {
@@ -76,4 +78,11 @@ func (u *UpdateTrackResponse) GetLanguageName() *string {
 		return nil
 	}
 	return u.LanguageName
+}
+
+func (u *UpdateTrackResponse) GetTitle() *string {
+	if u == nil {
+		return nil
+	}
+	return u.Title
 }

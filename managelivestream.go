@@ -315,7 +315,7 @@ func (s *ManageLiveStream) parseListResponse(req *http.Request, httpRes *http.Re
 // A creator disables a livestream to pause it temporarily. Later, they decide to continue the session.
 // By calling this endpoint with the stream's ID, they can re-enable and restart the same livestream.
 //
-// Related guide <a href="https://fastpix.com/docs/manage-live-streams/create-and-manage-live-streams">Manage streams</a>
+// Related guide <a href="https://fastpix.com/docs/live-streaming/create-and-manage-live-streams">Manage streams</a>
 func (s *ManageLiveStream) Enable(ctx context.Context, streamID string, opts ...operations.Option) (*operations.EnableLiveStreamResponse, error) {
 	request := operations.EnableLiveStreamRequest{StreamID: streamID}
 
@@ -404,7 +404,7 @@ func (s *ManageLiveStream) parseEnableResponse(req *http.Request, httpRes *http.
 // streaming. This endpoint ensures the livestream status is changed from `active` to `idle`,
 // indicating it's officially completed.
 //
-// Related guide <a href="https://fastpix.com/docs/manage-live-streams/create-and-manage-live-streams">Manage streams</a>
+// Related guide <a href="https://fastpix.com/docs/live-streaming/create-and-manage-live-streams">Manage streams</a>
 func (s *ManageLiveStream) Complete(ctx context.Context, streamID string, opts ...operations.Option) (*operations.CompleteLiveStreamResponse, error) {
 	request := operations.CompleteLiveStreamRequest{StreamID: streamID}
 
@@ -485,7 +485,7 @@ func (s *ManageLiveStream) parseCompleteResponse(req *http.Request, httpRes *htt
 //
 // The updated stream parameters and the `streamId` needs to be shared in the request, and FastPix
 // returns the updated stream details. After the update,
-// <a href="https://fastpix.com/docs/live-stream-events/live-events#videolive_streamupdated">video.live_stream.updated</a>
+// <a href="https://fastpix.com/docs/webhooks/live-events#videolive_streamupdated">video.live_stream.updated</a>
 // webhook event notifies your system.
 //
 // #### Example
@@ -495,7 +495,7 @@ func (s *ManageLiveStream) parseCompleteResponse(req *http.Request, httpRes *htt
 // organizers need to update the stream title to reflect the next day's session while keeping the same
 // stream ID for continuity.
 //
-// Related guide: <a href="https://fastpix.com/docs/manage-live-streams/create-and-manage-live-streams">Manage streams</a>
+// Related guide: <a href="https://fastpix.com/docs/live-streaming/create-and-manage-live-streams">Manage streams</a>
 func (s *ManageLiveStream) UpdateLiveStream(ctx context.Context, streamID string, body components.PatchLiveStreamRequest, opts ...operations.Option) (*operations.UpdateLiveStreamResponse, error) {
 	request := operations.UpdateLiveStreamRequest{StreamID: streamID, Body: body}
 

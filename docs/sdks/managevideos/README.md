@@ -128,7 +128,7 @@ This endpoint allows you to permanently delete a a specific video or audio media
 
 2. This action is irreversible. Make sure you no longer need the media before proceeding. Once deleted, the media can’t be retrieved or played back. 
 
-3. Monitor the following webhook event: <a href="https://fastpix.com/docs/vod-events/media-events#videomediadeleted">video.media.deleted</a>
+3. Monitor the following webhook event: <a href="https://fastpix.com/docs/webhooks/media-events#videomediadeleted">video.media.deleted</a>
 
 #### Example
 A user on a video-sharing platform decides to remove an old video from their profile, or suppose you're running a content moderation system, and one of the videos uploaded by a user violates your platform's policies. Using this endpoint, the media is permanently deleted from your library, ensuring it's no longer accessible or viewable by other users.
@@ -231,7 +231,7 @@ This endpoint allows you to cancel ongoing upload by its `uploadId`. Once cancel
 
 #### Webhook Events
 
-Once the upload is cancelled, you must receive the webhook event <a href="https://fastpix.com/docs/vod-events/media-events#videomediauploadcancelled">video.media.upload.cancelled</a>.
+Once the upload is cancelled, you must receive the webhook event <a href="https://fastpix.com/docs/webhooks/media-events#videomediauploadcancelled">video.media.upload.cancelled</a>.
 
 #### Example
 
@@ -341,11 +341,11 @@ This endpoint allows you to update an existing audio or subtitle track associate
 
 After updating a track, your system must receive webhook notifications:
 
-1. After successfully updating a track, your system must receive the webhook event <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediatrackupdated">video.media.track.updated</a>.
+1. After successfully updating a track, your system must receive the webhook event <a href="https://fastpix.com/docs/webhooks/transform-media-events#videomediatrackupdated">video.media.track.updated</a>.
 
-2. Once the new track is processed and ready, you must receive the webhook event <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediatrackready">video.media.track.ready</a>.
+2. Once the new track is processed and ready, you must receive the webhook event <a href="https://fastpix.com/docs/webhooks/transform-media-events#videomediatrackready">video.media.track.ready</a>.
 
-3. Once the media file is updated with the new track details, a <a href="https://fastpix.com/docs/vod-events/media-events#videomediaupdated">video.media.updated</a> event must be triggered.
+3. Once the media file is updated with the new track details, a <a href="https://fastpix.com/docs/webhooks/media-events#videomediaupdated">video.media.updated</a> event must be triggered.
 
 
 #### Example
@@ -354,7 +354,7 @@ Suppose you previously added a French subtitle track to a video but now need to 
   - The original track file has errors and needs correction.
   - You want to improve subtitle translations or replace an audio track with a better-quality version.
 
-Related guides: <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/add-subtitles-to-a-video">Add own subtitle tracks</a>, <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/add-audio-to-a-video">Add own audio tracks</a>
+Related guides: <a href="https://fastpix.com/docs/video-on-demand/add-subtitles-to-a-video">Add own subtitle tracks</a>, <a href="https://fastpix.com/docs/video-on-demand/add-audio-to-a-video">Add own audio tracks</a>
 
 
 ### Example Usage
@@ -385,9 +385,9 @@ func main() {
         }),
     )
 
-    // your-media-id: FastPix Media ID returned from upload/create API
     // your-track-id: Track ID returned from add track API
-    res, err := s.ManageVideos.UpdateTrack(ctx, "your-media-id", "your-track-id", components.UpdateTrackRequest{
+    // your-media-id: FastPix Media ID returned from upload/create API
+    res, err := s.ManageVideos.UpdateTrack(ctx, "your-track-id", "your-media-id", components.UpdateTrackRequest{
         LanguageName: fastpixgo.Pointer("french"),
     })
     if err != nil {
@@ -537,7 +537,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | fc733e3f-2fba-4c3d-9388-2511dc50d15f                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                                             |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
 ### Response
@@ -641,7 +641,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | Pass the list of the input objects used to create the media, along with applied settings. | 4fa85f64-5717-4562-b3fc-2c963f66afa6                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | Pass the list of the input objects used to create the media, along with applied settings. | your-media-id                                                                             |
 | `opts`                                                                                    | [][operations.Option](../../models/operations/option.md)                                  | :heavy_minus_sign:                                                                        | The options for this request.                                                             |                                                                                           |
 
 ### Response
@@ -775,11 +775,11 @@ This endpoint allows you to generate subtitles for an existing audio track in a 
 
 #### Webhook Events
 
-1. After the subtitle track is generated and ready, you receive the webhook event <a href="https://fastpix.com/docs/vod-events/transform-media-events#videomediasubtitlegeneratedready">video.media.subtitle.generated.ready</a>.
+1. After the subtitle track is generated and ready, you receive the webhook event <a href="https://fastpix.com/docs/webhooks/transform-media-events#videomediasubtitlegeneratedready">video.media.subtitle.generated.ready</a>.
 
-2. Finally the <a href="https://fastpix.com/docs/vod-events/media-events#videomediaupdated">video.media.updated</a> event notifies your system about the media’s updated status.
+2. Finally the <a href="https://fastpix.com/docs/webhooks/media-events#videomediaupdated">video.media.updated</a> event notifies your system about the media’s updated status.
 
-</br> Related guide: <a href="https://fastpix.com/docs/manage-audio-and-subtitle-tracks/generate-subtitles-automatically">Add auto-generated subtitles</a>
+</br> Related guide: <a href="https://fastpix.com/docs/video-on-demand/generate-subtitles-automatically">Add auto-generated subtitles</a>
 
 
 ### Example Usage
@@ -811,8 +811,8 @@ func main() {
     )
 
     // your-media-id: FastPix Media ID returned from upload/create API
-    // your-language-id: Language ID for subtitle generation
-    res, err := s.ManageVideos.GenerateSubtitleTrack(ctx, "your-media-id", "your-language-id", components.TrackSubtitlesGenerateRequest{
+    // your-track-id: Track ID of the audio track to generate subtitles from
+    res, err := s.ManageVideos.GenerateSubtitleTrack(ctx, "your-media-id", "your-track-id", components.TrackSubtitlesGenerateRequest{
         LanguageName: fastpixgo.Pointer("Italian"),
     })
     if err != nil {
@@ -858,7 +858,7 @@ func main() {
 | Parameter                                                                                                    | Type                                                                                                         | Required                                                                                                     | Description                                                                                                  | Example                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | `ctx`                                                                                                        | [context.Context](https://pkg.go.dev/context#Context)                                                        | :heavy_check_mark:                                                                                           | The context to use for the request.                                                                          |                                                                                                              |
-| `mediaID`                                                                                                    | *string*                                                                                                     | :heavy_check_mark:                                                                                           | The unique identifier assigned to the media when created. The value must be a valid UUID.                    | 4fa85f64-5717-4562-b3fc-2c963f66afa6                                                                         |
+| `mediaID`                                                                                                    | *string*                                                                                                     | :heavy_check_mark:                                                                                           | The unique identifier assigned to the media when created. The value must be a valid UUID.                    | your-media-id                                                                                                |
 | `trackID`                                                                                                    | *string*                                                                                                     | :heavy_check_mark:                                                                                           | A universally unique identifier (UUID) assigned to the specific track for which subtitles must be generated. | your-track-id                                                                         |
 | `body`                                                                                                       | [components.TrackSubtitlesGenerateRequest](../../models/components/tracksubtitlesgeneraterequest.md)         | :heavy_check_mark:                                                                                           | N/A                                                                                                          |                                                                                                              |
 | `opts`                                                                                                       | [][operations.Option](../../models/operations/option.md)                                                     | :heavy_minus_sign:                                                                                           | The options for this request.                                                                                |                                                                                                              |
@@ -892,7 +892,7 @@ A media clip is a segmented portion of an original media file (source media). Cl
 
 Imagine you’re managing a video editing platform where users upload full-length videos and create short clips for social media sharing. To keep track of all clips linked to a particular video, you call this API with the sourceMediaId. The response provides a list of all associated clips, allowing you to manage, edit, or repurpose them as needed.
 
-Related guide: <a href="https://fastpix.com/docs/edit-and-transform-videos/clip-and-trim-videos">Create clips from existing media</a>
+Related guide: <a href="https://fastpix.com/docs/video-on-demand/clip-and-trim-videos">Create clips from existing media</a>
 
 
 ### Example Usage
@@ -968,7 +968,7 @@ func main() {
 | Parameter                                                                                 | Type                                                                                      | Required                                                                                  | Description                                                                               | Example                                                                                   |
 | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `ctx`                                                                                     | [context.Context](https://pkg.go.dev/context#Context)                                     | :heavy_check_mark:                                                                        | The context to use for the request.                                                       |                                                                                           |
-| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | fc733e3f-2fba-4c3d-9388-2511dc50d15f                                                      |
+| `mediaID`                                                                                 | *string*                                                                                  | :heavy_check_mark:                                                                        | The unique identifier assigned to the media when created. The value must be a valid UUID. | your-media-id                                                                             |
 | `offset`                                                                                  | **int64*                                                                                  | :heavy_minus_sign:                                                                        | Offset determines the starting point for data retrieval within a paginated list.          | 5                                                                                         |
 | `limit`                                                                                   | **int64*                                                                                  | :heavy_minus_sign:                                                                        | The number of media clips to retrieve per request.                                        | 20                                                                                        |
 | `orderBy`                                                                                 | [*components.SortOrder](../../models/components/sortorder.md)                             | :heavy_minus_sign:                                                                        | The values in the list can be arranged in two ways DESC (Descending) or ASC (Ascending).  | desc                                                                                      |

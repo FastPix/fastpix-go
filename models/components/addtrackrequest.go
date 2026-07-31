@@ -49,6 +49,8 @@ type AddTrackRequest struct {
 	LanguageCode *string `default:"it" json:"languageCode"`
 	// The full name of the language corresponding to the `languageCode`.
 	LanguageName *string `default:"Italian" json:"languageName"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (a AddTrackRequest) MarshalJSON() ([]byte, error) {
@@ -88,4 +90,11 @@ func (a *AddTrackRequest) GetLanguageName() *string {
 		return nil
 	}
 	return a.LanguageName
+}
+
+func (a *AddTrackRequest) GetTitle() *string {
+	if a == nil {
+		return nil
+	}
+	return a.Title
 }
