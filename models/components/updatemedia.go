@@ -47,7 +47,6 @@ const (
 	UpdateMediaMaxResolutionOneThousandAndEightyp           UpdateMediaMaxResolution = "1080p"
 	UpdateMediaMaxResolutionSevenHundredAndTwentyp          UpdateMediaMaxResolution = "720p"
 	UpdateMediaMaxResolutionFourHundredAndEightyp           UpdateMediaMaxResolution = "480p"
-	UpdateMediaMaxResolutionThreeHundredAndSixtyp           UpdateMediaMaxResolution = "360p"
 )
 
 func (e UpdateMediaMaxResolution) ToPointer() *UpdateMediaMaxResolution {
@@ -58,7 +57,7 @@ func (e UpdateMediaMaxResolution) ToPointer() *UpdateMediaMaxResolution {
 func (e *UpdateMediaMaxResolution) IsExact() bool {
 	if e != nil {
 		switch *e {
-		case "2160p", "1440p", "1080p", "720p", "480p", "360p":
+		case "2160p", "1440p", "1080p", "720p", "480p":
 			return true
 		}
 	}
@@ -127,33 +126,122 @@ func (e *UpdateMediaStatus) IsExact() bool {
 	return false
 }
 
-// UpdateMediaMp4Support - Determines the type of MP4 support for the media.
-// - **none**: Disables MP4 support.
-// - **capped_4k**: Enables MP4 downloads with resolutions up to 4K.
-// - **audioOnly**: Provides an MP4 stream containing only the audio.
-// - **audioOnly,capped_4k**: Enables both MP4 video downloads (up to 4K) and an audio-only stream.
-type UpdateMediaMp4Support string
+// UpdateMediaMp4SupportType - The MP4 rendition type. `capped_4k` is a downloadable MP4 video capped at 4K resolution, `audioOnly` is a downloadable m4a audio-only file.
+type UpdateMediaMp4SupportType string
 
 const (
-	UpdateMediaMp4SupportNone              UpdateMediaMp4Support = "none"
-	UpdateMediaMp4SupportCapped4k          UpdateMediaMp4Support = "capped_4k"
-	UpdateMediaMp4SupportAudioOnly         UpdateMediaMp4Support = "audioOnly"
-	UpdateMediaMp4SupportAudioOnlyCapped4k UpdateMediaMp4Support = "audioOnly,capped_4k"
+	UpdateMediaMp4SupportTypeCapped4k  UpdateMediaMp4SupportType = "capped_4k"
+	UpdateMediaMp4SupportTypeAudioOnly UpdateMediaMp4SupportType = "audioOnly"
 )
 
-func (e UpdateMediaMp4Support) ToPointer() *UpdateMediaMp4Support {
+func (e UpdateMediaMp4SupportType) ToPointer() *UpdateMediaMp4SupportType {
 	return &e
 }
 
 // IsExact returns true if the value matches a known enum value, false otherwise.
-func (e *UpdateMediaMp4Support) IsExact() bool {
+func (e *UpdateMediaMp4SupportType) IsExact() bool {
 	if e != nil {
 		switch *e {
-		case "none", "capped_4k", "audioOnly", "audioOnly,capped_4k":
+		case "capped_4k", "audioOnly":
 			return true
 		}
 	}
 	return false
+}
+
+// UpdateMediaMp4SupportStatus - Generation status of this MP4 rendition.
+type UpdateMediaMp4SupportStatus string
+
+const (
+	UpdateMediaMp4SupportStatusPreparing UpdateMediaMp4SupportStatus = "preparing"
+	UpdateMediaMp4SupportStatusReady     UpdateMediaMp4SupportStatus = "ready"
+	UpdateMediaMp4SupportStatusFailed    UpdateMediaMp4SupportStatus = "failed"
+)
+
+func (e UpdateMediaMp4SupportStatus) ToPointer() *UpdateMediaMp4SupportStatus {
+	return &e
+}
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *UpdateMediaMp4SupportStatus) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "preparing", "ready", "failed":
+			return true
+		}
+	}
+	return false
+}
+
+// UpdateMediaMp4SupportExt - File extension of the downloadable rendition.
+type UpdateMediaMp4SupportExt string
+
+const (
+	UpdateMediaMp4SupportExtMp4 UpdateMediaMp4SupportExt = "mp4"
+	UpdateMediaMp4SupportExtM4a UpdateMediaMp4SupportExt = "m4a"
+)
+
+func (e UpdateMediaMp4SupportExt) ToPointer() *UpdateMediaMp4SupportExt {
+	return &e
+}
+
+// IsExact returns true if the value matches a known enum value, false otherwise.
+func (e *UpdateMediaMp4SupportExt) IsExact() bool {
+	if e != nil {
+		switch *e {
+		case "mp4", "m4a":
+			return true
+		}
+	}
+	return false
+}
+
+type UpdateMediaMp4Support struct {
+	// The MP4 rendition type. `capped_4k` is a downloadable MP4 video capped at 4K resolution, `audioOnly` is a downloadable m4a audio-only file.
+	Type *UpdateMediaMp4SupportType `json:"type,omitzero"`
+	// Generation status of this MP4 rendition.
+	Status *UpdateMediaMp4SupportStatus `json:"status,omitzero"`
+	// Pixel height of the rendition. Omitted for the `audioOnly` type.
+	Height optionalnullable.OptionalNullable[int64] `json:"height,omitzero"`
+	// Pixel width of the rendition. Omitted for the `audioOnly` type.
+	Width optionalnullable.OptionalNullable[int64] `json:"width,omitzero"`
+	// File extension of the downloadable rendition.
+	Ext *UpdateMediaMp4SupportExt `json:"ext,omitzero"`
+}
+
+func (m *UpdateMediaMp4Support) GetType() *UpdateMediaMp4SupportType {
+	if m == nil {
+		return nil
+	}
+	return m.Type
+}
+
+func (m *UpdateMediaMp4Support) GetStatus() *UpdateMediaMp4SupportStatus {
+	if m == nil {
+		return nil
+	}
+	return m.Status
+}
+
+func (m *UpdateMediaMp4Support) GetHeight() optionalnullable.OptionalNullable[int64] {
+	if m == nil {
+		return nil
+	}
+	return m.Height
+}
+
+func (m *UpdateMediaMp4Support) GetWidth() optionalnullable.OptionalNullable[int64] {
+	if m == nil {
+		return nil
+	}
+	return m.Width
+}
+
+func (m *UpdateMediaMp4Support) GetExt() *UpdateMediaMp4SupportExt {
+	if m == nil {
+		return nil
+	}
+	return m.Ext
 }
 
 type UpdateMediaTrackType string
@@ -293,15 +381,13 @@ type UpdateMedia struct {
 	SourceResolution *UpdateMediaSourceResolution `default:"1080p" json:"sourceResolution"`
 	// Determines the media's status, which can be one of the possible values.
 	Status *UpdateMediaStatus `json:"status,omitzero"`
-	// Determines the type of MP4 support for the media.
-	// - **none**: Disables MP4 support.
-	// - **capped_4k**: Enables MP4 downloads with resolutions up to 4K.
-	// - **audioOnly**: Provides an MP4 stream containing only the audio.
-	// - **audioOnly,capped_4k**: Enables both MP4 video downloads (up to 4K) and an audio-only stream.
+	// A list of MP4 renditions generated for the media when MP4 support is requested. Each entry represents one downloadable rendition (for example, a capped-4K video file or an audio-only m4a file) along with its generation status. Omitted when no MP4 support has been requested.
 	//
-	Mp4Support *UpdateMediaMp4Support `json:"mp4Support,omitzero"`
+	Mp4Support optionalnullable.OptionalNullable[[]UpdateMediaMp4Support] `json:"mp4Support,omitzero"`
 	// The sourceAccess parameter determines whether the original media file is accessible. Set to true to enable access or false to restrict it
 	SourceAccess *bool `json:"sourceAccess,omitzero"`
+	// Whether the audio track of the media has been volume-normalized.
+	OptimizeAudio optionalnullable.OptionalNullable[bool] `json:"optimizeAudio,omitzero"`
 	// A collection of Playback ID objects utilized for crafting HLS playback URLs.
 	PlaybackIds []PlaybackID `json:"playbackIds,omitzero"`
 	// A media consists of different media tracks, like video, audio, and subtitle, all combined.
@@ -411,7 +497,7 @@ func (u *UpdateMedia) GetStatus() *UpdateMediaStatus {
 	return u.Status
 }
 
-func (u *UpdateMedia) GetMp4Support() *UpdateMediaMp4Support {
+func (u *UpdateMedia) GetMp4Support() optionalnullable.OptionalNullable[[]UpdateMediaMp4Support] {
 	if u == nil {
 		return nil
 	}
@@ -423,6 +509,13 @@ func (u *UpdateMedia) GetSourceAccess() *bool {
 		return nil
 	}
 	return u.SourceAccess
+}
+
+func (u *UpdateMedia) GetOptimizeAudio() optionalnullable.OptionalNullable[bool] {
+	if u == nil {
+		return nil
+	}
+	return u.OptimizeAudio
 }
 
 func (u *UpdateMedia) GetPlaybackIds() []PlaybackID {

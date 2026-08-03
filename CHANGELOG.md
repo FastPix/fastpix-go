@@ -1,6 +1,41 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+---
+## [1.1.5]
+
+Regenerated against the updated OpenAPI spec. Validators resolve `old.yaml` —
+that spec minus the `/ai/` endpoints, plus the mismatches below.
+
+### Breaking
+
+- `mp4Support` is now `OptionalNullable[[]XMp4Support]` instead of a string
+  enum, on the six media schemas. Each entry has `Type`, `Status`, `Height`,
+  `Width`, `Ext`. Request-side enums unchanged.
+- `components.GetMediaResponse` → `GetMediaDetailResponse`, with its nested
+  types. `operations.GetMediaResponse` is not renamed.
+- `UpdateTrackRequest.URL` removed — a track's file can no longer be swapped.
+- `UpdateMediaMaxResolution` drops `360p`.
+
+### Added
+
+- `Title` on the ten track schemas.
+- `OptimizeAudio` (nullable `bool`) on the six media schemas.
+- `sourceResolution` gains `360p`/`360`.
+
+### Changed
+
+- SDK version `1.1.4` → `1.1.5`.
+- Doc links rewritten to current `fastpix.com/docs` paths; `docs/` regenerated;
+  hardcoded IDs in examples replaced with placeholders; `UpdateTrack` example
+  arg order corrected to `(ctx, trackID, mediaID)`.
+
+### Spec mismatches
+
+Not followed, because they contradict the live API:
+
+- `VideoTrackForGetAll.frameRate` kept — still returned by `list-media`.
+- `maxDuration` keeps `minimum: 0` — streams with no limit return `0`.
+
 ---
 ## [1.1.4]
 

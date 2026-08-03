@@ -10,14 +10,14 @@ import (
 	"github.com/FastPix/fastpix-go/internal/utils"
 )
 
-// UpdateTrackRequest - Contains details about the track being added to the media file.
+// UpdateTrackRequest - Contains details about the track being updated. The track's file (`url`) cannot be changed — only its language and title.
 type UpdateTrackRequest struct {
-	// The direct URL of the track file. It must point to a valid audio or subtitle file.
-	URL *string `default:"http://commondatastorage.googleapis.com/codeskulptor-assets/sounddogs/thrust.vtt" json:"url"`
 	// The BCP 47 language code representing the track’s language.
 	LanguageCode *string `default:"fr" json:"languageCode"`
 	// The full name of the language corresponding to the `languageCode`.
 	LanguageName *string `default:"French" json:"languageName"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (u UpdateTrackRequest) MarshalJSON() ([]byte, error) {
@@ -29,13 +29,6 @@ func (u *UpdateTrackRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	return nil
-}
-
-func (u *UpdateTrackRequest) GetURL() *string {
-	if u == nil {
-		return nil
-	}
-	return u.URL
 }
 
 func (u *UpdateTrackRequest) GetLanguageCode() *string {
@@ -50,4 +43,11 @@ func (u *UpdateTrackRequest) GetLanguageName() *string {
 		return nil
 	}
 	return u.LanguageName
+}
+
+func (u *UpdateTrackRequest) GetTitle() *string {
+	if u == nil {
+		return nil
+	}
+	return u.Title
 }

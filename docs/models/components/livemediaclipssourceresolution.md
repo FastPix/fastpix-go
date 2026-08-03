@@ -17,3 +17,5 @@ The actual resolution of the uploaded media. This represents the native quality 
 | `LiveMediaClipsSourceResolutionSevenHundredAndTwenty`           | 720                                                             |
 | `LiveMediaClipsSourceResolutionFourHundredAndEightyp`           | 480p                                                            |
 | `LiveMediaClipsSourceResolutionFourHundredAndEighty`            | 480                                                             |
+| `LiveMediaClipsSourceResolutionThreeHundredAndSixtyp`           | 360p                                                            |
+| `LiveMediaClipsSourceResolutionThreeHundredAndSixty`            | 360                                                             |

@@ -44,6 +44,8 @@ type SubtitleTrack struct {
 	Type *SubtitleTrackType `json:"type,omitzero"`
 	// Indicates the current state of the track. 'available' means the track has been processed successfully and is ready to be used or played.
 	Status *string `json:"status,omitzero"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 	// Name of the language in which the subtitles will be generated.
 	//
 	LanguageName *string `json:"languageName,omitzero"`
@@ -82,6 +84,13 @@ func (s *SubtitleTrack) GetStatus() *string {
 		return nil
 	}
 	return s.Status
+}
+
+func (s *SubtitleTrack) GetTitle() *string {
+	if s == nil {
+		return nil
+	}
+	return s.Title
 }
 
 func (s *SubtitleTrack) GetLanguageName() *string {

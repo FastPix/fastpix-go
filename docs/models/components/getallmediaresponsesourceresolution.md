@@ -17,3 +17,5 @@ The actual resolution of the uploaded media. This represents the native quality 
 | `GetAllMediaResponseSourceResolutionSevenHundredAndTwenty`           | 720                                                                  |
 | `GetAllMediaResponseSourceResolutionFourHundredAndEightyp`           | 480p                                                                 |
 | `GetAllMediaResponseSourceResolutionFourHundredAndEighty`            | 480                                                                  |
+| `GetAllMediaResponseSourceResolutionThreeHundredAndSixtyp`           | 360p                                                                 |
+| `GetAllMediaResponseSourceResolutionThreeHundredAndSixty`            | 360                                                                  |

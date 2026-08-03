@@ -19,6 +19,8 @@ type TrackSubtitlesGenerateRequest struct {
 	Metadata map[string]string `json:"metadata,omitzero"`
 	// Language code for content localization
 	LanguageCode *LanguageCode `default:"en-US" json:"languageCode"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (t TrackSubtitlesGenerateRequest) MarshalJSON() ([]byte, error) {
@@ -51,4 +53,11 @@ func (t *TrackSubtitlesGenerateRequest) GetLanguageCode() *LanguageCode {
 		return nil
 	}
 	return t.LanguageCode
+}
+
+func (t *TrackSubtitlesGenerateRequest) GetTitle() *string {
+	if t == nil {
+		return nil
+	}
+	return t.Title
 }

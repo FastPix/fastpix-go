@@ -21,9 +21,15 @@ type VideoTrackForGetAll struct {
 	// Track height denotes the range of height applicable to a specific track. Currently, this setting can be modified only for video tracks.
 	Height *float64 `json:"height,omitzero"`
 	// The frame rate (frames per second) of the video track, returned as a string (e.g. "24.000"). Applicable to video tracks only.
+	//
+	// NOTE: the spec dropped this property from VideoTrackForGetAll, but the live API
+	// still returns it on list-media video tracks and the spec's own example block for
+	// this schema still shows `frameRate: 30/1`. Kept to avoid re-breaking the 1.1.3 fix.
 	FrameRate *string `json:"frameRate,omitzero"`
 	// Indicates the current state of the track. 'available' means the track has been processed successfully and is ready to be used or played.
 	Status *string `json:"status,omitzero"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (v VideoTrackForGetAll) MarshalJSON() ([]byte, error) {
@@ -77,4 +83,11 @@ func (v *VideoTrackForGetAll) GetStatus() *string {
 		return nil
 	}
 	return v.Status
+}
+
+func (v *VideoTrackForGetAll) GetTitle() *string {
+	if v == nil {
+		return nil
+	}
+	return v.Title
 }

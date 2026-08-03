@@ -24,6 +24,8 @@ type VideoTrack struct {
 	FrameRate *string `json:"frameRate,omitzero"`
 	// Indicates the current state of the track. 'available' means the track has been processed successfully and is ready to be used or played.
 	Status *string `json:"status,omitzero"`
+	// Title of the track.
+	Title *string `json:"title,omitzero"`
 }
 
 func (v VideoTrack) MarshalJSON() ([]byte, error) {
@@ -77,4 +79,11 @@ func (v *VideoTrack) GetStatus() *string {
 		return nil
 	}
 	return v.Status
+}
+
+func (v *VideoTrack) GetTitle() *string {
+	if v == nil {
+		return nil
+	}
+	return v.Title
 }
