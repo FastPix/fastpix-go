@@ -1,6 +1,16 @@
 # FastPix Go SDK
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/FastPix/fastpix-go.svg)](https://pkg.go.dev/github.com/FastPix/fastpix-go)
+[![license](https://img.shields.io/github/license/FastPix/fastpix-go)](https://github.com/FastPix/fastpix-go/blob/main/LICENSE)
+[![Go 1.21+](https://img.shields.io/badge/Go-1.21%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+
 A robust, type-safe Go SDK designed for seamless integration with the FastPix API platform.
+
+The FastPix Go SDK is a type-safe Go client for the FastPix video API. From any Go 1.21+ application you can upload and manage videos, run live streams and simulcasts, create and secure playback IDs, manage playlists and signing keys, pull video analytics (views, metrics, dimensions, and errors), and drive in-video AI features such as subtitles, chapters, summaries, and content moderation.
+
+**Works with:** Go 1.21+ · Go modules · context-aware APIs · standard `net/http` · any Go service or CLI
+
+📖 **Docs:** https://fastpix.com/docs/language-sdks/go-sdk &nbsp;·&nbsp; 🚀 **Free account:** https://dashboard.fastpix.com
 
 ## Introduction
 
@@ -47,6 +57,8 @@ export FASTPIX_PASSWORD="your-secret-key"
   * [Error Handling](#error-handling)
   * [Server Selection](#server-selection)
   * [Custom HTTP Client](#custom-http-client)
+  * [FAQ](#faq)
+  * [Which FastPix SDK should I use?](#which-fastpix-sdk-should-i-use)
   * [Development](#development)
 
 ## Setup
@@ -690,7 +702,55 @@ func main() {
 </details>
 <!-- End Custom HTTP Client [http-client] -->
 
-# Development
+## FAQ
+
+**How do I install the FastPix Go SDK?**
+Run `go get github.com/FastPix/fastpix-go` and import it in your module. See [Setup](#setup) and [Installation](#installation).
+
+**How do I authenticate the SDK?**
+FastPix uses Basic Auth: build the client with `components.Security` passing your access token as `Username` and secret key as `Password`. See [Initialization](#initialization).
+
+**How do I upload a video in Go?**
+Create media from a URL or a direct upload through `s.InputVideo`, for example `s.InputVideo.Create(ctx, ...)`. See [Example Usage](#example-usage) and [Available Resources and Operations](#available-resources-and-operations).
+
+**How do I start a live stream?**
+Use the Live API resources to create and manage streams, simulcasts, and live playback IDs. See [Available Resources and Operations](#available-resources-and-operations).
+
+**How do I get video analytics and metrics in Go?**
+The Video Data API exposes metrics, views, dimensions, and errors for quality-of-experience monitoring. See [Available Resources and Operations](#available-resources-and-operations).
+
+**How do I handle API errors?**
+API errors are returned as `apierrors.APIError`; use `errors.As` to inspect the status code and body. See [Error Handling](#error-handling).
+
+**How do I configure automatic retries?**
+Pass `operations.WithRetries(...)` per call or `fastpixgo.WithRetryConfig(...)` at initialization to control the backoff strategy. See [Retries](#retries).
+
+**How do I use a custom HTTP client, proxy, or timeout?**
+Provide any client that satisfies the SDK's `HTTPClient` interface (for example an `*http.Client` with a timeout) via `fastpixgo.WithClient(...)`. See [Custom HTTP Client](#custom-http-client).
+
+**How do I change the API base URL?**
+Use `fastpixgo.WithServerURL(...)` when constructing the client. See [Server Selection](#server-selection).
+
+**Which Go versions are supported?**
+Go 1.21 and above. See [Prerequisites](#prerequisites).
+
+## Which FastPix SDK should I use?
+
+FastPix publishes a server SDK for every major backend language, each generated from the same API specification:
+
+| Language | Repo | Install |
+|---|---|---|
+| **Go** (this repo) | [fastpix-go](https://github.com/FastPix/fastpix-go) | `go get github.com/FastPix/fastpix-go` |
+| Node.js / TypeScript | [node-sdk](https://github.com/FastPix/node-sdk) | `npm install @fastpix/fastpix-node` |
+| Python | [fastpix-python](https://github.com/FastPix/fastpix-python) | `pip install fastpix-python` |
+| PHP | [fastpix-php](https://github.com/FastPix/fastpix-php) | `composer require fastpix/sdk` |
+| Java | [fastpix-java](https://github.com/FastPix/fastpix-java) | `io.fastpix:sdk` (Maven/Gradle) |
+| C# / .NET | [fastpix-sdk-csharp](https://github.com/FastPix/fastpix-sdk-csharp) | `dotnet add package Fastpix` |
+| Ruby | [fastpix-ruby](https://github.com/FastPix/fastpix-ruby) | `gem install fastpixapi` |
+
+To upload and play the media these SDKs create, use the FastPix browser libraries: [web-uploads-sdk](https://github.com/FastPix/web-uploads-sdk), [react-web-uploader](https://github.com/FastPix/react-web-uploader), and [web-player-component](https://github.com/FastPix/web-player-component). Browse everything in the [FastPix organization](https://github.com/orgs/FastPix/repositories).
+
+## Development
 
 This Go SDK is programmatically generated from our API specifications. Any manual modifications to internal files will be overwritten during subsequent generation cycles. 
 
