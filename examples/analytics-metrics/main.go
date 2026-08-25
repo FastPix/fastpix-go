@@ -1,5 +1,3 @@
-//go:build ignore
-
 package main
 
 import (
@@ -298,7 +296,6 @@ func runAdvancedAnalyticsQueries(ctx context.Context, client *fastpixgo.Fastpixg
 		operations.ListVideoViewsTimespanSixtyminutes,
 		operations.ListVideoViewsTimespanTwentyFourhours,
 		operations.ListVideoViewsTimespanSevendays,
-		operations.ListVideoViewsTimespanThirtydays,
 	}
 
 	for _, timespan := range timespans {

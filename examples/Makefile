@@ -1,6 +1,6 @@
 # FastPix Go SDK Examples Makefile
 
-.PHONY: help basic media live playback ai analytics security errors all clean
+.PHONY: help basic media live playback ai analytics security errors create-upload verify-webhook all clean
 
 # Default target
 help:
@@ -16,6 +16,8 @@ help:
 	@echo "  analytics  - Run analytics and metrics example"
 	@echo "  security   - Run security and signing keys example"
 	@echo "  errors     - Run error handling example"
+	@echo "  create-upload  - Create a signed direct-upload URL"
+	@echo "  verify-webhook - Verify a FastPix webhook signature (offline)"
 	@echo "  all        - Run all examples"
 	@echo "  clean      - Clean up generated files"
 	@echo ""
@@ -38,42 +40,52 @@ check-env:
 # Basic usage example
 basic: check-env
 	@echo "Running basic usage example..."
-	@go run basic_usage.go
+	@go run ./basic-usage
 
 # Media management example
 media: check-env
 	@echo "Running media management example..."
-	@go run media_management.go
+	@go run ./media-management
 
 # Live streaming example
 live: check-env
 	@echo "Running live streaming example..."
-	@go run live_streaming.go
+	@go run ./live-streaming
 
 # Playback and playlist example
 playback: check-env
 	@echo "Running playback and playlist example..."
-	@go run playback_playlist.go
+	@go run ./playback-playlist
 
 # AI features example
 ai: check-env
 	@echo "Running AI features example..."
-	@go run ai_features.go
+	@go run ./ai-features
 
 # Analytics and metrics example
 analytics: check-env
 	@echo "Running analytics and metrics example..."
-	@go run analytics_metrics.go
+	@go run ./analytics-metrics
 
 # Security and signing keys example
 security: check-env
 	@echo "Running security and signing keys example..."
-	@go run security_signing_keys.go
+	@go run ./security-signing-keys
 
 # Error handling example
 errors: check-env
 	@echo "Running error handling example..."
-	@go run error_handling.go
+	@go run ./error-handling
+
+# Create a signed direct-upload URL (its own package -> run by folder path)
+create-upload: check-env
+	@echo "Creating a signed upload URL..."
+	@go run ./create-upload
+
+# Verify a FastPix webhook signature (offline; no credentials needed)
+verify-webhook:
+	@echo "Verifying a webhook signature..."
+	@go run ./verify-webhook
 
 # Run all examples
 all: check-env
@@ -112,6 +124,14 @@ all: check-env
 	@echo "================="
 	@$(MAKE) errors
 	@echo ""
+	@echo "9. Create Upload"
+	@echo "================"
+	@$(MAKE) create-upload
+	@echo ""
+	@echo "10. Verify Webhook"
+	@echo "=================="
+	@$(MAKE) verify-webhook
+	@echo ""
 	@echo "All examples completed!"
 
 # Clean up generated files
@@ -139,20 +159,13 @@ test:
 	@go test ./...
 	@echo "Tests completed!"
 
-# Build all examples
+# Compile-check all examples
 build:
 	@echo "Building all examples..."
-	@go build -o basic_usage basic_usage.go
-	@go build -o media_management media_management.go
-	@go build -o live_streaming live_streaming.go
-	@go build -o playback_playlist playback_playlist.go
-	@go build -o ai_features ai_features.go
-	@go build -o analytics_metrics analytics_metrics.go
-	@go build -o security_signing_keys security_signing_keys.go
-	@go build -o error_handling error_handling.go
+	@go build ./...
 	@echo "All examples built!"
 
 # Run specific example by name
 run-%: check-env
 	@echo "Running $* example..."
-	@go run $*.go
+	@go run ./$*

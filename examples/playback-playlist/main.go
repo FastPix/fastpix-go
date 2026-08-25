@@ -1,5 +1,3 @@
-//go:build ignore
-
 package main
 
 import (
@@ -26,24 +24,32 @@ func main() {
 	)
 
 	fmt.Println("=== Creating Playlist ===")
+	// Reference IDs must be alphanumeric and unique per workspace, so suffix a
+	// timestamp to keep re-runs from colliding.
 	createPlaylistRequest := components.CreateCreatePlaylistRequestManual(
 		components.CreatePlaylistRequestManual{
 			Name:        "My Test Playlist",
-			ReferenceID: "testplaylistref123",
+			ReferenceID: fmt.Sprintf("sdkexample%d", time.Now().Unix()),
 			Description: fastpixgo.Pointer("A test playlist created by SDK"),
 		},
 	)
 
+	var createdPlaylistID string
 	playlistResponse, err := client.Playlists.Create(ctx, createPlaylistRequest)
 	if err != nil {
 		log.Printf("Error creating playlist: %v", err)
 	} else {
 		printCreatePlaylistResult(playlistResponse)
+		if playlistResponse.PlaylistCreatedResponse != nil {
+			if manual := playlistResponse.PlaylistCreatedResponse.GetDataManual(); manual != nil && manual.ID != nil {
+				createdPlaylistID = *manual.ID
+			}
+		}
 	}
 
 	fmt.Println("\n=== Listing All Playlists ===")
 	limit := int64(10)
-	offset := int64(0)
+	offset := int64(1)
 
 	playlistsResponse, err := client.Playlists.List(ctx, &limit, &offset)
 	if err != nil {
@@ -52,11 +58,12 @@ func main() {
 		printPlaylistList(playlistsResponse)
 	}
 
-	if playlistsResponse != nil &&
-		playlistsResponse.GetAllPlaylistsResponse != nil &&
-		len(playlistsResponse.GetAllPlaylistsResponse.Data) > 0 &&
-		playlistsResponse.GetAllPlaylistsResponse.Data[0].ID != nil {
-		managePlaylist(ctx, client, *playlistsResponse.GetAllPlaylistsResponse.Data[0].ID)
+	// Manage (and finally delete) only the playlist this example created above —
+	// never an existing playlist from the workspace.
+	if createdPlaylistID != "" {
+		managePlaylist(ctx, client, createdPlaylistID)
+	} else {
+		fmt.Println("\nSkipping playlist management steps (no playlist was created).")
 	}
 
 	manageMediaPlayback(ctx, client)
@@ -148,13 +155,12 @@ func managePlaylistMedia(ctx context.Context, client *fastpixgo.Fastpixgo, playl
 		return
 	}
 
-	if mediaResponse.Object == nil || len(mediaResponse.Object.Data) == 0 ||
-		mediaResponse.Object.Data[0].ID == nil {
-		fmt.Println("No media available to add to playlist")
+	// Only media in the "Ready" state can be added to a playlist.
+	mediaID := firstReadyMediaID(mediaResponse)
+	if mediaID == "" {
+		fmt.Println("No ready media available to add to playlist")
 		return
 	}
-
-	mediaID := *mediaResponse.Object.Data[0].ID
 	fmt.Printf("Adding media %s to playlist\n", mediaID)
 
 	addMediaToPlaylist(ctx, client, playlistID, mediaID)
@@ -226,13 +232,14 @@ func manageMediaPlayback(ctx context.Context, client *fastpixgo.Fastpixgo) {
 		return
 	}
 
-	if mediaResponse.Object == nil || len(mediaResponse.Object.Data) == 0 ||
-		mediaResponse.Object.Data[0].ID == nil {
-		fmt.Println("No media available for playback operations")
+	// Playback IDs can only be created once a media has finished processing,
+	// so pick the first media that is in the "Ready" state.
+	mediaID := firstReadyMediaID(mediaResponse)
+	if mediaID == "" {
+		fmt.Println("No ready media available for playback operations")
 		return
 	}
 
-	mediaID := *mediaResponse.Object.Data[0].ID
 	fmt.Printf("Working with media: %s\n", mediaID)
 	managePlaybackID(ctx, client, mediaID)
 }
@@ -310,4 +317,18 @@ func getInt64Value(ptr *int64) int64 {
 		return 0
 	}
 	return *ptr
+}
+
+// firstReadyMediaID returns the ID of the first media in the "Ready" state, or
+// "" if none. Most media operations require processing to have finished.
+func firstReadyMediaID(mediaResponse *operations.ListMediaResponse) string {
+	if mediaResponse == nil || mediaResponse.Object == nil {
+		return ""
+	}
+	for _, media := range mediaResponse.Object.Data {
+		if media.ID != nil && media.Status != nil && *media.Status == components.GetAllMediaResponseStatusReady {
+			return *media.ID
+		}
+	}
+	return ""
 }
