@@ -1,5 +1,3 @@
-//go:build ignore
-
 package main
 
 import (
@@ -43,17 +41,23 @@ func main() {
 		},
 	}
 
+	var createdID string
 	createResponse, err := client.InputVideo.Create(ctx, createRequest)
 	if err != nil {
 		log.Printf("Error creating media: %v", err)
 	} else {
 		printCreateMediaResult(createResponse)
+		if createResponse.CreateMediaSuccessResponse != nil &&
+			createResponse.CreateMediaSuccessResponse.Data != nil &&
+			createResponse.CreateMediaSuccessResponse.Data.ID != nil {
+			createdID = *createResponse.CreateMediaSuccessResponse.Data.ID
+		}
 	}
 
 	// 2. List all media
 	fmt.Println("\n=== Listing All Media ===")
 	limit := int64(10)
-	offset := int64(0)
+	offset := int64(1)
 	orderBy := components.SortOrderDesc
 
 	listResponse, err := client.ManageVideos.List(ctx, &limit, &offset, &orderBy)
@@ -63,8 +67,12 @@ func main() {
 		printMediaList(listResponse)
 	}
 
-	if listResponse != nil && listResponse.Object != nil && len(listResponse.Object.Data) > 0 {
-		manageMedia(ctx, client, *listResponse.Object.Data[0].ID)
+	// Manage (and finally delete) only the media this example created above —
+	// never an existing media from the workspace.
+	if createdID != "" {
+		manageMedia(ctx, client, createdID)
+	} else {
+		fmt.Println("\nSkipping media management steps (no media was created).")
 	}
 
 	listUploads(ctx, client)
@@ -95,10 +103,8 @@ func manageMedia(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID strin
 	getMediaDetails(ctx, client, mediaID)
 	updateMedia(ctx, client, mediaID)
 	addAudioTrack(ctx, client, mediaID)
-	generateSubtitleTrack(ctx, client, mediaID)
 	getMediaClips(ctx, client, mediaID)
 	updateSourceAccess(ctx, client, mediaID)
-	updateMp4Support(ctx, client, mediaID)
 	retrieveMediaInputInfo(ctx, client, mediaID)
 	deleteMedia(ctx, client, mediaID)
 }
@@ -175,26 +181,6 @@ func addAudioTrack(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID str
 	}
 }
 
-func generateSubtitleTrack(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID string) {
-	fmt.Printf("\n=== Generating Subtitle Track for Media: %s ===\n", mediaID)
-
-	// A track ID is required to generate subtitles for an existing audio track.
-	trackID := "audio-track-id"
-	subtitleRequest := components.TrackSubtitlesGenerateRequest{
-		LanguageName: fastpixgo.Pointer("English"),
-	}
-
-	subtitleResponse, err := client.ManageVideos.GenerateSubtitleTrack(ctx, mediaID, trackID, subtitleRequest)
-	if err != nil {
-		log.Printf("Error generating subtitle track: %v", err)
-		return
-	}
-
-	if subtitleResponse.Object != nil && subtitleResponse.Object.Data != nil && subtitleResponse.Object.Data.ID != nil {
-		fmt.Printf("Subtitle track generated successfully! Track ID: %s\n", *subtitleResponse.Object.Data.ID)
-	}
-}
-
 func getMediaClips(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID string) {
 	fmt.Printf("\n=== Listing Clips for Media: %s ===\n", mediaID)
 
@@ -223,22 +209,6 @@ func updateSourceAccess(ctx context.Context, client *fastpixgo.Fastpixgo, mediaI
 	}
 
 	fmt.Println("Source access updated successfully!")
-}
-
-func updateMp4Support(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID string) {
-	fmt.Printf("\n=== Updating MP4 Support for Media: %s ===\n", mediaID)
-
-	mp4SupportRequest := operations.UpdatedMp4SupportRequestBody{
-		Mp4Support: operations.UpdatedMp4SupportMp4SupportCapped4k.ToPointer(),
-	}
-
-	_, err := client.Videos.UpdateMp4Support(ctx, mediaID, mp4SupportRequest)
-	if err != nil {
-		log.Printf("Error updating MP4 support: %v", err)
-		return
-	}
-
-	fmt.Println("MP4 support updated successfully!")
 }
 
 func retrieveMediaInputInfo(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID string) {
