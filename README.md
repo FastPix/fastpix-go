@@ -1,211 +1,591 @@
 # FastPix Go SDK
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/FastPix/fastpix-go.svg)](https://pkg.go.dev/github.com/FastPix/fastpix-go)
-[![license](https://img.shields.io/github/license/FastPix/fastpix-go)](https://github.com/FastPix/fastpix-go/blob/main/LICENSE)
-[![Go 1.21+](https://img.shields.io/badge/Go-1.21%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
-
 A robust, type-safe Go SDK designed for seamless integration with the FastPix API platform.
 
-The FastPix Go SDK is a type-safe Go client for the FastPix video API. From any Go 1.21+ application you can upload and manage videos, run live streams and simulcasts, create and secure playback IDs, manage playlists and signing keys, pull video analytics (views, metrics, dimensions, and errors), and drive in-video AI features such as subtitles, chapters, summaries, and content moderation.
+The FastPix Go SDK is a strongly typed Go client for the FastPix video API. From any Go application, you can upload and manage videos, run live streams and simulcasts, create and secure playback IDs, manage playlists and signing keys, pull video analytics, and use in-video AI features.
 
-**Works with:** Go 1.21+ · Go modules · context-aware APIs · standard `net/http` · any Go service or CLI
+**Supported Go:** 1.21 and later
+**Package:** `github.com/FastPix/fastpix-go`
+**Authentication:** HTTP Basic Authentication
+**Dependency management:** Go Modules
 
 📖 **Docs:** https://fastpix.com/docs/language-sdks/go-sdk &nbsp;·&nbsp; 🚀 **Free account:** https://dashboard.fastpix.com
 
-## Introduction
+<br />
 
-The FastPix Go SDK simplifies integration with the FastPix platform. It provides a clean, strongly-typed interface for secure and efficient communication with the FastPix API, enabling easy management of media uploads, live streaming, on‑demand content, playlists, video analytics, and signing keys for secure access and token management. It is intended for use with Go 1.21 and above.
+## Start here
 
-## Prerequisites
+If you are using the FastPix Go SDK for the first time, follow these steps in order:
 
-### Environment and Version Support
+1. [Check your Go version](#1-check-your-go-version)
+2. [Create a Go project](#2-create-a-go-project)
+3. [Install the SDK](#3-install-the-sdk)
+4. [Verify the installation](#4-verify-the-installation)
+5. [Configure authentication](#5-configure-authentication)
+6. [Initialize the FastPix client](#6-initialize-the-fastpix-client)
+7. [Make your first API request](#7-make-your-first-api-request)
+8. [Verify the API response](#8-verify-the-api-response)
+9. [Retrieve the media asset](#9-retrieve-the-media-asset)
+10. [Verify the media ID](#10-verify-the-media-id)
 
-| Requirement | Version | Description |
-|---|---:|---|
-| Go | `1.21+` | Core runtime environment |
-| Go Modules | `Enabled` | Dependency management |
-| Internet | `Required` | API communication and authentication |
+Do not skip the verification steps. If installation, authentication, or client initialization fails, troubleshoot that problem before continuing to the next API operation.
 
-> Pro Tip: We recommend using Go 1.21+ for optimal performance and the latest language features.
+---
 
-### Getting Started with FastPix
+### Before you begin
 
-To get started with the FastPix Go SDK, ensure you have the following:
+To use the SDK, make sure you have:
 
-- The FastPix APIs are authenticated using a **Username** and a **Password**. You must generate these credentials to use the SDK.
-- Follow the steps in the [Authentication with Basic Auth](https://fastpix.com/docs/getting-started/activate-your-account) guide to obtain your credentials.
+- Go 1.21 or later.
+- Go Modules enabled.
+- Internet access.
+- A FastPix account.
+- A FastPix Access Token.
+- A FastPix Secret Key.
 
-### Environment Variables (Optional)
+FastPix uses Basic Authentication:
 
-Configure your FastPix credentials using environment variables for enhanced security and convenience:
+| SDK value | FastPix credential |
+|---|---|
+| `Username` | Access Token |
+| `Password` | Secret Key |
+
+You can obtain your credentials from the FastPix Dashboard. Follow the [Authentication with Basic Auth](https://fastpix.com/docs/getting-started/activate-your-account) guide to obtain your credentials.
+
+## 1. Check your Go version
+
+Run:
 
 ```bash
-# Set your FastPix credentials
-export FASTPIX_USERNAME="your-access-token"
-export FASTPIX_PASSWORD="your-secret-key"
+go version
 ```
 
-> Security Note: Never commit your credentials to version control. Use environment variables or secure credential management systems.
+Output is similar to:
 
-## Table of Contents
+```text
+go version go1.21.0 darwin/arm64
+```
 
-* [FastPix Go SDK](#fastpix-go-sdk)
-  * [Setup](#setup)
-  * [Example Usage](#example-usage)
-  * [Available Resources and Operations](#available-resources-and-operations)
-  * [Retries](#retries)
-  * [Error Handling](#error-handling)
-  * [Server Selection](#server-selection)
-  * [Custom HTTP Client](#custom-http-client)
-  * [FAQ](#faq)
-  * [Which FastPix SDK should I use?](#which-fastpix-sdk-should-i-use)
-  * [Development](#development)
+or a later version.
 
-## Setup
+The FastPix Go SDK supports Go 1.21 and later.
 
-### Installation
+If your Go version is earlier than 1.21, install a supported version before continuing.
 
-Install the FastPix Go SDK using Go modules:
+---
+
+## 2. Create a Go project
+
+### a. Create a new directory for your FastPix application
+
+```bash
+mkdir fastpix-go-demo
+cd fastpix-go-demo
+```
+
+### b. Initialize a Go module
+
+Run:
+
+```bash
+go mod init fastpix-go-demo
+```
+
+Output is similar to:
+
+```text
+go: creating new go.mod: module fastpix-go-demo
+```
+
+This creates a `go.mod` file that tracks your project's module name and dependencies.
+
+Your project should now contain:
+
+```text
+fastpix-go-demo/
+└── go.mod
+```
+
+---
+
+## 3. Install the SDK
+
+Install the FastPix Go SDK using Go Modules:
 
 ```bash
 go get github.com/FastPix/fastpix-go
 ```
 
-### Imports
+Go downloads the SDK and adds it to your project's dependencies.
 
-The SDK uses standard Go packages. Import the necessary packages at the top of your files:
+Verify the dependency:
 
-```go
-import (
-    "context"
-    "github.com/FastPix/fastpix-go"
-    "github.com/FastPix/fastpix-go/models/components"
-)
+```bash
+go list -m github.com/FastPix/fastpix-go
 ```
 
-### Initialization
+Output is similar to:
 
-Initialize the FastPix SDK with your credentials:
-
-```go
-package main
-
-import (
-    "context"
-    "github.com/FastPix/fastpix-go"
-    "github.com/FastPix/fastpix-go/models/components"
-)
-
-func main() {
-    ctx := context.Background()
-
-    s := fastpixgo.New(
-        fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your-access-token"),
-            Password: fastpixgo.Pointer("your-secret-key"),
-        }),
-    )
-}
+```text
+github.com/FastPix/fastpix-go v<version>
 ```
 
-Or using environment variables:
+You can also inspect the `go.mod` file:
+
+```bash
+cat go.mod
+```
+
+The FastPix SDK should be listed as a dependency.
+
+## 4. Verify the installation
+
+Before making an API request, verify that your Go project can import the SDK.
+
+Create a file named `main.go`:
 
 ```go
 package main
-
 import (
-    "context"
-    "os"
-    "github.com/FastPix/fastpix-go"
-    "github.com/FastPix/fastpix-go/models/components"
+	"fmt"
+	fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 func main() {
-    ctx := context.Background()
-
-    s := fastpixgo.New(
-        fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")), // Your Access Token
-            Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")), // Your Secret Key
-        }),
-    )
+	_ = fastpixgo.New
+	fmt.Println("FastPix SDK imported successfully")
 }
 ```
 
-## Example Usage
+Run:
+
+```bash
+go run .
+```
+
+Output is similar to:
+
+```text
+FastPix SDK imported successfully
+```
+
+If this command fails, do not continue to API calls.
+
+Check:
+
+- Go 1.21 or later is installed.
+- The Go module has been initialized.
+- `github.com/FastPix/fastpix-go` is listed in `go.mod`.
+- You are running the command from the project directory.
+- Your Go environment is configured correctly.
+
+You can download or update dependencies with:
+
+```bash
+go mod tidy
+```
+
+Then run the verification again:
+
+```bash
+go run .
+```
+
+## 5. Configure authentication
+
+FastPix uses Basic Authentication.
+
+Set the Access Token and Secret Key as environment variables.
+
+### macOS and Linux
+
+```bash
+export FASTPIX_USERNAME="<YOUR_ACCESS_TOKEN>"
+export FASTPIX_PASSWORD="<YOUR_SECRET_KEY>"
+```
+
+### Windows PowerShell
+
+```powershell
+$env:FASTPIX_USERNAME="<YOUR_ACCESS_TOKEN>"
+$env:FASTPIX_PASSWORD="<YOUR_SECRET_KEY>"
+```
+
+The SDK maps these variables as follows:
+
+```text
+FASTPIX_USERNAME → Access Token
+FASTPIX_PASSWORD → Secret Key
+```
+
+### Verify the credentials are set
+
+Do not print the actual credential values.
+
+Instead, run:
+
+### macOS and Linux
+
+```bash
+if [ -n "$FASTPIX_USERNAME" ]; then
+  echo "Access Token: set"
+else
+  echo "Access Token: missing"
+fi
+if [ -n "$FASTPIX_PASSWORD" ]; then
+  echo "Secret Key: set"
+else
+  echo "Secret Key: missing"
+fi
+```
+
+Output is similar to:
+
+```text
+Access Token: set
+Secret Key: set
+```
+
+### Security
+
+Never:
+
+- Commit credentials to Git.
+- Put credentials directly into source code.
+- Include credentials in screenshots, logs, or bug reports.
+- Print authentication headers during debugging in production.
+
+Use environment variables or a secure credential-management system.
+
+## 6. Initialize the FastPix client
+
+Create or replace `main.go` with:
 
 ```go
 package main
-
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-
-    "github.com/FastPix/fastpix-go/models/components"
-    fastpixgo "github.com/FastPix/fastpix-go"
+	"context"
+	"fmt"
+	"os"
+	fastpixgo "github.com/FastPix/fastpix-go"
+	"github.com/FastPix/fastpix-go/models/components"
 )
-
 func main() {
-    ctx := context.Background()
-
-    s := fastpixgo.New(
-        fastpixgo.WithSecurity(components.Security{
-            Username: fastpixgo.Pointer("your access-token"),
-            Password: fastpixgo.Pointer("your-secret-key"),
-        }),
-    )
-
-    res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
-        Inputs: []components.Input{
-            components.CreateInputPullVideoInput(
-                components.PullVideoInput{},
-            ),
-        },
-        Metadata: map[string]string{
-            "your-metadata-key": "your-metadata-value",
-        },
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    if res.CreateMediaSuccessResponse != nil {
-        // Read raw response body to preserve API's JSON field order
-        if res.HTTPMeta.Response != nil && res.HTTPMeta.Response.Body != nil {
-            rawBody, err := io.ReadAll(res.HTTPMeta.Response.Body)
-            if err == nil && len(rawBody) > 0 {
-                var buf bytes.Buffer
-                if err := json.Indent(&buf, rawBody, "", "  "); err == nil {
-                    fmt.Println(buf.String())
-                } else {
-                    fmt.Println(string(rawBody))
-                }
-            } else {
-                responseJSON, err := json.MarshalIndent(res.CreateMediaSuccessResponse, "", "  ")
-                if err != nil {
-                    log.Printf("Error marshaling response: %v", err)
-                    fmt.Printf("Response: %+v\n", res.CreateMediaSuccessResponse)
-                } else {
-                    fmt.Println(string(responseJSON))
-                }
-            }
-        } else {
-            responseJSON, err := json.MarshalIndent(res.CreateMediaSuccessResponse, "", "  ")
-            if err != nil {
-                log.Printf("Error marshaling response: %v", err)
-                fmt.Printf("Response: %+v\n", res.CreateMediaSuccessResponse)
-            } else {
-                fmt.Println(string(responseJSON))
-            }
-        }
-    } else if res.DefaultError != nil {
-        fmt.Printf("Error: %+v\n", res.DefaultError)
-    }
+	ctx := context.Background()
+	fastpix := fastpixgo.New(
+		fastpixgo.WithSecurity(components.Security{
+			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
+			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
+		}),
+	)
+	_ = ctx
+	_ = fastpix
+	fmt.Println("FastPix client initialized")
 }
 ```
+
+Run:
+
+```bash
+go run .
+```
+
+Output is similar to:
+
+```text
+FastPix client initialized
+```
+
+### What this code does
+
+`fastpixgo.New()` creates the top-level FastPix SDK client.
+
+`components.Security` contains the credentials used to authenticate API requests.
+
+The SDK client does not make an API request simply because it is initialized.
+
+An API request occurs when you call an operation such as:
+
+```go
+fastpix.InputVideo.Create(...)
+```
+
+## 7. Make your first API request
+
+The easiest way to verify the complete integration is to create media from a publicly accessible video URL.
+
+FastPix provides a sample video URL:
+
+```text
+https://static.fastpix.com/fp-sample-video.mp4
+```
+
+The SDK uses the `InputVideo.Create` operation to create media from an external video URL.
+
+Replace `main.go` with:
+
+```go
+package main
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	fastpixgo "github.com/FastPix/fastpix-go"
+	"github.com/FastPix/fastpix-go/models/components"
+)
+func main() {
+	ctx := context.Background()
+	fastpix := fastpixgo.New(
+		fastpixgo.WithSecurity(components.Security{
+			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
+			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
+		}),
+	)
+	response, err := fastpix.InputVideo.Create(
+		ctx,
+		components.CreateMediaRequest{
+			Inputs: []components.Input{
+				components.CreateInputPullVideoInput(
+					components.PullVideoInput{
+						URL: fastpixgo.Pointer(
+							"https://static.fastpix.com/fp-sample-video.mp4",
+						),
+					},
+				),
+			},
+			Metadata: map[string]string{
+				"source": "fastpix-go-demo",
+			},
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if response.CreateMediaSuccessResponse == nil {
+		log.Fatal("FastPix API did not return a successful media response")
+	}
+	output, err := json.MarshalIndent(
+		response.CreateMediaSuccessResponse,
+		"",
+		"  ",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(output))
+}
+```
+
+Run:
+
+```bash
+go run .
+```
+
+A successful request returns information about the newly created media asset.
+
+## 8. Verify the API response
+
+A successful request returns a media ID.
+
+The response contains a structure similar to:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "..."
+  }
+}
+```
+
+The value of:
+
+```text
+data.id
+```
+
+is the unique ID assigned to the media.
+
+The exact response fields depend on the API response and SDK version.
+
+Save the media ID
+
+You will need the media ID for subsequent media operations.
+
+For example:
+
+```text
+MEDIA_ID=<value returned in data.id>
+```
+
+Do not confuse a `media_id` with a `playback_id`.
+
+They identify different resources and are used for different operations.
+
+## 9. Retrieve the media asset
+
+Use the media ID returned by the create operation to retrieve the media asset.
+
+The Go SDK exposes the operation through:
+
+```go
+fastpix.Videos.Get(ctx, mediaID)
+```
+
+The `mediaID` must be the ID returned when the media was created.
+
+Update `main.go` to retrieve the media after creating it:
+
+```go
+package main
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	fastpixgo "github.com/FastPix/fastpix-go"
+	"github.com/FastPix/fastpix-go/models/components"
+)
+func main() {
+	ctx := context.Background()
+	fastpix := fastpixgo.New(
+		fastpixgo.WithSecurity(components.Security{
+			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
+			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
+		}),
+	)
+	// Create media.
+	fmt.Println("Creating media...")
+	createResponse, err := fastpix.InputVideo.Create(
+		ctx,
+		components.CreateMediaRequest{
+			Inputs: []components.Input{
+				components.CreateInputPullVideoInput(
+					components.PullVideoInput{
+						URL: fastpixgo.Pointer(
+							"https://static.fastpix.com/fp-sample-video.mp4",
+						),
+					},
+				),
+			},
+			Metadata: map[string]string{
+				"source": "fastpix-go-demo",
+			},
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if createResponse.CreateMediaSuccessResponse == nil {
+		log.Fatal("FastPix API did not return a successful media response")
+	}
+	createData := createResponse.CreateMediaSuccessResponse
+	output, err := json.MarshalIndent(createData, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("\nCREATE MEDIA")
+	fmt.Println(string(output))
+	// Get the media ID.
+	//
+	// The generated response type exposes the media data.
+	// Extract the ID returned by the create operation here.
+	mediaID := createData.Data.Id
+	fmt.Println("\nMEDIA ID:")
+	fmt.Println(mediaID)
+	// Retrieve the media.
+	fmt.Println("\nRetrieving media...")
+	mediaResponse, err := fastpix.Videos.Get(ctx, mediaID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if mediaResponse.Object == nil {
+		log.Fatal("FastPix API did not return media data")
+	}
+	mediaOutput, err := json.MarshalIndent(
+		mediaResponse.Object,
+		"",
+		"  ",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("\nGET MEDIA")
+	fmt.Println(string(mediaOutput))
+}
+```
+
+Run:
+
+```bash
+go run .
+```
+
+The output should contain:
+
+```text
+Creating media...
+CREATE MEDIA
+{
+  ...
+}
+MEDIA ID:
+<media-id>
+Retrieving media...
+GET MEDIA
+{
+  ...
+}
+```
+
+The Go SDK's `Videos.Get` operation accepts the media ID as a required string and returns a `GetMediaResponse`. The generated SDK documentation describes this operation as retrieving detailed information about a specific media item, including its current status.
+
+## 10. Verify the media ID
+
+The `media_id` returned by the create operation identifies the media asset.
+
+The same ID is used to retrieve the media asset:
+
+<Image alt="FastPix Go media ID hand-off: the ID returned by create (data.id) becomes mediaID, which you pass to Videos.Get() to retrieve the media asset." border={false} src="https://static.fastpix.com/go-media-id-flow.png" />
+
+A successful response from the get-media operation confirms that:
+
+- The SDK was installed successfully.
+- The Go application can import the SDK.
+- Your FastPix credentials are configured.
+- The FastPix client was initialized successfully.
+- Your application authenticated with the FastPix API.
+- You created a media asset.
+- FastPix returned a media ID.
+- The media ID can be used in a subsequent API operation.
+- The Go SDK can retrieve the media asset.
+
+At this point, the initial SDK integration is complete.
+
+## What you have verified
+
+By completing this guide, you have verified that:
+
+- Go 1.21 or later is installed.
+- Go Modules are configured.
+- The FastPix Go SDK is installed.
+- Your Go application can import the SDK.
+- Your FastPix credentials are configured.
+- The FastPix client can be initialized.
+- Your application can authenticate with the FastPix API.
+- You can create a media asset.
+- You can retrieve the media asset using its media ID.
+
+Your completed workflow is:
+
+<Image alt="FastPix Go media workflow: a Go application calls the FastPix Go SDK, which calls the FastPix API to create media, returns a media ID, then retrieves the media with Videos.Get." border={false} src="https://static.fastpix.com/go-media-workflow.png" />
+
+You are now ready to use the returned `media_id` with other FastPix API operations.
+
+<br />
 
 ## Available Resources and Operations
 
@@ -327,26 +707,21 @@ Enhance video content with AI-powered features including moderation, summarizati
 - [Enable Moderation](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/invideoaifeatures/README.md#updatemoderation) - Activate content moderation and safety checks
 
 #### Media Clips
-
 - [List Live Clips](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#listliveclips) - Get all clips of a live stream
 - [List Media Clips](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#getmediaclips) - Retrieve all clips associated with a source media
 
 #### Subtitles
-
 - [Generate Subtitles](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#generatesubtitletrack) - Create automatic subtitles for media
 
 #### Media Tracks
-
 - [Add Track](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#addmediatrack) - Add audio or subtitle tracks to media
 - [Update Track](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/managevideos/README.md#updatetrack) - Modify existing audio or subtitle tracks
 - [Delete Track](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#deletetrack) - Remove audio or subtitle tracks
 
 #### Access Control
-
 - [Update Source Access](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#updatesourceaccess) - Control access permissions for media source
 
 #### Format Support
-
 - [Update MP4 Support](https://github.com/FastPix/fastpix-go/blob/feature/fixed-missing-parameters/docs/sdks/videos/README.md#updatemp4support) - Configure MP4 download capabilities
 
 <!-- End Available Resources and Operations [operations] -->
@@ -360,27 +735,22 @@ To change the default retry strategy for a single API call, simply provide a `re
 
 ```go
 package main
-
 import (
     "context"
     "log"
-
     "github.com/FastPix/fastpix-go/models/components"
     "github.com/FastPix/fastpix-go/models/operations"
     "github.com/FastPix/fastpix-go/retry"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 func main() {
     ctx := context.Background()
-
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
             Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
-
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -414,19 +784,15 @@ If you'd like to override the default retry strategy for all operations that sup
 
 ```go
 package main
-
 import (
     "context"
     "log"
-
     "github.com/FastPix/fastpix-go/models/components"
     "github.com/FastPix/fastpix-go/retry"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 func main() {
     ctx := context.Background()
-
     s := fastpixgo.New(
         fastpixgo.WithRetryConfig(
             retry.Config{
@@ -444,7 +810,6 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
-
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -482,27 +847,22 @@ For example, the `Create` function may return the following errors:
 
 ```go
 package main
-
 import (
     "context"
     "errors"
     "log"
-
     "github.com/FastPix/fastpix-go/models/apierrors"
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 func main() {
     ctx := context.Background()
-
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
             Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
-
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -548,18 +908,14 @@ The default server can be overridden globally using the `WithServerURL(serverURL
 
 ```go
 package main
-
 import (
     "context"
     "log"
-
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 func main() {
     ctx := context.Background()
-
     s := fastpixgo.New(
         fastpixgo.WithServerURL("your-server-url"),
         fastpixgo.WithSecurity(components.Security{
@@ -567,7 +923,6 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
-
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -603,19 +958,15 @@ The built-in `net/http` client satisfies this interface and a default client bas
 
 ```go
 package main
-
 import (
     "context"
     "net/http"
     "time"
-
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 func main() {
     ctx := context.Background()
-
     httpClient := &http.Client{Timeout: 30 * time.Second}
     s := fastpixgo.New(
         fastpixgo.WithClient(httpClient),
@@ -624,7 +975,6 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
-
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -651,20 +1001,16 @@ This can be a convenient way to configure timeouts, cookies, proxies, custom hea
 
 ```go
 package main
-
 import (
     "fmt"
     "net/http"
     "time"
-
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
-
 type LoggingHTTPClient struct {
     client *http.Client
 }
-
 func (c *LoggingHTTPClient) Do(req *http.Request) (*http.Response, error) {
     // Log request
     fmt.Printf("Sending %s request to %s\n", req.Method, req.URL.String())
@@ -680,10 +1026,8 @@ func (c *LoggingHTTPClient) Do(req *http.Request) (*http.Response, error) {
     
     return resp, err
 }
-
 func main() {
     ctx := context.Background()
-
     loggingClient := &LoggingHTTPClient{
         client: &http.Client{Timeout: 30 * time.Second},
     }
@@ -695,7 +1039,6 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
-
     // Use SDK as normal
 }
 ```
@@ -705,13 +1048,13 @@ func main() {
 ## FAQ
 
 **How do I install the FastPix Go SDK?**
-Run `go get github.com/FastPix/fastpix-go` and import it in your module. See [Setup](#setup) and [Installation](#installation).
+Run `go get github.com/FastPix/fastpix-go` and import it in your module. See [Install the SDK](#3-install-the-sdk).
 
 **How do I authenticate the SDK?**
-FastPix uses Basic Auth: build the client with `components.Security` passing your access token as `Username` and secret key as `Password`. See [Initialization](#initialization).
+FastPix uses Basic Auth: build the client with `components.Security` passing your access token as `Username` and secret key as `Password`. See [Initialize the FastPix client](#6-initialize-the-fastpix-client).
 
 **How do I upload a video in Go?**
-Create media from a URL or a direct upload through `s.InputVideo`, for example `s.InputVideo.Create(ctx, ...)`. See [Example Usage](#example-usage) and [Available Resources and Operations](#available-resources-and-operations).
+Create media from a URL or a direct upload through `s.InputVideo`, for example `s.InputVideo.Create(ctx, ...)`. See [Make your first API request](#7-make-your-first-api-request) and [Available Resources and Operations](#available-resources-and-operations).
 
 **How do I start a live stream?**
 Use the Live API resources to create and manage streams, simulcasts, and live playback IDs. See [Available Resources and Operations](#available-resources-and-operations).
@@ -732,7 +1075,7 @@ Provide any client that satisfies the SDK's `HTTPClient` interface (for example 
 Use `fastpixgo.WithServerURL(...)` when constructing the client. See [Server Selection](#server-selection).
 
 **Which Go versions are supported?**
-Go 1.21 and above. See [Prerequisites](#prerequisites).
+Go 1.21 and above. See [Before you begin](#before-you-begin).
 
 ## Which FastPix SDK should I use?
 
