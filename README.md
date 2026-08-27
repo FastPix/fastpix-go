@@ -1,5 +1,9 @@
 # FastPix Go SDK
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/FastPix/fastpix-go.svg)](https://pkg.go.dev/github.com/FastPix/fastpix-go)
+[![license](https://img.shields.io/github/license/FastPix/fastpix-go)](https://github.com/FastPix/fastpix-go/blob/main/LICENSE)
+[![Go 1.21+](https://img.shields.io/badge/Go-1.21%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+
 A robust, type-safe Go SDK designed for seamless integration with the FastPix API platform.
 
 The FastPix Go SDK is a strongly typed Go client for the FastPix video API. From any Go application, you can upload and manage videos, run live streams and simulcasts, create and secure playback IDs, manage playlists and signing keys, pull video analytics, and use in-video AI features.
