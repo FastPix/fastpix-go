@@ -1,6 +1,11 @@
 # Changelog
 
 ---
+## [1.1.6] 
+
+### Changed
+- Licence changed from MIT to Apache-2.0.
+  
 ## [1.1.5]
 
 Regenerated against the updated OpenAPI spec. Validators resolve `old.yaml` —
