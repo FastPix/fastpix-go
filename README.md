@@ -15,6 +15,18 @@ The FastPix Go SDK is a strongly typed Go client for the FastPix video API. From
 
 📖 **Docs:** https://fastpix.com/docs/language-sdks/go-sdk &nbsp;·&nbsp; 🚀 **Free account:** https://dashboard.fastpix.com
 
+## Jump to
+
+Skip straight to a section without scrolling:
+
+| Get started | API reference | Help & more |
+|---|---|---|
+| [Start here](#start-here) | [Available resources & operations](#available-resources-and-operations) | [FAQ](#faq) |
+| [Before you begin](#before-you-begin) | [Retries](#retries) | [Which SDK?](#which-fastpix-sdk-should-i-use) |
+| [Install the SDK](#3-install-the-sdk) | [Error handling](#error-handling) | [Development](#development) |
+| [Make your first API request](#7-make-your-first-api-request) | [Server selection](#server-selection) | [Detailed usage](#detailed-usage) |
+| [Retrieve the media asset](#9-retrieve-the-media-asset) | [Custom HTTP client](#custom-http-client) | [Examples](https://github.com/FastPix/fastpix-go/tree/main/examples) |
+
 <br />
 
 ## Start here
@@ -73,7 +85,6 @@ go version go1.21.0 darwin/arm64
 or a later version.
 
 The FastPix Go SDK supports Go 1.21 and later.
-
 If your Go version is earlier than 1.21, install a supported version before continuing.
 
 ---
@@ -150,10 +161,13 @@ Create a file named `main.go`:
 
 ```go
 package main
+
 import (
 	"fmt"
+
 	fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 func main() {
 	_ = fastpixgo.New
 	fmt.Println("FastPix SDK imported successfully")
@@ -173,7 +187,6 @@ FastPix SDK imported successfully
 ```
 
 If this command fails, do not continue to API calls.
-
 Check:
 
 - Go 1.21 or later is installed.
@@ -197,7 +210,6 @@ go run .
 ## 5. Configure authentication
 
 FastPix uses Basic Authentication.
-
 Set the Access Token and Secret Key as environment variables.
 
 ### macOS and Linux
@@ -224,7 +236,6 @@ FASTPIX_PASSWORD → Secret Key
 ### Verify the credentials are set
 
 Do not print the actual credential values.
-
 Instead, run:
 
 ### macOS and Linux
@@ -235,6 +246,7 @@ if [ -n "$FASTPIX_USERNAME" ]; then
 else
   echo "Access Token: missing"
 fi
+
 if [ -n "$FASTPIX_PASSWORD" ]; then
   echo "Secret Key: set"
 else
@@ -266,23 +278,29 @@ Create or replace `main.go` with:
 
 ```go
 package main
+
 import (
 	"context"
 	"fmt"
 	"os"
+
 	fastpixgo "github.com/FastPix/fastpix-go"
 	"github.com/FastPix/fastpix-go/models/components"
 )
+
 func main() {
 	ctx := context.Background()
+
 	fastpix := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
 			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
 		}),
 	)
+
 	_ = ctx
 	_ = fastpix
+
 	fmt.Println("FastPix client initialized")
 }
 ```
@@ -302,11 +320,9 @@ FastPix client initialized
 ### What this code does
 
 `fastpixgo.New()` creates the top-level FastPix SDK client.
-
 `components.Security` contains the credentials used to authenticate API requests.
 
 The SDK client does not make an API request simply because it is initialized.
-
 An API request occurs when you call an operation such as:
 
 ```go
@@ -329,23 +345,28 @@ Replace `main.go` with:
 
 ```go
 package main
+
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+
 	fastpixgo "github.com/FastPix/fastpix-go"
 	"github.com/FastPix/fastpix-go/models/components"
 )
+
 func main() {
 	ctx := context.Background()
+
 	fastpix := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
 			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
 		}),
 	)
+
 	response, err := fastpix.InputVideo.Create(
 		ctx,
 		components.CreateMediaRequest{
@@ -366,9 +387,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if response.CreateMediaSuccessResponse == nil {
 		log.Fatal("FastPix API did not return a successful media response")
 	}
+
 	output, err := json.MarshalIndent(
 		response.CreateMediaSuccessResponse,
 		"",
@@ -377,6 +400,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Println(string(output))
 }
 ```
@@ -415,9 +439,7 @@ is the unique ID assigned to the media.
 The exact response fields depend on the API response and SDK version.
 
 Save the media ID
-
 You will need the media ID for subsequent media operations.
-
 For example:
 
 ```text
@@ -425,7 +447,6 @@ MEDIA_ID=<value returned in data.id>
 ```
 
 Do not confuse a `media_id` with a `playback_id`.
-
 They identify different resources and are used for different operations.
 
 ## 9. Retrieve the media asset
@@ -444,23 +465,28 @@ Update `main.go` to retrieve the media after creating it:
 
 ```go
 package main
+
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+
 	fastpixgo "github.com/FastPix/fastpix-go"
 	"github.com/FastPix/fastpix-go/models/components"
 )
+
 func main() {
 	ctx := context.Background()
+
 	fastpix := fastpixgo.New(
 		fastpixgo.WithSecurity(components.Security{
 			Username: fastpixgo.Pointer(os.Getenv("FASTPIX_USERNAME")),
 			Password: fastpixgo.Pointer(os.Getenv("FASTPIX_PASSWORD")),
 		}),
 	)
+
 	// Create media.
 	fmt.Println("Creating media...")
 	createResponse, err := fastpix.InputVideo.Create(
@@ -483,16 +509,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if createResponse.CreateMediaSuccessResponse == nil {
 		log.Fatal("FastPix API did not return a successful media response")
 	}
+
 	createData := createResponse.CreateMediaSuccessResponse
+
 	output, err := json.MarshalIndent(createData, "", "  ")
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("\nCREATE MEDIA")
 	fmt.Println(string(output))
+
 	// Get the media ID.
 	//
 	// The generated response type exposes the media data.
@@ -500,15 +530,18 @@ func main() {
 	mediaID := createData.Data.Id
 	fmt.Println("\nMEDIA ID:")
 	fmt.Println(mediaID)
+
 	// Retrieve the media.
 	fmt.Println("\nRetrieving media...")
 	mediaResponse, err := fastpix.Videos.Get(ctx, mediaID)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if mediaResponse.Object == nil {
 		log.Fatal("FastPix API did not return media data")
 	}
+
 	mediaOutput, err := json.MarshalIndent(
 		mediaResponse.Object,
 		"",
@@ -532,13 +565,17 @@ The output should contain:
 
 ```text
 Creating media...
+
 CREATE MEDIA
 {
   ...
 }
+
 MEDIA ID:
 <media-id>
+
 Retrieving media...
+
 GET MEDIA
 {
   ...
@@ -550,7 +587,6 @@ The Go SDK's `Videos.Get` operation accepts the media ID as a required string an
 ## 10. Verify the media ID
 
 The `media_id` returned by the create operation identifies the media asset.
-
 The same ID is used to retrieve the media asset:
 
 <Image alt="FastPix Go media ID hand-off: the ID returned by create (data.id) becomes mediaID, which you pass to Videos.Get() to retrieve the media asset." border={false} src="https://static.fastpix.com/go-media-id-flow.png" />
@@ -588,6 +624,8 @@ Your completed workflow is:
 <Image alt="FastPix Go media workflow: a Go application calls the FastPix Go SDK, which calls the FastPix API to create media, returns a media ID, then retrieves the media with Videos.Get." border={false} src="https://static.fastpix.com/go-media-workflow.png" />
 
 You are now ready to use the returned `media_id` with other FastPix API operations.
+
+> **More examples:** For additional runnable examples, see the [`examples/`](https://github.com/FastPix/fastpix-go/tree/main/examples) directory in this repository.
 
 <br />
 
@@ -736,25 +774,29 @@ Enhance video content with AI-powered features including moderation, summarizati
 Some of the endpoints in this SDK support retries. If you use the SDK without any configuration, it will fall back to the default retry strategy provided by the API. However, the default retry strategy can be overridden on a per-operation basis, or across the entire SDK.
 
 To change the default retry strategy for a single API call, simply provide a `retry.Config` object to the call by using the `WithRetries` option:
-
 ```go
 package main
+
 import (
     "context"
     "log"
+
     "github.com/FastPix/fastpix-go/models/components"
     "github.com/FastPix/fastpix-go/models/operations"
     "github.com/FastPix/fastpix-go/retry"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 func main() {
     ctx := context.Background()
+
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
             Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
+
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -785,18 +827,21 @@ func main() {
 ```
 
 If you'd like to override the default retry strategy for all operations that support retries, you can use the `WithRetryConfig` option at SDK initialization:
-
 ```go
 package main
+
 import (
     "context"
     "log"
+
     "github.com/FastPix/fastpix-go/models/components"
     "github.com/FastPix/fastpix-go/retry"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 func main() {
     ctx := context.Background()
+
     s := fastpixgo.New(
         fastpixgo.WithRetryConfig(
             retry.Config{
@@ -814,6 +859,7 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
+
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -851,22 +897,27 @@ For example, the `Create` function may return the following errors:
 
 ```go
 package main
+
 import (
     "context"
     "errors"
     "log"
+
     "github.com/FastPix/fastpix-go/models/apierrors"
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 func main() {
     ctx := context.Background()
+
     s := fastpixgo.New(
         fastpixgo.WithSecurity(components.Security{
             Username: fastpixgo.Pointer("your access-token"),
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
+
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -878,6 +929,7 @@ func main() {
         },
     })
     if err != nil {
+
         var e *apierrors.APIError
         if errors.As(err, &e) {
             // handle error
@@ -909,17 +961,20 @@ func main() {
 ### Override Server URL Per-Client
 
 The default server can be overridden globally using the `WithServerURL(serverURL string)` option when initializing the SDK client instance. For example:
-
 ```go
 package main
+
 import (
     "context"
     "log"
+
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 func main() {
     ctx := context.Background()
+
     s := fastpixgo.New(
         fastpixgo.WithServerURL("your-server-url"),
         fastpixgo.WithSecurity(components.Security{
@@ -927,6 +982,7 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
+
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -962,15 +1018,19 @@ The built-in `net/http` client satisfies this interface and a default client bas
 
 ```go
 package main
+
 import (
     "context"
     "net/http"
     "time"
+
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 func main() {
     ctx := context.Background()
+
     httpClient := &http.Client{Timeout: 30 * time.Second}
     s := fastpixgo.New(
         fastpixgo.WithClient(httpClient),
@@ -979,6 +1039,7 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
+
     res, err := s.InputVideo.Create(ctx, components.CreateMediaRequest{
         Inputs: []components.Input{
             components.CreateInputPullVideoInput(
@@ -1005,16 +1066,20 @@ This can be a convenient way to configure timeouts, cookies, proxies, custom hea
 
 ```go
 package main
+
 import (
     "fmt"
     "net/http"
     "time"
+
     "github.com/FastPix/fastpix-go/models/components"
     fastpixgo "github.com/FastPix/fastpix-go"
 )
+
 type LoggingHTTPClient struct {
     client *http.Client
 }
+
 func (c *LoggingHTTPClient) Do(req *http.Request) (*http.Response, error) {
     // Log request
     fmt.Printf("Sending %s request to %s\n", req.Method, req.URL.String())
@@ -1030,8 +1095,10 @@ func (c *LoggingHTTPClient) Do(req *http.Request) (*http.Response, error) {
     
     return resp, err
 }
+
 func main() {
     ctx := context.Background()
+
     loggingClient := &LoggingHTTPClient{
         client: &http.Client{Timeout: 30 * time.Second},
     }
@@ -1043,6 +1110,7 @@ func main() {
             Password: fastpixgo.Pointer("your-secret-key"),
         }),
     )
+
     // Use SDK as normal
 }
 ```
