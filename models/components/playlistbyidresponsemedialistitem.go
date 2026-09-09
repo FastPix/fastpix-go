@@ -17,8 +17,8 @@ type PlaylistByIDResponseMediaListItem struct {
 	CreatedAt *time.Time `json:"createdAt,omitzero"`
 	// Creator ID of the media.
 	CreatorID optionalnullable.OptionalNullable[string] `json:"creatorId,omitzero"`
-	// Duration of the media in hh:mm:ss format.
-	Duration *string `json:"duration,omitzero"`
+	// Duration of the media in seconds.
+	Duration *float64 `json:"duration,omitzero"`
 	// unique id of the particular media.
 	ID *string `json:"id,omitzero"`
 	// source resolution of the media.
@@ -56,7 +56,7 @@ func (p *PlaylistByIDResponseMediaListItem) GetCreatorID() optionalnullable.Opti
 	return p.CreatorID
 }
 
-func (p *PlaylistByIDResponseMediaListItem) GetDuration() *string {
+func (p *PlaylistByIDResponseMediaListItem) GetDuration() *float64 {
 	if p == nil {
 		return nil
 	}

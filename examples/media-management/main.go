@@ -125,7 +125,9 @@ func getMediaDetails(ctx context.Context, client *fastpixgo.Fastpixgo, mediaID s
 
 	media := mediaResponse.Object.Data
 	fmt.Printf("Title: %s\n", optString(media.Title))
-	fmt.Printf("Duration: %s seconds\n", getStringValue(media.Duration))
+	if media.Duration != nil {
+		fmt.Printf("Duration: %.2f seconds\n", *media.Duration)
+	}
 	if media.Status != nil {
 		fmt.Printf("Status: %s\n", string(*media.Status))
 	}

@@ -410,8 +410,8 @@ type GetAllMediaResponse struct {
 	IsAudioOnly optionalnullable.OptionalNullable[bool] `json:"isAudioOnly,omitzero"`
 	// Indicates whether subtitles are available for the media.
 	SubtitleAvailable optionalnullable.OptionalNullable[bool] `json:"subtitleAvailable,omitzero"`
-	// The length of the media in seconds, with a maximum allowed duration of 12 hours per individual media.
-	Duration *string `json:"duration,omitzero"`
+	// Duration of the media in seconds.
+	Duration *float64 `json:"duration,omitzero"`
 	// Frame rate quantifies the speed at which frames are displayed per second. It represents the range of frames available for a specific track. The indeterminable frame rate of the input file is indicated by a value of -1.
 	FrameRate *string `json:"frameRate,omitzero"`
 	// The aspect ratio of a video is a value that describes the relative shape of a video based on its width and height.
@@ -601,7 +601,7 @@ func (g *GetAllMediaResponse) GetSubtitleAvailable() optionalnullable.OptionalNu
 	return g.SubtitleAvailable
 }
 
-func (g *GetAllMediaResponse) GetDuration() *string {
+func (g *GetAllMediaResponse) GetDuration() *float64 {
 	if g == nil {
 		return nil
 	}

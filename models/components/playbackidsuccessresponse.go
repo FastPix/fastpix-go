@@ -15,6 +15,8 @@ type PlaybackIDSuccessResponseData struct {
 	ID *string `json:"id,omitzero"`
 	// Determines if access to the streamed content is kept private or available to all.
 	AccessPolicy *string `json:"accessPolicy,omitzero"`
+	// Controls access based on domains and user agents.
+	AccessRestrictions *AccessRestrictions `json:"accessRestrictions,omitzero"`
 }
 
 func (p *PlaybackIDSuccessResponseData) GetID() *string {
@@ -29,6 +31,13 @@ func (p *PlaybackIDSuccessResponseData) GetAccessPolicy() *string {
 		return nil
 	}
 	return p.AccessPolicy
+}
+
+func (p *PlaybackIDSuccessResponseData) GetAccessRestrictions() *AccessRestrictions {
+	if p == nil {
+		return nil
+	}
+	return p.AccessRestrictions
 }
 
 // PlaybackIDSuccessResponse - Displays the result of the request.

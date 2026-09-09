@@ -145,6 +145,14 @@ func str(req map[string]any, key string) *string {
 	return &s
 }
 
+// validateAccessRestrictions is the accessRestrictions body sent on live stream / playback ID creation.
+func validateAccessRestrictions() *components.AccessRestrictions {
+	return &components.AccessRestrictions{
+		Domains:    &components.DomainRestrictions{DefaultPolicy: components.PolicyActionDeny.ToPointer(), Allow: []string{"example.com"}},
+		UserAgents: &components.UserAgentRestrictions{DefaultPolicy: components.PolicyActionAllow.ToPointer()},
+	}
+}
+
 func strVal(req map[string]any, key string) string {
 	if p := str(req, key); p != nil {
 		return *p
@@ -507,8 +515,11 @@ func dispatchCreate(s *fastpixgo.Fastpixgo, op string, req map[string]any, sdkVa
 		}))
 	case "create-new-stream":
 		return s.StartLiveStream.Create(ctx, components.CreateLiveStreamRequest{
-			PlaybackSettings:   components.PlaybackSettings{},
-			InputMediaSettings: components.InputMediaSettings{Metadata: map[string]string{"name": sdkValidate}},
+			PlaybackSettings: components.PlaybackSettings{AccessRestrictions: validateAccessRestrictions()},
+			InputMediaSettings: components.InputMediaSettings{
+				Metadata:        map[string]string{"name": sdkValidate},
+				EnableRecording: fastpixgo.Bool(false),
+			},
 		})
 	case "create-media-playback-id":
 		// Request an explicit resolution so the API returns a non-null
@@ -526,7 +537,7 @@ func dispatchCreate(s *fastpixgo.Fastpixgo, op string, req map[string]any, sdkVa
 	case "Generate-subtitle-track":
 		return s.ManageVideos.GenerateSubtitleTrack(ctx, strVal(req, keyMediaID), strVal(req, keyTrackID), components.TrackSubtitlesGenerateRequest{})
 	case "create-playbackId-of-stream":
-		return s.LivePlayback.Create(ctx, strVal(req, keyStreamID), components.PlaybackIDRequest{})
+		return s.LivePlayback.Create(ctx, strVal(req, keyStreamID), components.PlaybackIDRequest{AccessRestrictions: validateAccessRestrictions()})
 	case "create-simulcast-of-stream":
 		return s.SimulcastStreams.Create(ctx, strVal(req, keyStreamID), components.SimulcastRequest{
 			URL:       fastpixgo.String("rtmp://example.com/live"),
@@ -574,6 +585,14 @@ func dispatchUpdate(s *fastpixgo.Fastpixgo, op string, req map[string]any) (any,
 		})
 	case "update-user-agent-restrictions":
 		return s.PlaybackIds.UpdateUserAgentRestrictions(ctx, strVal(req, keyMediaID), strVal(req, keyPlaybackID), operations.UpdateUserAgentRestrictionsRequestBody{
+			Allow: []string{"Mozilla"},
+		})
+	case "update-live-stream-domain-restrictions":
+		return s.LivePlayback.UpdateDomainRestrictions(ctx, strVal(req, keyStreamID), strVal(req, keyPlaybackID), operations.UpdateLiveStreamDomainRestrictionsRequestBody{
+			Allow: []string{"example.com"},
+		})
+	case "update-live-stream-user-agent-restrictions":
+		return s.LivePlayback.UpdateUserAgentRestrictions(ctx, strVal(req, keyStreamID), strVal(req, keyPlaybackID), operations.UpdateLiveStreamUserAgentRestrictionsRequestBody{
 			Allow: []string{"Mozilla"},
 		})
 	case "update-a-playlist":
