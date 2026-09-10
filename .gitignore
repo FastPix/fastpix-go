@@ -88,10 +88,9 @@ tests/test-project/
 tests/examples
 
 # Compiled SDK test harness binary
-sdkharness
+/sdkharness
 
-# Generated/working spec files and scratch dirs
-fixed*.yaml
+# Local OpenAPI snapshot and spec-sync check script
+/openapi.yaml
+/spec_sync_check.*
 .gotmp/
-/old.yaml
-/fastpix-openai.yaml

@@ -406,8 +406,8 @@ type Media struct {
 	IsAudioOnly optionalnullable.OptionalNullable[bool] `json:"isAudioOnly,omitzero"`
 	// Indicates whether subtitles are available for the media.
 	SubtitleAvailable optionalnullable.OptionalNullable[bool] `json:"subtitleAvailable,omitzero"`
-	// The length of the media in seconds, with a maximum allowed duration of 12 hours per individual media.
-	Duration *string `json:"duration,omitzero"`
+	// Duration of the media in seconds.
+	Duration *float64 `json:"duration,omitzero"`
 	// The aspect ratio of a video is a value that describes the relative shape of a video based on its width and height.
 	AspectRatio optionalnullable.OptionalNullable[string] `json:"aspectRatio,omitzero"`
 	// Time the media was created, defined as a localDateTime (UTC Time).
@@ -581,7 +581,7 @@ func (m *Media) GetSubtitleAvailable() optionalnullable.OptionalNullable[bool] {
 	return m.SubtitleAvailable
 }
 
-func (m *Media) GetDuration() *string {
+func (m *Media) GetDuration() *float64 {
 	if m == nil {
 		return nil
 	}

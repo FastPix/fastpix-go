@@ -505,3 +505,153 @@ func (s *LivePlayback) newHookContext(ctx context.Context, baseURL, operationID 
 		SecuritySource:   s.sdkConfiguration.Security,
 	}
 }
+
+// UpdateDomainRestrictions - Update domain restrictions for a live playback ID
+// Updates the domain access policy of a live stream playback ID. Specify a default policy (`allow` or
+// `deny`) and the domains that are explicitly allowed or denied.
+//
+//	#### Example
+//
+//	A broadcaster restricts a live stream so it can only be embedded on its own domain by setting the
+//	default policy to `deny` and allowing `example.com`.
+func (s *LivePlayback) UpdateDomainRestrictions(ctx context.Context, streamID string, playbackID string, body operations.UpdateLiveStreamDomainRestrictionsRequestBody, opts ...operations.Option) (*operations.UpdateLiveStreamDomainRestrictionsResponse, error) {
+	request := operations.UpdateLiveStreamDomainRestrictionsRequest{StreamID: streamID, PlaybackID: playbackID, Body: body}
+	req, httpRes, err := s.patchRestrictions(ctx, "/live/streams/{streamId}/playback-ids/{playbackId}/domains", "update-live-stream-domain-restrictions", request, opts)
+	if err != nil {
+		return nil, err
+	}
+	return s.parseUpdateDomainRestrictionsResponse(req, httpRes)
+}
+
+// parseUpdateDomainRestrictionsResponse handles status-code dispatch for UpdateDomainRestrictions.
+func (s *LivePlayback) parseUpdateDomainRestrictionsResponse(req *http.Request, httpRes *http.Response) (*operations.UpdateLiveStreamDomainRestrictionsResponse, error) {
+	res := &operations.UpdateLiveStreamDomainRestrictionsResponse{
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
+	}
+	switch {
+	case httpRes.StatusCode == 200:
+		if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
+			return nil, unknownContentTypeError(httpRes)
+		}
+		rawBody, err := utils.ConsumeRawBody(httpRes)
+		if err != nil {
+			return nil, err
+		}
+		var out operations.UpdateLiveStreamDomainRestrictionsResponseBody
+		if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+			return nil, err
+		}
+		res.Object = &out
+
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, consumeAPIError(httpRes)
+
+	default:
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = defaultErr
+	}
+	return res, nil
+}
+
+// UpdateUserAgentRestrictions - Update user-agent restrictions for a live playback ID
+// Updates the user-agent access policy of a live stream playback ID. Specify a default policy (`allow`
+// or `deny`) and the user-agent substrings that are explicitly allowed or denied.
+//
+//	#### Example
+//
+//	A broadcaster denies known scraping user-agents on a live stream while allowing all others by default.
+func (s *LivePlayback) UpdateUserAgentRestrictions(ctx context.Context, streamID string, playbackID string, body operations.UpdateLiveStreamUserAgentRestrictionsRequestBody, opts ...operations.Option) (*operations.UpdateLiveStreamUserAgentRestrictionsResponse, error) {
+	request := operations.UpdateLiveStreamUserAgentRestrictionsRequest{StreamID: streamID, PlaybackID: playbackID, Body: body}
+	req, httpRes, err := s.patchRestrictions(ctx, "/live/streams/{streamId}/playback-ids/{playbackId}/user-agents", "update-live-stream-user-agent-restrictions", request, opts)
+	if err != nil {
+		return nil, err
+	}
+	return s.parseUpdateUserAgentRestrictionsResponse(req, httpRes)
+}
+
+// parseUpdateUserAgentRestrictionsResponse handles status-code dispatch for UpdateUserAgentRestrictions.
+func (s *LivePlayback) parseUpdateUserAgentRestrictionsResponse(req *http.Request, httpRes *http.Response) (*operations.UpdateLiveStreamUserAgentRestrictionsResponse, error) {
+	res := &operations.UpdateLiveStreamUserAgentRestrictionsResponse{
+		HTTPMeta: components.HTTPMetadata{Request: req, Response: httpRes},
+	}
+	switch {
+	case httpRes.StatusCode == 200:
+		if !utils.MatchContentType(httpRes.Header.Get(contentType), ApplicationJson) {
+			return nil, unknownContentTypeError(httpRes)
+		}
+		rawBody, err := utils.ConsumeRawBody(httpRes)
+		if err != nil {
+			return nil, err
+		}
+		var out operations.UpdateLiveStreamUserAgentRestrictionsResponseBody
+		if err := utils.UnmarshalJsonFromResponseBody(bytes.NewBuffer(rawBody), &out, ""); err != nil {
+			return nil, err
+		}
+		res.Object = &out
+
+	case httpRes.StatusCode >= 400 && httpRes.StatusCode < 600:
+		return nil, consumeAPIError(httpRes)
+
+	default:
+		defaultErr, err := parseDefaultResponse(httpRes)
+		if err != nil {
+			return nil, err
+		}
+		res.DefaultError = defaultErr
+	}
+	return res, nil
+}
+
+// patchRestrictions sends a JSON PATCH for the two playback-ID restriction operations and returns the
+// request/response pair for the caller's status-code dispatch.
+func (s *LivePlayback) patchRestrictions(ctx context.Context, pathTemplate, operationID string, request interface{}, opts []operations.Option) (*http.Request, *http.Response, error) {
+	o, err := s.applyOptions(opts)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	baseURL := s.resolveBaseURL(o)
+	opURL, err := utils.GenerateURL(ctx, baseURL, pathTemplate, request, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf(errGeneratingURL, err)
+	}
+
+	hookCtx := s.newHookContext(ctx, baseURL, operationID)
+
+	bodyReader, reqContentType, err := utils.SerializeRequestBody(ctx, request, false, false, "Body", "json", `request:"mediaType=application/json"`)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ctx, cancel := s.applyTimeout(ctx, o)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "PATCH", opURL, bodyReader)
+	if err != nil {
+		return nil, nil, fmt.Errorf(errCreatingRequest, err)
+	}
+	req.Header.Set("Accept", ApplicationJson)
+	req.Header.Set(UserAgent, s.sdkConfiguration.UserAgent)
+	if reqContentType != "" {
+		req.Header.Set(contentType, reqContentType)
+	}
+	if err := utils.PopulateSecurity(ctx, req, s.sdkConfiguration.Security); err != nil {
+		return nil, nil, err
+	}
+	for k, v := range o.SetHeaders {
+		req.Header.Set(k, v)
+	}
+
+	httpRes, err := s.doRequest(ctx, req, hookCtx, s.resolveRetryConfig(o))
+	if err != nil {
+		return nil, nil, err
+	}
+	// Buffer the body now: the request context is cancelled when this helper returns.
+	if _, err := utils.ConsumeRawBody(httpRes); err != nil {
+		return nil, nil, err
+	}
+	return req, httpRes, nil
+}

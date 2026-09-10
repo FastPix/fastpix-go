@@ -13,6 +13,8 @@ import (
 type PlaybackIDRequest struct {
 	// Basic access policy for media content
 	AccessPolicy *BasicAccessPolicy `default:"public" json:"accessPolicy"`
+	// Controls access based on domains and user agents.
+	AccessRestrictions *AccessRestrictions `json:"accessRestrictions,omitzero"`
 }
 
 func (p PlaybackIDRequest) MarshalJSON() ([]byte, error) {
@@ -31,4 +33,11 @@ func (p *PlaybackIDRequest) GetAccessPolicy() *BasicAccessPolicy {
 		return nil
 	}
 	return p.AccessPolicy
+}
+
+func (p *PlaybackIDRequest) GetAccessRestrictions() *AccessRestrictions {
+	if p == nil {
+		return nil
+	}
+	return p.AccessRestrictions
 }

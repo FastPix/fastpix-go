@@ -59,6 +59,9 @@ type InputMediaSettings struct {
 	// Enables DVR (Digital Video Recorder) functionality, allowing viewers to pause, rewind, and resume live playback.
 	//
 	EnableDvrMode *bool `json:"enableDvrMode,omitzero"`
+	// Controls whether the livestream is recorded to a VOD asset (Live-to-VOD). When true (default), FastPix records and stores the livestream for on-demand viewing. When false, the livestream is not recorded.
+	//
+	EnableRecording *bool `default:"true" json:"enableRecording"`
 }
 
 func (i InputMediaSettings) MarshalJSON() ([]byte, error) {
@@ -105,6 +108,13 @@ func (i *InputMediaSettings) GetEnableDvrMode() *bool {
 		return nil
 	}
 	return i.EnableDvrMode
+}
+
+func (i *InputMediaSettings) GetEnableRecording() *bool {
+	if i == nil {
+		return nil
+	}
+	return i.EnableRecording
 }
 
 type CreateLiveStreamRequest struct {

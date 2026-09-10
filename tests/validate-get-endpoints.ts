@@ -348,14 +348,9 @@ function resolveSpecPath(): string {
   // then the known spec filenames at the repo root (parent of tests/).
   const candidates = [
     process.env.FASTPIX_OPENAPI_SPEC,
-    // old.yaml is the vendored spec for what this SDK actually implements:
-    // fastpix-openai.yaml minus the /ai/ endpoints the SDK does not expose, plus
-    // VideoTrackForGetAll.frameRate (which the live API still returns). It is the
-    // default; set FASTPIX_OPENAPI_SPEC to validate against upstream instead.
-    join(__dirname, "../old.yaml"),
-    join(__dirname, "../../old.yaml"),
-    join(__dirname, "../fastpix-openai.yaml"),
-    join(__dirname, "../../fastpix-openai.yaml"),
+    // openapi.yaml is the untracked snapshot of the upstream spec at the repo root.
+    join(__dirname, "../openapi.yaml"),
+    join(__dirname, "../../openapi.yaml"),
   ].filter((p): p is string => Boolean(p));
   for (const p of candidates) {
     if (existsSync(p)) return p;

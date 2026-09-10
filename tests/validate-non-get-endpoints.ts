@@ -291,12 +291,9 @@ async function waitForTrackReady(
 function resolveSpecPath(): string {
   const candidates = [
     process.env.FASTPIX_OPENAPI_SPEC,
-    // Same ordering as the GET validator: old.yaml is the vendored spec for what
-    // this SDK actually implements, and is the default.
-    join(__dirname, "../old.yaml"),
-    join(__dirname, "../../old.yaml"),
-    join(__dirname, "../fastpix-openai.yaml"),
-    join(__dirname, "../../fastpix-openai.yaml"),
+    // openapi.yaml is the untracked snapshot of the upstream spec at the repo root.
+    join(__dirname, "../openapi.yaml"),
+    join(__dirname, "../../openapi.yaml"),
   ].filter((p): p is string => Boolean(p));
   for (const p of candidates) if (existsSync(p)) return p;
   throw new Error(`OpenAPI spec not found. Tried: ${candidates.join(", ")}`);
@@ -438,6 +435,8 @@ const STEPS: Step[] = [
   { operationId: "update-media-track", phase: "UPDATE", needs: ["mediaId", "trackId"], request: (c) => ({ mediaId: c.mediaId, trackId: c.trackId }) },
   { operationId: "update-domain-restrictions", phase: "UPDATE", needs: ["mediaId", "mediaPlaybackId"], retryOn: "not ready for updates", request: (c) => ({ mediaId: c.mediaId, playbackId: c.mediaPlaybackId }) },
   { operationId: "update-user-agent-restrictions", phase: "UPDATE", needs: ["mediaId", "mediaPlaybackId"], retryOn: "not ready for updates", request: (c) => ({ mediaId: c.mediaId, playbackId: c.mediaPlaybackId }) },
+  { operationId: "update-live-stream-domain-restrictions", phase: "UPDATE", needs: ["streamId", "streamPlaybackId"], request: (c) => ({ streamId: c.streamId, playbackId: c.streamPlaybackId }) },
+  { operationId: "update-live-stream-user-agent-restrictions", phase: "UPDATE", needs: ["streamId", "streamPlaybackId"], request: (c) => ({ streamId: c.streamId, playbackId: c.streamPlaybackId }) },
   { operationId: "update-a-playlist", phase: "UPDATE", needs: ["playlistId"], request: (c) => ({ playlistId: c.playlistId }) },
   { operationId: "add-media-to-playlist", phase: "UPDATE", needs: ["playlistId", "mediaId"], request: (c) => ({ playlistId: c.playlistId, mediaId: c.mediaId }) },
   { operationId: "change-media-order-in-playlist", phase: "UPDATE", needs: ["playlistId", "mediaId"], request: (c) => ({ playlistId: c.playlistId, mediaId: c.mediaId }) },

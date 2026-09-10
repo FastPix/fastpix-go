@@ -27,14 +27,22 @@ func main() {
 	// 1. Create New Live Stream
 	fmt.Println("=== Creating New Live Stream ===")
 	reconnectWindow := int64(60)
+	enableRecording := false // skip Live-to-VOD recording for this stream
 	createStreamRequest := components.CreateLiveStreamRequest{
 		PlaybackSettings: components.PlaybackSettings{
 			AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
+			AccessRestrictions: &components.AccessRestrictions{
+				Domains: &components.DomainRestrictions{
+					DefaultPolicy: components.PolicyActionDeny.ToPointer(),
+					Allow:         []string{"example.com"},
+				},
+			},
 		},
 		InputMediaSettings: components.InputMediaSettings{
 			MaxResolution:   components.CreateLiveStreamRequestMaxResolutionOneThousandAndEightyp.ToPointer(),
 			ReconnectWindow: &reconnectWindow,
 			MediaPolicy:     components.BasicAccessPolicyPublic.ToPointer(),
+			EnableRecording: &enableRecording,
 		},
 	}
 	createResponse, err := client.StartLiveStream.Create(ctx, createStreamRequest)
@@ -176,6 +184,15 @@ func managePlayback(ctx context.Context, client *fastpixgo.Fastpixgo, streamID s
 
 	playbackRequest := components.PlaybackIDRequest{
 		AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
+		AccessRestrictions: &components.AccessRestrictions{
+			Domains: &components.DomainRestrictions{
+				DefaultPolicy: components.PolicyActionDeny.ToPointer(),
+				Allow:         []string{"example.com"},
+			},
+			UserAgents: &components.UserAgentRestrictions{
+				DefaultPolicy: components.PolicyActionAllow.ToPointer(),
+			},
+		},
 	}
 
 	playbackResponse, err := client.LivePlayback.Create(ctx, streamID, playbackRequest)
@@ -204,9 +221,37 @@ func managePlaybackDetails(ctx context.Context, client *fastpixgo.Fastpixgo, str
 		playbackDetailsResponse.PlaybackIDSuccessResponse.Data != nil {
 		fmt.Println("Playback ID details retrieved successfully!")
 		fmt.Printf("Access Policy: %s\n", getStringValue(playbackDetailsResponse.PlaybackIDSuccessResponse.Data.AccessPolicy))
+		if ar := playbackDetailsResponse.PlaybackIDSuccessResponse.Data.AccessRestrictions; ar != nil && ar.Domains != nil {
+			fmt.Printf("Domain policy: %v (allow %v)\n", *ar.Domains.DefaultPolicy, ar.Domains.Allow)
+		}
 	}
 
+	updatePlaybackRestrictions(ctx, client, streamID, playbackID)
 	deletePlayback(ctx, client, streamID, playbackID)
+}
+
+func updatePlaybackRestrictions(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, playbackID string) {
+	fmt.Printf("\n=== Updating Domain Restrictions for Playback ID: %s ===\n", playbackID)
+
+	domainResponse, err := client.LivePlayback.UpdateDomainRestrictions(ctx, streamID, playbackID, operations.UpdateLiveStreamDomainRestrictionsRequestBody{
+		DefaultPolicy: operations.UpdateLiveStreamDomainRestrictionsDefaultPolicyDeny.ToPointer(),
+		Allow:         []string{"example.com", "*.example.com"},
+	})
+	if err != nil {
+		log.Printf("Error updating domain restrictions: %v", err)
+	} else if domainResponse.Object != nil && domainResponse.Object.Data != nil {
+		fmt.Printf("Domain restrictions updated: allow %v\n", domainResponse.Object.Data.Allow)
+	}
+
+	fmt.Printf("\n=== Updating User-Agent Restrictions for Playback ID: %s ===\n", playbackID)
+	uaResponse, err := client.LivePlayback.UpdateUserAgentRestrictions(ctx, streamID, playbackID, operations.UpdateLiveStreamUserAgentRestrictionsRequestBody{
+		Deny: []string{"PostmanRuntime"},
+	})
+	if err != nil {
+		log.Printf("Error updating user-agent restrictions: %v", err)
+	} else if uaResponse.Object != nil && uaResponse.Object.Data != nil {
+		fmt.Printf("User-agent restrictions updated: deny %v\n", uaResponse.Object.Data.Deny)
+	}
 }
 
 func deletePlayback(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, playbackID string) {
