@@ -1,5 +1,3 @@
-//go:build ignore
-
 package main
 
 import (
@@ -62,7 +60,7 @@ func listSigningKeys(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Listing All Signing Keys ===")
 
 	limit := int64(10)
-	offset := int64(0)
+	offset := int64(1)
 
 	keysResponse, err := client.SigningKeys.List(ctx, &limit, &offset)
 	if err != nil {
@@ -85,7 +83,7 @@ func listSigningKeys(ctx context.Context, client *fastpixgo.Fastpixgo) {
 
 func manageFirstSigningKey(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	limit := int64(10)
-	offset := int64(0)
+	offset := int64(1)
 
 	keysResponse, err := client.SigningKeys.List(ctx, &limit, &offset)
 	if err != nil {
@@ -286,7 +284,7 @@ func paginationExample(ctx context.Context, client *fastpixgo.Fastpixgo) {
 	fmt.Println("\n=== Pagination Example ===")
 
 	pageSize := int64(5)
-	pageOffset := int64(0)
+	pageOffset := int64(1)
 
 	fmt.Printf("Fetching signing keys with pagination (limit: %d, offset: %d)\n", pageSize, pageOffset)
 
@@ -300,7 +298,7 @@ func paginationExample(ctx context.Context, client *fastpixgo.Fastpixgo) {
 		fmt.Printf("Page 1: Found %d keys\n", len(paginatedResponse.GetAllSigningKeysResponse.Data))
 	}
 
-	pageOffset = int64(5)
+	pageOffset = int64(2)
 	fmt.Printf("Fetching next page (limit: %d, offset: %d)\n", pageSize, pageOffset)
 
 	nextPageResponse, err := client.SigningKeys.List(ctx, &pageSize, &pageOffset)

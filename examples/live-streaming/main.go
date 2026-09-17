@@ -1,5 +1,3 @@
-//go:build ignore
-
 package main
 
 import (
@@ -29,14 +27,22 @@ func main() {
 	// 1. Create New Live Stream
 	fmt.Println("=== Creating New Live Stream ===")
 	reconnectWindow := int64(60)
+	enableRecording := false // skip Live-to-VOD recording for this stream
 	createStreamRequest := components.CreateLiveStreamRequest{
 		PlaybackSettings: components.PlaybackSettings{
 			AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
+			AccessRestrictions: &components.AccessRestrictions{
+				Domains: &components.DomainRestrictions{
+					DefaultPolicy: components.PolicyActionDeny.ToPointer(),
+					Allow:         []string{"example.com"},
+				},
+			},
 		},
 		InputMediaSettings: components.InputMediaSettings{
 			MaxResolution:   components.CreateLiveStreamRequestMaxResolutionOneThousandAndEightyp.ToPointer(),
 			ReconnectWindow: &reconnectWindow,
 			MediaPolicy:     components.BasicAccessPolicyPublic.ToPointer(),
+			EnableRecording: &enableRecording,
 		},
 	}
 	createResponse, err := client.StartLiveStream.Create(ctx, createStreamRequest)
@@ -49,7 +55,7 @@ func main() {
 	// 2. List All Live Streams
 	fmt.Println("\n=== Listing All Live Streams ===")
 	limit := int64(10)
-	offset := int64(0)
+	offset := int64(1)
 	orderBy := operations.OrderByDesc
 
 	streamsResponse, err := client.ManageLiveStream.List(ctx, &limit, &offset, &orderBy)
@@ -92,6 +98,8 @@ func printStreamList(streams []components.GetCreateLiveStreamResponseDTO) {
 func manageStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	getStreamDetails(ctx, client, streamID)
 	updateStream(ctx, client, streamID)
+	// New streams start enabled, so disable first, then re-enable.
+	disableStream(ctx, client, streamID)
 	enableStream(ctx, client, streamID)
 
 	playbackID := managePlayback(ctx, client, streamID)
@@ -104,7 +112,6 @@ func manageStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID str
 		manageSimulcastDetails(ctx, client, streamID, simulcastID)
 	}
 
-	completeStream(ctx, client, streamID)
 	deleteStream(ctx, client, streamID)
 }
 
@@ -150,6 +157,17 @@ func updateStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID str
 	}
 }
 
+func disableStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
+	fmt.Printf("\n=== Disabling Live Stream: %s ===\n", streamID)
+
+	_, err := client.LiveStreams.Disable(ctx, streamID)
+	if err != nil {
+		log.Printf("Error disabling stream: %v", err)
+	} else {
+		fmt.Println("Live stream disabled successfully!")
+	}
+}
+
 func enableStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
 	fmt.Printf("\n=== Enabling Live Stream: %s ===\n", streamID)
 
@@ -166,6 +184,15 @@ func managePlayback(ctx context.Context, client *fastpixgo.Fastpixgo, streamID s
 
 	playbackRequest := components.PlaybackIDRequest{
 		AccessPolicy: components.BasicAccessPolicyPublic.ToPointer(),
+		AccessRestrictions: &components.AccessRestrictions{
+			Domains: &components.DomainRestrictions{
+				DefaultPolicy: components.PolicyActionDeny.ToPointer(),
+				Allow:         []string{"example.com"},
+			},
+			UserAgents: &components.UserAgentRestrictions{
+				DefaultPolicy: components.PolicyActionAllow.ToPointer(),
+			},
+		},
 	}
 
 	playbackResponse, err := client.LivePlayback.Create(ctx, streamID, playbackRequest)
@@ -194,9 +221,37 @@ func managePlaybackDetails(ctx context.Context, client *fastpixgo.Fastpixgo, str
 		playbackDetailsResponse.PlaybackIDSuccessResponse.Data != nil {
 		fmt.Println("Playback ID details retrieved successfully!")
 		fmt.Printf("Access Policy: %s\n", getStringValue(playbackDetailsResponse.PlaybackIDSuccessResponse.Data.AccessPolicy))
+		if ar := playbackDetailsResponse.PlaybackIDSuccessResponse.Data.AccessRestrictions; ar != nil && ar.Domains != nil {
+			fmt.Printf("Domain policy: %v (allow %v)\n", *ar.Domains.DefaultPolicy, ar.Domains.Allow)
+		}
 	}
 
+	updatePlaybackRestrictions(ctx, client, streamID, playbackID)
 	deletePlayback(ctx, client, streamID, playbackID)
+}
+
+func updatePlaybackRestrictions(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, playbackID string) {
+	fmt.Printf("\n=== Updating Domain Restrictions for Playback ID: %s ===\n", playbackID)
+
+	domainResponse, err := client.LivePlayback.UpdateDomainRestrictions(ctx, streamID, playbackID, operations.UpdateLiveStreamDomainRestrictionsRequestBody{
+		DefaultPolicy: operations.UpdateLiveStreamDomainRestrictionsDefaultPolicyDeny.ToPointer(),
+		Allow:         []string{"example.com", "*.example.com"},
+	})
+	if err != nil {
+		log.Printf("Error updating domain restrictions: %v", err)
+	} else if domainResponse.Object != nil && domainResponse.Object.Data != nil {
+		fmt.Printf("Domain restrictions updated: allow %v\n", domainResponse.Object.Data.Allow)
+	}
+
+	fmt.Printf("\n=== Updating User-Agent Restrictions for Playback ID: %s ===\n", playbackID)
+	uaResponse, err := client.LivePlayback.UpdateUserAgentRestrictions(ctx, streamID, playbackID, operations.UpdateLiveStreamUserAgentRestrictionsRequestBody{
+		Deny: []string{"PostmanRuntime"},
+	})
+	if err != nil {
+		log.Printf("Error updating user-agent restrictions: %v", err)
+	} else if uaResponse.Object != nil && uaResponse.Object.Data != nil {
+		fmt.Printf("User-agent restrictions updated: deny %v\n", uaResponse.Object.Data.Deny)
+	}
 }
 
 func deletePlayback(ctx context.Context, client *fastpixgo.Fastpixgo, streamID, playbackID string) {
@@ -214,8 +269,8 @@ func manageSimulcast(ctx context.Context, client *fastpixgo.Fastpixgo, streamID 
 	fmt.Printf("\n=== Creating Simulcast for Stream: %s ===\n", streamID)
 
 	simulcastRequest := components.SimulcastRequest{
-		URL:       fastpixgo.Pointer("rtmp://example.contribute.live-video.net/app/"),
-		StreamKey: fastpixgo.Pointer("live_example_streamkey"),
+		URL:       fastpixgo.Pointer("rtmps://a.rtmp.youtube.com/live2"),
+		StreamKey: fastpixgo.Pointer("your-destination-stream-key"),
 	}
 
 	simulcastResponse, err := client.SimulcastStreams.Create(ctx, streamID, simulcastRequest)
@@ -271,17 +326,6 @@ func deleteSimulcast(ctx context.Context, client *fastpixgo.Fastpixgo, streamID,
 		log.Printf("Error deleting simulcast: %v", err)
 	} else {
 		fmt.Println("Simulcast deleted successfully!")
-	}
-}
-
-func completeStream(ctx context.Context, client *fastpixgo.Fastpixgo, streamID string) {
-	fmt.Printf("\n=== Completing Live Stream: %s ===\n", streamID)
-
-	_, err := client.ManageLiveStream.Complete(ctx, streamID)
-	if err != nil {
-		log.Printf("Error completing stream: %v", err)
-	} else {
-		fmt.Println("Live stream completed successfully!")
 	}
 }
 

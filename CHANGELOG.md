@@ -1,6 +1,27 @@
 # Changelog
 
 ---
+## [1.2.0]
+
+### Breaking
+- Media `duration` is now a `*float64` (seconds) instead of an `"HH:MM:SS"` string, matching the updated API. Affects `Videos.Get`, `Videos.Update`, `Videos.UpdateSourceAccess`, `Videos.UpdateMp4Support`, `Videos.ListLiveClips`, `ManageVideos.List`, `ManageVideos.GetMediaClips`, `Playlist.Get`, `Playlist.AddMedia`, `Playlist.ChangeMediaOrder`, `Playlists.Create`, `Playlists.List`, `Playlists.Update`.
+
+### Added
+- `EnableRecording` on live stream creation (`InputMediaSettings`, defaults to `true`).
+- `AccessRestrictions` (domain and user-agent allow/deny policies) on live playback ID create/get, live stream `PlaybackSettings`, and the `playbackIds[]` items of live stream responses.
+- `LivePlayback.UpdateDomainRestrictions` for `PATCH /live/streams/{streamId}/playback-ids/{playbackId}/domains`.
+- `LivePlayback.UpdateUserAgentRestrictions` for `PATCH /live/streams/{streamId}/playback-ids/{playbackId}/user-agents`.
+- Offline tests: model contracts, mocked live playback restriction requests, and a scan asserting every resource method returns the response type it deserializes.
+
+### Changed
+- SDK version `1.1.6` → `1.2.0`.
+- README links now point at `main`; `tests/.env.example` added; validators read the spec from an untracked `openapi.yaml` at the repo root.
+
+## [1.1.6] 
+
+### Changed
+- Licence changed from MIT to Apache-2.0.
+  
 ## [1.1.5]
 
 Regenerated against the updated OpenAPI spec. Validators resolve `old.yaml` —

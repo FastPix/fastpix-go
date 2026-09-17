@@ -64,8 +64,8 @@ func (m *MediaClipResponsePlaybackID) GetAccessPolicy() *string {
 type MediaClipResponseData struct {
 	// The unique identifier assigned to the media by FastPix.
 	ID *string `json:"id,omitzero"`
-	// Duration of the media in HH:MM:SS format.
-	Duration *string `json:"duration,omitzero"`
+	// Duration of the media in seconds.
+	Duration *float64 `json:"duration,omitzero"`
 	// The current processing status of the media.
 	Status *MediaClipResponseStatus `json:"status,omitzero"`
 	// A video thumbnail that acts as a preview image for the video.
@@ -93,7 +93,7 @@ func (m *MediaClipResponseData) GetID() *string {
 	return m.ID
 }
 
-func (m *MediaClipResponseData) GetDuration() *string {
+func (m *MediaClipResponseData) GetDuration() *float64 {
 	if m == nil {
 		return nil
 	}

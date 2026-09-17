@@ -1,4 +1,4 @@
-# FastPix Go SDK Samples
+# FastPix Go SDK Examples
 
 This directory contains comprehensive, production-ready examples demonstrating how to use the FastPix Go SDK for various video and live streaming operations.
 
@@ -13,41 +13,51 @@ This directory contains comprehensive, production-ready examples demonstrating h
    export FASTPIX_PASSWORD="your-secret-key"
    ```
 
-### Running Samples
+### Running Examples
 
-#### Individual Samples
+#### Individual Examples
 ```bash
 # Basic usage and connectivity
-go run basic_usage.go
+go run ./basic-usage
 
 # Media management operations
-go run media_management.go
+go run ./media-management
 
 # Live streaming operations
-go run live_streaming.go
+go run ./live-streaming
 
 # Playback and playlist management
-go run playback_playlist.go
+go run ./playback-playlist
 
 # AI-powered video features
-go run ai_features.go
+go run ./ai-features
 
 # Analytics and metrics
-go run analytics_metrics.go
+go run ./analytics-metrics
 
 # Security and signing keys
-go run security_signing_keys.go
+go run ./security-signing-keys
 
 # Error handling patterns
-go run error_handling.go
+go run ./error-handling
+
+# Create a signed upload URL (then PUT your file to it)
+go run ./create-upload
+
+# Verify a FastPix webhook signature (offline; no credentials needed)
+go run ./verify-webhook
 ```
+
+> Each example is its own package under `examples/`, so you run it by folder
+> path — e.g. `go run ./basic-usage`. `verify-webhook` runs offline and needs no
+> credentials.
 
 #### Using Makefile
 ```bash
 # Show all available targets
 make help
 
-# Run specific sample
+# Run specific example
 make basic
 make media
 make live
@@ -56,26 +66,30 @@ make ai
 make analytics
 make security
 make errors
+make create-upload
+make verify-webhook
 
-# Run all samples
+# Run all examples
 make all
 
 # Clean up generated files
 make clean
 ```
 
-## Sample Overview
+## Example Overview
 
-| Sample | Description | Key Features |
+| Example | Description | Key Features |
 |--------|-------------|--------------|
-| `basic_usage.go` | SDK initialization and basic connectivity | Authentication, basic API calls |
-| `media_management.go` | Complete media lifecycle management | Upload, list, update, delete, tracks |
-| `live_streaming.go` | Live streaming operations | Create streams, simulcast, playback |
-| `playback_playlist.go` | Playback and playlist management | Playlists, DRM, playback IDs |
-| `ai_features.go` | AI-powered video features | Summaries, chapters, moderation |
-| `analytics_metrics.go` | Analytics and performance metrics | Views, metrics, dimensions |
-| `security_signing_keys.go` | Security and cryptographic keys | Key management, rotation |
-| `error_handling.go` | Comprehensive error handling | Retry, fallback, graceful degradation |
+| `basic-usage/` | SDK initialization and basic connectivity | Authentication, basic API calls |
+| `media-management/` | Complete media lifecycle management | Upload, list, update, delete, tracks |
+| `live-streaming/` | Live streaming operations | Create streams, simulcast, playback |
+| `playback-playlist/` | Playback and playlist management | Playlists, DRM, playback IDs |
+| `ai-features/` | AI-powered video features | Summaries, chapters, moderation |
+| `analytics-metrics/` | Analytics and performance metrics | Views, metrics, dimensions |
+| `security-signing-keys/` | Security and cryptographic keys | Key management, rotation |
+| `error-handling/` | Comprehensive error handling | Retry, fallback, graceful degradation |
+| `create-upload/` | Create a signed direct-upload URL | Direct upload, upload lifecycle |
+| `verify-webhook/` | Verify a FastPix webhook signature | HMAC-SHA256, constant-time compare |
 
 ## Key Features Demonstrated
 
@@ -117,11 +131,11 @@ make clean
 
 ## Production-Ready Features
 
-All samples include:
+All examples include:
 - ✅ **Robust Error Handling**: Comprehensive error checking and logging
 - ✅ **Nil Pointer Safety**: All pointer accesses are protected
 - ✅ **Response Validation**: Proper validation of API responses
-- ✅ **Consistent Patterns**: Uniform approach across all samples
+- ✅ **Consistent Patterns**: Uniform approach across all examples
 - ✅ **Clear Documentation**: Well-commented and documented code
 - ✅ **Real-world Scenarios**: Practical examples developers can use
 
@@ -210,4 +224,4 @@ client := fastpixgo.New(
 
 ## License
 
-These samples are provided under the same license as the FastPix Go SDK.
+These examples are provided under the same license as the FastPix Go SDK.
